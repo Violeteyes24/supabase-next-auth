@@ -3,10 +3,10 @@
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import RegisterLinks from '../components/register_links'; // function + jsx file
+import RegisterLinks from "@/app/components/register_links";      
 
+export default function SecretaryRegister() {
 
-export default function LoginPage() {
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
     const router = useRouter()
@@ -64,7 +64,7 @@ export default function LoginPage() {
         return <h1>loading..</h1>
     }
 
-    if (user) { // need to learn how to make this a component, because I will replace this with different homepages for counselor and secretary
+    if (user) {
         return (
             <div className="h-screen flex flex-col justify-center items-center bg-gray-100">
                 <div className="bg-white dark:bg-gray-900 p-8 rounded-lg shadow-md w-96 text-center">
@@ -81,12 +81,11 @@ export default function LoginPage() {
             </div>
         )
     }
-
     return (
-            <main className="h-screen flex items-center justify-center bg-gray-800 p-6">
-                <div className="bg-gray-900 p-8 rounded-lg shadow-md w-96">
+        <main className="h-screen flex items-center justify-center bg-gray-800 p-6">
+            <div className="bg-gray-900 p-8 rounded-lg shadow-md w-96">
                 <h1 className="mb-4 text-3xl font-extrabold text-gray-900 dark:text-white md:text-3xl lg:text-3xl py-5"><span className="text-transparent bg-clip-text bg-gradient-to-r to-emerald-600 from-sky-400">Mental </span><mark className="px-2 text-white bg-emerald-600 rounded dark:bg-emerald-300">Help</mark></h1>
-                    
+
                 <input
                     type="email"
                     name="email"
@@ -107,30 +106,17 @@ export default function LoginPage() {
                     onClick={handleSignUp}
                     className="w-full mb-2 p-3 rounded-md bg-blue-600 text-white hover:bg-blue-700 focus:outline-none"
                 >
-                    Sign Up 
-                </button> 
+                    Sign Up
+                </button>
                 <button
                     onClick={handleSignIn}
-                    className="w-full mb-5 p-3 rounded-md bg-gray-700 text-white hover:bg-gray-600 focus:outline-none"
+                    className="w-full p-3 rounded-md bg-gray-700 text-white hover:bg-gray-600 focus:outline-none"
                 >
                     Sign In
                 </button>
                 <h3 className="items-center justify-center mb-4">Sign Up as a:</h3>
                 <RegisterLinks />
-                </div>
-            </main> 
-            )
-
+            </div>
+        </main>
+    )
 }
-
-/*
-
-TO DO: 
-
-1. Set up Database on Supabase 
-2. Different form fields.
-3. HNU Email Validation.
-4. OTP for every log-in attempt.
-5. Home Page / Admin Dashboard template
-
-*/

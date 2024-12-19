@@ -34,3 +34,20 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## GitHub Work Flow
+
+- git add .                         # Stage all changes
+- git commit -m "First attempt, Register, Sign In and Middleware"  # Commit with a message
+- git remote add origin https://github.com/Violeteyes24/supabase-next-auth.git  # Add the remote repository
+- git push -u origin main           # Push changes to the main branch
+
+``` 
+git push -u origin main --force
+```
+
+⚠️ Warning: Force pushing will overwrite the remote repository's current state, potentially deleting others' work. Use it with caution.
+
+## Tutorial Hell Links :>
+
+- Supabase-next-auth: https://www.youtube.com/watch?v=dhXjHGklaZc&t=2s
