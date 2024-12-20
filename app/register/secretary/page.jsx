@@ -3,7 +3,8 @@
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import RegisterLinks from "@/app/components/register_links";      
+import Link from "next/link";  
+import SignUpButton from "@/app/components/sign_up_button";  
 
 export default function SecretaryRegister() {
 
@@ -12,6 +13,15 @@ export default function SecretaryRegister() {
     const router = useRouter()
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [name, setName] = useState('')
+    const [username, setUserName] = useState('')
+    const [address, setAddress] = useState('')
+    const [contact_number, setContactNumber] = useState('')
+    const [birthday, setBirthday] = useState('')
+    const [gender, setGender] = useState('')
+    const [department_assigned, setDepartmentAssigned] = useState('')
+    const [short_biography, setShortBiography] = useState('')
+    const [imagePreview, setImagePreview] = useState(null);
 
 
     const supabase = createClientComponentClient();
@@ -58,6 +68,17 @@ export default function SecretaryRegister() {
         setUser(null)
     }
 
+    const handleImageChange = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = () => {
+                setImagePreview(reader.result);
+            };
+            reader.readAsDataURL(file); // Convert the file to a base64 string
+        }
+    };
+
     console.log({ loading, user })
 
     if (loading) {
@@ -82,10 +103,10 @@ export default function SecretaryRegister() {
         )
     }
     return (
-        <main className="h-screen flex items-center justify-center bg-gray-800 p-6">
-            <div className="bg-gray-900 p-8 rounded-lg shadow-md w-96">
+        <main className="min-h-screen flex items-center justify-center bg-gray-800 p-6 overflow-y-auto">
+            <div className="bg-gray-900 p-8 rounded-lg shadow-md w-96 overflow-y-auto">
                 <h1 className="mb-4 text-3xl font-extrabold text-gray-900 dark:text-white md:text-3xl lg:text-3xl py-5"><span className="text-transparent bg-clip-text bg-gradient-to-r to-emerald-600 from-sky-400">Mental </span><mark className="px-2 text-white bg-emerald-600 rounded dark:bg-emerald-300">Help</mark></h1>
-
+                <h3 className="items-center justify-center mb-4">Secretary's form</h3>
                 <input
                     type="email"
                     name="email"
@@ -102,20 +123,87 @@ export default function SecretaryRegister() {
                     placeholder="Password"
                     className="mb-4 w-full p-3 rounded-md border border-gray-700 bg-gray-800 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
                 />
-                <button
-                    onClick={handleSignUp}
-                    className="w-full mb-2 p-3 rounded-md bg-blue-600 text-white hover:bg-blue-700 focus:outline-none"
-                >
-                    Sign Up
-                </button>
-                <button
-                    onClick={handleSignIn}
-                    className="w-full p-3 rounded-md bg-gray-700 text-white hover:bg-gray-600 focus:outline-none"
-                >
-                    Sign In
-                </button>
-                <h3 className="items-center justify-center mb-4">Sign Up as a:</h3>
-                <RegisterLinks />
+                <input
+                    type="name"
+                    name="name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Name"
+                    className="mb-4 w-full p-3 rounded-md border border-gray-700 bg-gray-800 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+                />
+                <input
+                    type="username"
+                    name="username"
+                    value={username}
+                    onChange={(e) => setUserName(e.target.value)}
+                    placeholder="Username"
+                    className="mb-4 w-full p-3 rounded-md border border-gray-700 bg-gray-800 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+                />
+                <input
+                    type="address"
+                    name="address"
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                    placeholder="Address"
+                    className="mb-4 w-full p-3 rounded-md border border-gray-700 bg-gray-800 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+                />
+                <input
+                    type="contact_number"
+                    name="contact_number"
+                    value={contact_number}
+                    onChange={(e) => setContactNumber(e.target.value)}
+                    placeholder="ContactNumber"
+                    className="mb-4 w-full p-3 rounded-md border border-gray-700 bg-gray-800 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+                />
+                <input
+                    type="birthday"
+                    name="birthday"
+                    value={birthday}
+                    onChange={(e) => setBirthday(e.target.value)}
+                    placeholder="Birthday"
+                    className="mb-4 w-full p-3 rounded-md border border-gray-700 bg-gray-800 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+                />
+                <input
+                    type="gender"
+                    name="gender"
+                    value={gender}
+                    onChange={(e) => setGender(e.target.value)}
+                    placeholder="Gender"
+                    className="mb-4 w-full p-3 rounded-md border border-gray-700 bg-gray-800 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+                />
+                <input
+                    type="department_assigned"
+                    name="department_assigned"
+                    value={department_assigned}
+                    onChange={(e) => setDepartmentAssigned(e.target.value)}
+                    placeholder="Department Assigned"
+                    className="mb-4 w-full p-3 rounded-md border border-gray-700 bg-gray-800 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+                />
+                <input
+                    type="short_biography"
+                    name="short_biography"
+                    value={short_biography}
+                    onChange={(e) => setShortBiography(e.target.value)}
+                    placeholder="Short Biography"
+                    className="mb-4 w-full p-3 rounded-md border border-gray-700 bg-gray-800 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+                />
+                <label htmlFor="imageInput" className="block mb-2 text-sm font-medium text-gray-700">
+                    Upload an Image for Proof
+                </label>
+                <input
+                    type="file"
+                    id="imageInput"
+                    name="image"
+                    accept="image/*"
+                    className="mb-4 w-full p-3 rounded-md border border-gray-700 bg-gray-800 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+                    onChange={handleImageChange}
+                />
+                <SignUpButton handleSignUp={handleSignUp} />
+                <div className="flex items-center justify-center">
+                    <Link href={'/login'} className="text-white-500 hover:underline">
+                        Click here to go login.
+                    </Link>
+                </div>
             </div>
         </main>
     )
