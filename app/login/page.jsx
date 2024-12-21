@@ -28,7 +28,7 @@ export default function LoginPage() {
         getUser();
     }, [])
 
-    const handleSignUp = async () => {
+    const handleSignUp = async () => { // not used 
         const res = await supabase.auth.signUp({
             email,
             password,
@@ -170,12 +170,11 @@ export default function LoginPage() {
 
 TO DO: 
 
-
-2. Fetch data from forms
-3. OTP for every log-in attempt.
-4. Home Page / Admin Dashboard template
-5. Connect Supabase to React Native.
-6. Update Log in functionality of React
+1. Fetch data from forms
+2. OTP for every log-in attempt.
+3. Home Page / Admin Dashboard template
+4. Connect Supabase to React Native.
+5. Update Log in functionality of React
 
 What's happening?
 

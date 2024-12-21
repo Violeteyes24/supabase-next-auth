@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import SignUpButton from "@/app/components/sign_up_button";
-// email and password error message
+
 export default function CounselorRegister() {
    
         const [email, setEmail] = useState('')
@@ -38,28 +38,40 @@ export default function CounselorRegister() {
             getUser();
         }, [])
 
+        const validateEmail = (email) => {
+            const regex = /^[a-zA-Z0-9._%+-]+@hnu\.edu\.ph$/;
+            return regex.test(email);
+        };
 
         const handleSignUp = async () => {
-            const { data, error } = await supabase.auth.signUp({
-                email,
-                password,
-                options: {
-                    emailRedirectTo: `${location.origin}/auth/callback`
-                }
-            });
+            if (!validateEmail(email)) {
+                setError('Please enter a valid HNU email address.');
+                return;
+            }
 
-            if (error) {
-                // Handle known errors
-                setError('An error occurred during sign-up. Please try again.');
-            } else if (data.user && data.user.identities.length === 0) {
-                // User exists but has no associated identity, indicating the email is already taken
-                setError('Email address is already in use.');
-            } else {
-                // Sign-up successful
-                setUser(data.user);
-                router.refresh();
-                setEmail('');
-                setPassword('');
+            setError('');
+
+            try {
+                const { data, error } = await supabase.auth.signUp(
+                    {
+                        email,
+                        password,
+                    },
+                    {
+                        emailRedirectTo: `${location.origin}/auth/callback`,
+                    }
+                );
+
+                if (error) {
+                    setError(error.message);
+                    return;
+                }
+
+                // Handle successful sign-up
+                // For example, redirect to a confirmation page or show a success message
+                router.push('/auth/confirmation');
+            } catch (err) {
+                setError('An error occurred during sign-up.');
             }
         };
 
@@ -115,6 +127,7 @@ export default function CounselorRegister() {
                 </div>
             )
         }
+
     return (
         <main className="min-h-screen flex items-center justify-center bg-gray-800 p-6 overflow-y-auto">
             <div className="bg-gray-900 p-8 rounded-lg shadow-md w-96">

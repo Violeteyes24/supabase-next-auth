@@ -37,20 +37,42 @@ export default function SecretaryRegister() {
         getUser();
     }, [])
 
+    const validateEmail = (email) => {
+        const regex = /^[a-zA-Z0-9._%+-]+@hnu\.edu\.ph$/;
+        return regex.test(email);
+    };
 
     const handleSignUp = async () => {
-        const res = await supabase.auth.signUp({
-            email,
-            password,
-            options: {
-                emailRedirectTo: `${location.origin}/auth/callback`
+        if (!validateEmail(email)) {
+            setError('Please enter a valid HNU email address.');
+            return;
+        }
+
+        setError('');
+
+        try {
+            const { data, error } = await supabase.auth.signUp(
+                {
+                    email,
+                    password,
+                },
+                {
+                    emailRedirectTo: `${location.origin}/auth/callback`,
+                }
+            );
+
+            if (error) {
+                setError(error.message);
+                return;
             }
-        })
-        setUser(res.data.user)
-        router.refresh();
-        setEmail('')
-        setPassword('')
-    }
+
+            // Handle successful sign-up
+            // For example, redirect to a confirmation page or show a success message
+            router.push('/auth/confirmation');
+        } catch (err) {
+            setError('An error occurred during sign-up.');
+        }
+    };
 
     const handleSignIn = async () => {
         const res = await supabase.auth.signInWithPassword({
