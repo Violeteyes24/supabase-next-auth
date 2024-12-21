@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import Link from "next/link";  
 import SignUpButton from "@/app/components/sign_up_button";  
-
+// email and password error message
 export default function SecretaryRegister() {
 
     const [email, setEmail] = useState('')
@@ -22,6 +22,7 @@ export default function SecretaryRegister() {
     const [department_assigned, setDepartmentAssigned] = useState('')
     const [short_biography, setShortBiography] = useState('')
     const [imagePreview, setImagePreview] = useState(null);
+    const [error, setError] = useState(null); 
 
 
     const supabase = createClientComponentClient();
@@ -115,6 +116,11 @@ export default function SecretaryRegister() {
                     placeholder="Email"
                     className="mb-4 w-full p-3 rounded-md border border-gray-700 bg-gray-800 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
                 />
+                {error && (
+                    <div className="mb-4 text-red-500 text-sm">
+                        {error}
+                    </div>
+                )}
                 <input
                     type="password"
                     name="password"
@@ -123,6 +129,11 @@ export default function SecretaryRegister() {
                     placeholder="Password"
                     className="mb-4 w-full p-3 rounded-md border border-gray-700 bg-gray-800 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
                 />
+                {error && (
+                    <div className="mb-4 text-red-500 text-sm">
+                        {error}
+                    </div>
+                )}
                 <input
                     type="name"
                     name="name"

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import SignUpButton from "@/app/components/sign_up_button";
-
+// email and password error message
 export default function CounselorRegister() {
    
         const [email, setEmail] = useState('')
@@ -23,6 +23,7 @@ export default function CounselorRegister() {
         const [short_biography, setShortBiography] = useState ('')
         const [credentials, setCredentials] = useState('')
         const [imagePreview, setImagePreview] = useState(null);
+        const [error, setError] = useState(null); 
 
 
         const supabase = createClientComponentClient();
@@ -38,19 +39,30 @@ export default function CounselorRegister() {
         }, [])
 
 
-        const handleSignUp = async () => {  
-            const res = await supabase.auth.signUp({
+        const handleSignUp = async () => {
+            const { data, error } = await supabase.auth.signUp({
                 email,
                 password,
                 options: {
                     emailRedirectTo: `${location.origin}/auth/callback`
                 }
-            })
-            setUser(res.data.user)
-            router.refresh();
-            setEmail('')
-            setPassword('')
-        }
+            });
+
+            if (error) {
+                // Handle known errors
+                setError('An error occurred during sign-up. Please try again.');
+            } else if (data.user && data.user.identities.length === 0) {
+                // User exists but has no associated identity, indicating the email is already taken
+                setError('Email address is already in use.');
+            } else {
+                // Sign-up successful
+                setUser(data.user);
+                router.refresh();
+                setEmail('');
+                setPassword('');
+            }
+        };
+
 
         const handleSignIn = async () => {
             const res = await supabase.auth.signInWithPassword({
@@ -116,6 +128,11 @@ export default function CounselorRegister() {
                     placeholder="Email"
                     className="mb-4 w-full p-3 rounded-md border border-gray-700 bg-gray-800 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
                 />
+                {error && (
+                    <div className="mb-4 text-red-500 text-sm">
+                        {error}
+                    </div>
+                )}
                 <input
                     type="password"
                     name="password"
@@ -124,6 +141,11 @@ export default function CounselorRegister() {
                     placeholder="Password"
                     className="mb-4 w-full p-3 rounded-md border border-gray-700 bg-gray-800 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
                 />
+                {error && (
+                    <div className="mb-4 text-red-500 text-sm">
+                        {error}
+                    </div>
+                )}
                 <input
                     type="name"
                     name="name"

@@ -42,34 +42,57 @@ export default function LoginPage() {
         setPassword('')
     }
 
-    const handleSignIn = async () => {
-        const { data, error } = await supabase.auth.signInWithPassword({
-            email,
-            password
-        });
+    const handleSignIn = async (email, password, setError) => {
+        // Basic validation to ensure email and password are provided
+        if (!email || !password) {
+            setError('Please enter both email and password.');
+            return;
+        }
 
-        if (error) {
-            // Check for specific error codes and set corresponding messages
-            if (error.code === 'auth/user-not-found') {
-                setError('Email address not found.');
-            } else if (error.code === 'auth/invalid-password') {
-                setError('Incorrect password.');
+        try {
+            const { data, error } = await supabase.auth.signInWithPassword({
+                email,
+                password,
+            });
+
+            if (error) {
+                // Handle specific error messages returned by Supabase
+                if (error.message.toLowerCase().includes('invalid login credentials')) {
+                    setError('Incorrect email or password.');
+                } else {
+                    setError('An error occurred. Please try again.');
+                }
             } else {
-                setError('An error occurred. Please try again.');
+                setUser(data.user);
+                setEmail('');
+                setPassword('');
+                setError(null); // Clear any previous errors
+                // router.push('/dashboard'); // Redirect to the desired page after successful sign-in
             }
-        } else {
-            setUser(data.user);
-            router.refresh();
-            setEmail('');
-            setPassword('');
-            setError(null); // Clear any previous errors
+        } catch (err) {
+            // Catch any unexpected errors
+            console.error('Unexpected error during sign-in:', err);
+            setError('An unexpected error occurred. Please try again.');
         }
     };
 
+
+
+
     const handleLogout = async () => {
-        await supabase.auth.signOut();
-        router.refresh();
-        setUser(null)
+        const { error } = await supabase.auth.signOut();
+        if (error) {
+            console.error('Error during sign out:', error);
+            return;
+        }
+        setUser(null);
+        // Ensure the router is ready
+        if (router.isReady) {
+            // Refresh the router state
+            router.refresh();
+            // Redirect to login page
+            router.push('/login');
+        };
     }
 
     console.log({ loading, user })
@@ -129,7 +152,12 @@ export default function LoginPage() {
                         {error}
                     </div>
                 )}
-                <SignInButton handleSignIn={handleSignIn} />
+                <SignInButton
+                    handleSignIn={handleSignIn}
+                    setError={setError}
+                    email={email}
+                    password={password} 
+                />
                 <h3 className="items-center justify-center mb-4">Sign Up as a:</h3>
                 <RegisterLinks />
                 </div>
@@ -142,17 +170,19 @@ export default function LoginPage() {
 
 TO DO: 
 
-1. Review table fields.
+
 2. Fetch data from forms
-3. HNU Email Validation.
-4. Password Validation.
-5. OTP for every log-in attempt.
-6. Home Page / Admin Dashboard template
+3. OTP for every log-in attempt.
+4. Home Page / Admin Dashboard template
+5. Connect Supabase to React Native.
+6. Update Log in functionality of React
 
 What's happening?
 
 - When clicking Sign up button, logs in and goes to /register/counselor or /register/secretary depending on where you Signed up as.
 - It still invokes the "Sign Up" Functionality, and appears on my authentication table.
 - I want to redirect them to the login page after signing up.
+- might put a link to /counselor/Dashboard home
+- when I log out, it  will go back to /register/counselor or /register/secretary or /login. It should only go to /login
 
 */
