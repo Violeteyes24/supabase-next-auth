@@ -108,7 +108,7 @@ const handleSignIn = async (email, password, setError) => {
         return <h1>loading..</h1>
     }
 
-    if (user) { // need to learn how to make this a component, because I will replace this with different homepages for counselor and secretary
+    if (user) { // need to learn how to make this a component, because I will replace this with different homepages for Director, counselor and secretary
         setSuccess(true);
         return (
             <div className="h-screen flex flex-col justify-center items-center bg-gray-100">
@@ -179,9 +179,12 @@ const handleSignIn = async (email, password, setError) => {
 
 TO DO: 
 
-1. Fetch data from forms
-2. OTP for every log-in attempt.
-3. Home Page / Admin Dashboard template
+1. Role based access next js 
+    - if isDirector is true, /dashboard/director
+    - if user_type = counselor, /dashboard/counselor
+    - if user_type = secretary, /dashboard/secretary
+2. Home Page / Admin Dashboard template
+3. Fetch data from forms
 4. Connect Supabase to React Native.
 5. Update Log in functionality of React
 
@@ -192,5 +195,9 @@ What's happening?
 - I want to redirect them to the login page after signing up.
 - might put a link to /counselor/Dashboard home
 - when I log out, it  will go back to /register/counselor or /register/secretary or /login. It should only go to /login
+
+TO BE PERFECTED:
+
+1. Sign Up: Existing Email validation (Figure out Policies, RLS, debugging etc.)
 
 */

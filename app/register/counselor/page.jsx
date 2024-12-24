@@ -38,28 +38,42 @@ export default function CounselorRegister() {
             getUser();
         }, [])
 
-        const validateEmail = (email) => {
-            const regex = /^[a-zA-Z0-9._%+-]+@hnu\.edu\.ph$/;
-            return regex.test(email);
-        };
+        // const validateEmail = (email) => {
+        //     const regex = /^[a-zA-Z0-9._%+-]+@hnu\.edu\.ph$/;
+        //     return regex.test(email);
+        // };
 
         const handleSignUp = async () => {
-            if (!validateEmail(email)) {
-                setError('Please enter a valid HNU email address.');
-                return;
-            }
 
-            setError('');
+            // if (!validateEmail(email)) {
+            //     setError('Please enter a valid HNU email address.');
+            //     return;
+            // }
+
+            // setError('');
 
             try {
+                // Query the `auth.users` table to check if the email exists
+                const { data: existingUsers, error: fetchError } = await supabase
+                    .from('auth.users')
+                    .select('email')
+                    .eq('email', email);
+
+                if (fetchError) {
+                    console.error('Fetch Error:', fetchError);
+                    setError('Failed to check email. Please try again later.');
+                    return;
+                }
+
+                if (existingUsers && existingUsers.length > 0) {
+                    setError('This email is already in use. Please use a different email.');
+                    return;
+                }
+
+                // If email does not exist, proceed with sign-up
                 const { data, error } = await supabase.auth.signUp(
-                    {
-                        email,
-                        password,
-                    },
-                    {
-                        emailRedirectTo: `${location.origin}/auth/callback`,
-                    }
+                    { email, password },
+                    { emailRedirectTo: `${location.origin}/auth/callback` }
                 );
 
                 if (error) {
@@ -67,14 +81,13 @@ export default function CounselorRegister() {
                     return;
                 }
 
-                // Handle successful sign-up
-                // For example, redirect to a confirmation page or show a success message
+                // Redirect to confirmation page
                 router.push('/auth/confirmation');
             } catch (err) {
+                console.error('Unexpected Error:', err);
                 setError('An error occurred during sign-up.');
             }
         };
-
 
         const handleSignIn = async () => {
             const res = await supabase.auth.signInWithPassword({
