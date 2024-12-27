@@ -204,29 +204,40 @@ export default function SecretaryRegister() {
                     className="mb-4 w-full p-3 rounded-md border border-gray-700 bg-gray-800 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
                 />
                 <input
-                    type="birthday"
+                    type="date"
                     name="birthday"
                     value={birthday}
                     onChange={(e) => setBirthday(e.target.value)}
                     placeholder="Birthday"
+                    required
                     className="mb-4 w-full p-3 rounded-md border border-gray-700 bg-gray-800 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
                 />
-                <input
+                <select
                     type="gender"
                     name="gender"
                     value={gender}
                     onChange={(e) => setGender(e.target.value)}
                     placeholder="Gender"
                     className="mb-4 w-full p-3 rounded-md border border-gray-700 bg-gray-800 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
-                />
-                <input
+                >
+                <option value="male">Male</option>
+                <option value="female">Female</option>
+                <option value="others">Others</option>
+                </select>
+                <select
                     type="department_assigned"
                     name="department_assigned"
                     value={department_assigned}
                     onChange={(e) => setDepartmentAssigned(e.target.value)}
-                    placeholder="Department Assigned"
                     className="mb-4 w-full p-3 rounded-md border border-gray-700 bg-gray-800 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
-                />
+                >
+                <option value="COECS">COECS</option>
+                <option value="CBA">CBA</option>
+                <option value="COL">COL</option>
+                <option value="CAS">CAS</option>
+                <option value="IBED">IBED</option>
+                <option value="CHS">CHS</option>
+                </select>
                 <input
                     type="short_biography"
                     name="short_biography"
