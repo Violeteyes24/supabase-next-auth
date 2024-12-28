@@ -3,10 +3,10 @@
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import Link from "next/link";  
-import SignUpButton from "@/app/components/sign_up_button";  
+import Link from "next/link";
+import SignUpButton from "@/app/components/sign_up_button";
 
-export default function SecretaryRegister() {
+export default function CounselorRegister() {
 
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
@@ -18,11 +18,12 @@ export default function SecretaryRegister() {
     const [address, setAddress] = useState('')
     const [contact_number, setContactNumber] = useState('')
     const [birthday, setBirthday] = useState('')
-    const [gender, setGender] = useState('Male')
-    const [department_assigned, setDepartmentAssigned] = useState('COECS')
+    const [gender, setGender] = useState('')
+    const [department_assigned, setDepartmentAssigned] = useState('')
     const [short_biography, setShortBiography] = useState('')
+    const [credentials, setCredentials] = useState('')
     const [imagePreview, setImagePreview] = useState(null);
-    const [error, setError] = useState(null); 
+    const [error, setError] = useState(null);
 
 
     const supabase = createClientComponentClient();
@@ -43,34 +44,62 @@ export default function SecretaryRegister() {
     // };
 
     const handleSignUp = async () => {
-        try {
-            setError(''); // Clear any previous errors
+        // Validate email format
+        // if (!validateEmail(email)) {
+        //     setError('Please enter a valid HNU email address.');
+        //     return;
+        // }
 
-            // Sign up the user
-            const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-                email,
-                password,
-            }, {
-                emailRedirectTo: `${location.origin}/auth/callback`, // Replace with your email verification callback URL
-            });
+        // setError('');
 
-            if (signUpError) {
-                console.error('Sign-Up Error:', signUpError);
-                setError(signUpError.message);
-                return;
-            }
+        // try {
+        //      Check if the email already exists in auth.users
+        //     const { data: existingUsers, error: fetchError } = await supabase
+        //         .from('auth.users')
+        //         .select('email')
+        //         .eq('email', email);
 
-            console.log('Sign-Up Data:', signUpData);
+        //     if (fetchError) {
+        //         console.error('Fetch Error:', fetchError);
+        //         setError('Failed to check email. Please try again later.');
+        //         return;
+        //     }
 
-            // Insert user data into the database
+        //     if (existingUsers && existingUsers.length > 0) {
+        //         setError('This email is already in use. Please use a different email.');
+        //         return;
+        //     }
+
+        // Proceed with sign-up
+        const { data: signUpData, error: signUpError } = await supabase.auth.signUp(
+            { email, password },
+            { emailRedirectTo: `${location.origin}/auth/callback` }
+        );
+
+        if (signUpError) {
+            setError(signUpError.message);
+            return;
+        }
+
+        // Extract user ID from sign-up response
+        const user_id = signUpData.user?.id;
+
+        console.log('User ID:', user_id);
+        if (!user_id) {
+            setError('User ID is undefined or invalid.');
+            return;
+        }
+
+        if (user_id) {
+            // Insert user profile into 'Users' table
             const { error: insertError } = await supabase
                 .from('users')
                 .insert([
                     {
-                        user_id: signUpData.user?.id || null, // Associate user ID if available
+                        user_id: user_id, // Ensure this matches the user's ID in auth.users
                         user_type: 'counselor',
-                        approval_status: 'pending', // Default status for new users
-                        is_director: false, // Adjust based on form input or logic
+                        approval_status: 'pending',
+                        is_director: false,
                         name,
                         username,
                         address,
@@ -79,42 +108,41 @@ export default function SecretaryRegister() {
                         gender,
                         department_assigned,
                         short_biography,
-                        credentials,
-                    },
+                        credentials
+                    }
                 ]);
 
             if (insertError) {
-                console.error(
-                    'Error inserting user profile:',
-                    insertError.details,
-                    insertError.message,
-                    insertError.hint
-                );
+                console.error('Error inserting user profile:', insertError.details, insertError.message, insertError.hint);
                 setError('An error occurred while creating your profile.');
                 return;
             }
 
             console.log('User profile created successfully.');
-
-            // Notify user to verify email
-            setError('Sign-up successful. Please verify your email before logging in.');
-        } catch (err) {
-            console.error('Unexpected Error:', err);
-            setError('An error occurred during sign-up.');
+        } else {
+            setError('Failed to retrieve user information after sign-up.');
+            return;
         }
+
+        // Redirect to confirmation page
+        router.push('/auth/confirmation');
+        // } catch (err) {
+        //     console.error('Unexpected Error:', err);
+        //     setError('An error occurred during sign-up.');
+        // }
     };
 
 
-    const handleSignIn = async () => {
-        const res = await supabase.auth.signInWithPassword({
-            email,
-            password
-        })
-        setUser(res.data.user)
-        router.refresh();
-        setEmail('')
-        setPassword('')
-    }
+    // const handleSignIn = async () => {
+    //     const res = await supabase.auth.signInWithPassword({
+    //         email,
+    //         password
+    //     })
+    //     setUser(res.data.user)
+    //     router.refresh();
+    //     setEmail('')
+    //     setPassword('')
+    // }
 
     const handleLogout = async () => {
         await supabase.auth.signOut();
@@ -156,11 +184,12 @@ export default function SecretaryRegister() {
             </div>
         )
     }
+
     return (
         <main className="min-h-screen flex items-center justify-center bg-gray-800 p-6 overflow-y-auto">
-            <div className="bg-gray-900 p-8 rounded-lg shadow-md w-96 overflow-y-auto">
+            <div className="bg-gray-900 p-8 rounded-lg shadow-md w-96">
                 <h1 className="mb-4 text-3xl font-extrabold text-gray-900 dark:text-white md:text-3xl lg:text-3xl py-5"><span className="text-transparent bg-clip-text bg-gradient-to-r to-emerald-600 from-sky-400">Mental </span><mark className="px-2 text-white bg-emerald-600 rounded dark:bg-emerald-300">Help</mark></h1>
-                <h3 className="items-center justify-center mb-4">Secretary's form</h3>
+                <h3 className="items-center justify-center mb-4">Counselor's form</h3>
                 <input
                     type="email"
                     name="email"
@@ -240,7 +269,6 @@ export default function SecretaryRegister() {
                     <option value="female">Female</option>
                     <option value="others">Others</option>
                 </select>
-
                 <select
                     type="department_assigned"
                     name="department_assigned"
@@ -263,6 +291,14 @@ export default function SecretaryRegister() {
                     placeholder="Short Biography"
                     className="mb-4 w-full p-3 rounded-md border border-gray-700 bg-gray-800 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
                 />
+                <input
+                    type="credentials"
+                    name="credentials"
+                    value={credentials}
+                    onChange={(e) => setCredentials(e.target.value)}
+                    placeholder="Credentials"
+                    className="mb-4 w-full p-3 rounded-md border border-gray-700 bg-gray-800 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+                />
                 <label htmlFor="imageInput" className="block mb-2 text-sm font-medium text-gray-700">
                     Upload an Image for Proof
                 </label>
@@ -280,7 +316,9 @@ export default function SecretaryRegister() {
                         Click here to go login.
                     </Link>
                 </div>
+
             </div>
         </main>
     )
+
 }
