@@ -42,42 +42,57 @@ export default function LoginPage() {
         getUser();
     }, []);
 
-    // Handle sign-in with email and password
     const handleSignIn = async () => {
         if (!email || !password) {
             setError('Please enter both email and password.');
             return;
         }
+
         try {
+            // Attempt to sign in the user with email and password
             const { data: { user }, error } = await supabase.auth.signInWithPassword({
                 email,
                 password,
             });
 
+            // Handle sign-in error
             if (error) {
                 setError('An error occurred during sign-in. Please try again.');
+                console.error('Sign-In Error:', error.message);
                 return;
+            } else {
+                setIsPasswordValid(true); // Password is valid, you can trigger UI changes if needed
+                console.log('Sign-In Successful. User ID:', user?.id);
             }
 
+            // After sign-in is successful, fetch the user profile to get their role
             const { data: profile, error: profileError } = await supabase
-                .from('users') // Use "users" table
-                .select('user_type') // Fetch the "user_type" column
-                .eq('id', user.id)
-                .single();
+                .from('users') // Your table name
+                .select('user_type, is_director') // Fetch the "user_type" and "is_director"
+                .eq('user_id', user.id) // Use user.id from sign-in result
+                .single(); // Get a single row
 
+            // Handle profile fetching error
             if (profileError) {
                 setError('Unable to fetch user role. Please try again.');
+                console.error('Profile Fetch Error:', profileError.message);
                 return;
             }
 
-            // Redirect based on role
+            // Check if the user is a director (if needed)
+            if (profile.is_director) {
+                console.log('Director privileges granted');
+            }
+
+            // Redirect based on user role
             if (profile.user_type === 'counselor') {
                 router.push('/dashboard/counselor');
             } else if (profile.user_type === 'secretary') {
                 router.push('/dashboard/secretary');
             } else {
-                setError('Unknown role. Please contact support.');
+                setError('Unauthorized access.');
             }
+
         } catch (err) {
             console.error('Unexpected error during sign-in:', err);
             setError('An unexpected error occurred. Please try again.');

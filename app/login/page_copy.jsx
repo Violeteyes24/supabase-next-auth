@@ -184,9 +184,8 @@ TO DO:
     - if user_type = counselor, /dashboard/counselor
     - if user_type = secretary, /dashboard/secretary
 2. Home Page / Admin Dashboard template
-3. Fetch data from forms
-4. Connect Supabase to React Native.
-5. Update Log in functionality of React
+3. Connect Supabase to React Native.
+4. Update Log in functionality of React Native
 
 What's happening?
 
