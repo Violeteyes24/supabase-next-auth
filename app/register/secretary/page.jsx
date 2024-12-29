@@ -68,7 +68,7 @@ export default function SecretaryRegister() {
                 .insert([
                     {
                         user_id: signUpData.user?.id || null, // Associate user ID if available
-                        user_type: 'counselor',
+                        user_type: 'secretary',
                         approval_status: 'pending', // Default status for new users
                         is_director: false, // Adjust based on form input or logic
                         name,

@@ -20,27 +20,13 @@ export default function LoginPage() {
     // Check if the user is already logged in
     useEffect(() => {
         async function getUser() {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (user) {
-                const { data: profile, error } = await supabase
-                    .from('users') // Use "users" table
-                    .select('user_type') // Fetch the "user_type" column
-                    .eq('id', user.id)
-                    .single();
-
-                if (error) {
-                    console.error('Error fetching user role:', error);
-                    setError('Unable to fetch user role. Please try again.');
-                    return;
-                }
-
-                setUser({ ...user, role: profile.user_type });
-            }
-            setLoading(false);
+            const { data: { user } } = await supabase.auth.getUser()
+            setUser(user)
+            setLoading(false)
         }
 
         getUser();
-    }, []);
+    }, [])
 
     // Handle sign-in with email and password
     const handleSignIn = async () => {
@@ -49,41 +35,20 @@ export default function LoginPage() {
             return;
         }
         try {
-            const { data: { user }, error } = await supabase.auth.signInWithPassword({
+            const { data, error } = await supabase.auth.signInWithPassword({
                 email,
                 password,
             });
-
             if (error) {
                 setError('An error occurred during sign-in. Please try again.');
-                return;
-            }
-
-            const { data: profile, error: profileError } = await supabase
-                .from('users') // Use "users" table
-                .select('user_type') // Fetch the "user_type" column
-                .eq('id', user.id)
-                .single();
-
-            if (profileError) {
-                setError('Unable to fetch user role. Please try again.');
-                return;
-            }
-
-            // Redirect based on role
-            if (profile.user_type === 'counselor') {
-                router.push('/dashboard/counselor');
-            } else if (profile.user_type === 'secretary') {
-                router.push('/dashboard/secretary');
             } else {
-                setError('Unknown role. Please contact support.');
+                setIsPasswordValid(true); // Password is valid, show Magic Link button
             }
         } catch (err) {
             console.error('Unexpected error during sign-in:', err);
             setError('An unexpected error occurred. Please try again.');
         }
     };
-
 
     // Handle sending magic link
     const handleSendMagicLink = async () => {
