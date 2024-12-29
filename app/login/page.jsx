@@ -14,10 +14,11 @@ export default function LoginPage() {
     const [error, setError] = useState(null);
     const [message, setMessage] = useState(null);
     const [user, setUser] = useState(null);
+    const [magicLinkSent, setMagicLinkSent] = useState(false); // To track if magic link was sent
     const router = useRouter();
     const supabase = createClientComponentClient();
 
-    // Check if the user is already logged in
+    // Check if the user is already logged in (run after magic link click)
     useEffect(() => {
         async function getUser() {
             const { data: { user } } = await supabase.auth.getUser();
@@ -35,12 +36,14 @@ export default function LoginPage() {
                 }
 
                 setUser({ ...user, role: profile.user_type });
+                setLoading(false); // Stop loading if the user is authenticated
+            } else {
+                setLoading(false); // Stop loading if no user is found
             }
-            setLoading(false);
         }
 
         getUser();
-    }, []);
+    }, []); // Runs once after initial mount (and after magic link is clicked)
 
     const handleSignIn = async () => {
         if (!email || !password) {
@@ -61,7 +64,6 @@ export default function LoginPage() {
                 console.error('Sign-In Error:', error.message);
                 return;
             } else {
-                setIsPasswordValid(true); // Password is valid, you can trigger UI changes if needed
                 console.log('Sign-In Successful. User ID:', user?.id);
             }
 
@@ -79,11 +81,6 @@ export default function LoginPage() {
                 return;
             }
 
-            // Check if the user is a director (if needed)
-            if (profile.is_director) {
-                console.log('Director privileges granted');
-            }
-
             // Redirect based on user role
             if (profile.user_type === 'counselor') {
                 router.push('/dashboard/counselor');
@@ -99,20 +96,20 @@ export default function LoginPage() {
         }
     };
 
-
     // Handle sending magic link
     const handleSendMagicLink = async () => {
         try {
             const { error } = await supabase.auth.signInWithOtp({
                 email,
                 options: {
-                    emailRedirectTo: `${location.origin}/login`, // Adjust the redirect URL as needed
+                    emailRedirectTo: `${location.origin}/auth/confirmation?email=${email}`, // Redirect to confirmation page
                 },
             });
             if (error) {
                 setError('An error occurred. Please try again.');
             } else {
-                setError('A magic link has been sent to your email. Please check your inbox.');
+                setMessage('A magic link has been sent to your email. Please check your inbox.');
+                setMagicLinkSent(true); // Mark magic link as sent
             }
         } catch (err) {
             console.error('Unexpected error during magic link send:', err);
@@ -120,39 +117,9 @@ export default function LoginPage() {
         }
     };
 
-    // Handle logout
-    const handleLogout = async () => {
-        const { error } = await supabase.auth.signOut();
-        if (error) {
-            console.error('Error during sign out:', error);
-            return;
-        }
-        setUser(null);
-        router.push('/login'); // Redirect to login page after logout
-    };
-
     // Loading state
     if (loading) {
         return <h1>Loading...</h1>;
-    }
-
-    // If user is already logged in, show a message and logout option
-    if (user) {
-        return (
-            <div className="h-screen flex flex-col justify-center items-center bg-gray-100">
-                <div className="bg-white dark:bg-gray-900 p-8 rounded-lg shadow-md w-96 text-center">
-                    <h1 className="mb-4 text-xl font-bold text-gray-700 dark:text-gray-300">
-                        You're already logged in
-                    </h1>
-                    <button
-                        onClick={handleLogout}
-                        className="w-full p-3 rounded-md bg-red-500 text-white hover:bg-red-600 focus:outline-none"
-                    >
-                        Logout
-                    </button>
-                </div>
-            </div>
-        );
     }
 
     // Main login form
@@ -184,20 +151,20 @@ export default function LoginPage() {
                     placeholder="Password"
                     className="mb-4 w-full p-3 rounded-md border border-gray-700 bg-gray-800 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
                 />
-                {isPasswordValid && (
-                    <button
-                        onClick={handleSendMagicLink}
-                        className="w-full p-3 mb-3 rounded-md bg-blue-500 text-white hover:bg-blue-600 focus:outline-none"
-                    >
-                        Send Magic Link
-                    </button>
-                )}
-                {!isPasswordValid && (
+                {magicLinkSent && !user && (
                     <button
                         onClick={handleSignIn}
                         className="w-full p-3 mb-3 rounded-md bg-blue-500 text-white hover:bg-blue-600 focus:outline-none"
                     >
                         Log in
+                    </button>
+                )}
+                {!magicLinkSent && (
+                    <button
+                        onClick={handleSendMagicLink}
+                        className="w-full p-3 mb-3 rounded-md bg-blue-500 text-white hover:bg-blue-600 focus:outline-none"
+                    >
+                        Send Magic Link
                     </button>
                 )}
                 <h3 className="items-center justify-center mb-4">Sign Up as a:</h3>

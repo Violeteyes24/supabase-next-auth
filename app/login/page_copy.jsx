@@ -179,13 +179,10 @@ const handleSignIn = async (email, password, setError) => {
 
 TO DO: 
 
-1. Role based access next js 
-    - if isDirector is true, /dashboard/director
-    - if user_type = counselor, /dashboard/counselor
-    - if user_type = secretary, /dashboard/secretary
-2. Home Page / Admin Dashboard template
-3. Connect Supabase to React Native.
-4. Update Log in functionality of React Native
+1. Home Page / Admin Dashboard template
+2. Component for log out button.
+2. Connect Supabase to React Native.
+3. Update Log in functionality of React Native
 
 What's happening?
 
