@@ -15,9 +15,10 @@ const Sidebar = ({ handleLogout }) => {
     };
 
     const menuItems = [
-        { text: 'Dashboard', action: () => (window.location.href = '/dashboard') },
+        { text: 'Dashboard', action: () => (window.location.href = '/dashboard/counselor') },
         { text: 'Reports', action: () => (window.location.href = '/reports') },
-        { text: 'Settings', action: () => (window.location.href = '/settings') },
+        { text: 'Appointments', action: () => (window.location.href = '/appointment') },
+        { text: 'Messages', action: () => (window.location.href = '/messages') },
         { text: 'Logout', action: handleLogout }, // Attach the logout function here
     ];
 
