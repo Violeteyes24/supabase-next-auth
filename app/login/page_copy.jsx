@@ -3,8 +3,8 @@
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import RegisterLinks from '../components/register_links'; // function + jsx file
-import SignInButton from "../components/sign_in_button";
+import RegisterLinks from '../components/dashboard components/register_links'; // function + jsx file
+import SignInButton from "../components/login components/sign_in_button";
 
 export default function LoginPage() {
     const [email, setEmail] = useState('')

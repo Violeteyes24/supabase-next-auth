@@ -3,7 +3,7 @@
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import RegisterLinks from '../components/register_links'; // Function + JSX file
+import RegisterLinks from '../components/dashboard components/register_links'; // Function + JSX file
 
 export default function LoginPage() {
     // State variables

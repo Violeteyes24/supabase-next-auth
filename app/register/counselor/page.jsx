@@ -4,7 +4,7 @@ import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import SignUpButton from "@/app/components/sign_up_button";
+import SignUpButton from "@/app/components/login components/sign_up_button";
 
 export default function CounselorRegister() {
    

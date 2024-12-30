@@ -8,7 +8,7 @@ const KPISection = ({ data }) => {
                 <Grid item xs={12} sm={6} md={3} key={index}>
                     <Paper elevation={3} sx={{ padding: '16px', textAlign: 'center' }}>
                         <Typography variant="h6">{kpi.title}</Typography>
-                        <Typography variant="h4" color="primary">
+                        <Typography variant="h4" style={{ color: '#00ffff' }}>
                             {kpi.value}
                         </Typography>
                     </Paper>

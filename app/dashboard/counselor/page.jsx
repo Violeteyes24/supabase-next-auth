@@ -5,9 +5,9 @@ import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { useRouter } from "next/navigation";
 import { Container } from '@mui/material';
 
-import Sidebar from '../../components/sidebar';
-import KPISection from '../../components/kpi_section';
-import Charts from '../../components/charts';
+import Sidebar from '../../components/dashboard components/sidebar';
+import KPISection from '../../components/dashboard components/kpi_section';
+import Charts from '../../components/dashboard components/charts';
 
 export default function CounselorPage() {
     const supabase = createClientComponentClient();
@@ -30,8 +30,13 @@ export default function CounselorPage() {
         { title: 'Average Mood Score', value: 7.8 },
     ];
 
-    const chartLabels = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
-    const chartData = [6, 7, 8, 7.5, 9];
+    const chartData = [
+        { day: 'Monday', mood: 6 },
+        { day: 'Tuesday', mood: 7 },
+        { day: 'Wednesday', mood: 8 },
+        { day: 'Thursday', mood: 7.5 },
+        { day: 'Friday', mood: 9 },
+    ];
 
     return (
         <div className="bg-gray-900 p-2 rounded-lg shadow-md">
@@ -41,7 +46,7 @@ export default function CounselorPage() {
             <Container sx={{ marginTop: '16px', textAlign: 'center' }}>
                 <h1 className="mb-4 text-3xl font-extrabold text-gray-900 dark:text-white py-5">
                     <span className="text-transparent bg-clip-text bg-gradient-to-r to-emerald-600 from-sky-400">
-                        Welcome Counselor! 
+                        Welcome Counselor!
                     </span>
                     <mark className="ml-3 px-2 text-white bg-emerald-600 rounded dark:bg-emerald-300">
                         Kapoyag atiman ani nila oi
@@ -49,7 +54,7 @@ export default function CounselorPage() {
                 </h1>
                 <KPISection data={kpiData} />
                 <div style={{ marginTop: '32px' }}>
-                    <Charts data={chartData} labels={chartLabels} />
+                    <Charts data={chartData} />
                 </div>
             </Container>
         </div>
