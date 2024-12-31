@@ -18,8 +18,9 @@ export default function ReportsPage() {
         router.push('/login');
     };
     return (
+        <main className='h-screen flex bg-gray-800'>
+        <Sidebar handleLogout={handleLogout} />
         <Container sx={{ marginTop: '32px' }}>
-            <Sidebar handleLogout={handleLogout} />
             <h1 className="mb-8 text-3xl font-bold text-center text-gray-800 dark:text-white">
                 Reports Dashboard
             </h1>
@@ -41,5 +42,6 @@ export default function ReportsPage() {
                 </Grid>
             </Grid>
         </Container>
+        </main>
     );
 }

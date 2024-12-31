@@ -15,7 +15,7 @@ export default function AppointmentPage() {
     };
 
     return (
-        <div className="h-screen bg-blue-950 flex">
+        <div className="h-screen bg-gray-800 flex">
             {/* Sidebar */}
                 <Sidebar handleLogout={handleLogout} />
             {/* Main Content */}

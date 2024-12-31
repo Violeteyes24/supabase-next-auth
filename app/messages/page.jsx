@@ -69,15 +69,15 @@ export default function MessagePage () {
     };
     
     return (
-        <div className="h-screen bg-blue-950 flex flex-col">
+        <div className="h-screen bg-gray-800 flex flex-col">
             {/* Header */}
             <Sidebar handleLogout={handleLogout} />
-            <div className="bg-blue-900 text-white text-xl py-4 px-6 font-bold shadow-md">
+            <div className="bg-gray-900 text-white text-xl py-4 px-6 font-bold shadow-md">
                 Support Chat
             </div>
 
             {/* Chat Area */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-blue-950">
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
                 {messages.map((msg, index) => (
                     <div
                         key={index}
@@ -99,12 +99,12 @@ export default function MessagePage () {
             </div>
 
             {/* Footer with Buttons */}
-            <div className="bg-blue-900 p-4">
+            <div className="bg-gray-900 p-4">
                 <div className="flex space-x-4 justify-center">
                     {conversationFlow[currentStep]?.options.map((option, index) => (
                         <button
                             key={index}
-                            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+                            className="bg-emerald-600 text-white px-4 py-2 rounded hover:bg-blue-700"
                             onClick={() => handleOptionClick(option.next)}
                         >
                             {option.label}

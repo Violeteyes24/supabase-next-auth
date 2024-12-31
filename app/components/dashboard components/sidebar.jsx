@@ -19,13 +19,14 @@ const Sidebar = ({ handleLogout }) => {
         { text: 'Reports', action: () => (window.location.href = '/reports') },
         { text: 'Appointments', action: () => (window.location.href = '/appointment') },
         { text: 'Messages', action: () => (window.location.href = '/messages') },
+        { text: 'Notifications', action: () => (window.location.href = '/notifications')},
         { text: 'Logout', action: handleLogout }, // Attach the logout function here
     ];
 
     return (
         <Box>
             {/* Menu Button */}
-            <IconButton edge="start" color="inherit" aria-label="menu" onClick={toggleDrawer(true)}>
+            <IconButton edge="start" color="inherit" aria-label="menu" style={{ marginLeft: '5px' }} onClick={toggleDrawer(true)}>
                 <MenuIcon />
             </IconButton>
 
@@ -37,7 +38,15 @@ const Sidebar = ({ handleLogout }) => {
                     onClick={toggleDrawer(false)}
                     onKeyDown={toggleDrawer(false)}
                 >
-                    <List>
+                    <List
+                        sx={{
+                            display: "flex",
+                            flexDirection: "column",
+                            justifyContent: "space-between",
+                            height: "100vh", // Ensure the List takes the full viewport height
+                            overflow: "hidden"
+                        }}
+                    >
                         {menuItems.map((item, index) => (
                             <ListItem
                                 key={index}
@@ -50,6 +59,9 @@ const Sidebar = ({ handleLogout }) => {
                                     padding: "12px 16px",
                                     borderRadius: "8px",
                                     margin: "4px 8px",
+                                    ...(item.text === "Logout" && {
+                                        marginTop: "auto", // Push "Logout" to the bottom
+                                    }),
                                 }}
                             >
                                 <ListItemText
@@ -63,6 +75,7 @@ const Sidebar = ({ handleLogout }) => {
                             </ListItem>
                         ))}
                     </List>
+
                 </Box>
             </Drawer>
         </Box>

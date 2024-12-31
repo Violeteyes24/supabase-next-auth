@@ -2,7 +2,7 @@ export default function LogOutButton({ handleLogout }) {
     return (
         <button
             onClick={handleLogout}
-            className={`w-full p-3 rounded-md bg-red-500 text-white hover:bg-red-600 focus:outline-none ${className}`}
+            className= "w-30 p-3 rounded-md bg-red-500 text-white hover:bg-red-600 focus:outline-none"
         >
             Logout
         </button>

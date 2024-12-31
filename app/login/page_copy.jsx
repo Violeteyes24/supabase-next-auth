@@ -179,10 +179,11 @@ const handleSignIn = async (email, password, setError) => {
 
 TO DO: 
 
-1. Home Page / Admin Dashboard template
-2. Component for log out button.
-2. Connect Supabase to React Native.
-3. Update Log in functionality of React Native
+1. Connect Supabase to React Native.
+2. Minimum UI requirements
+3. Practice UI at /test
+4. HOC / roles management 
+5. Update Log in functionality of React Native
 
 What's happening?
 

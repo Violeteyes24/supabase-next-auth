@@ -39,12 +39,12 @@ export default function CounselorPage() {
     ];
 
     return (
-        <div className="bg-gray-900 p-2 rounded-lg shadow-md">
+        <main className="h-screen bg-gray-800 p-2 rounded-lg shadow-md">
             {/* Pass the handleLogout prop to Sidebar */}
             <Sidebar handleLogout={handleLogout} />
 
             <Container sx={{ marginTop: '16px', textAlign: 'center' }}>
-                <h1 className="mb-4 text-3xl font-extrabold text-gray-900 dark:text-white py-5">
+                <h1 className="mb-4 text-3xl font-extrabold text-gray-900 darkv :text-white py-5">
                     <span className="text-transparent bg-clip-text bg-gradient-to-r to-emerald-600 from-sky-400">
                         Welcome Counselor!
                     </span>
@@ -57,6 +57,6 @@ export default function CounselorPage() {
                     <Charts data={chartData} />
                 </div>
             </Container>
-        </div>
+        </main>
     );
 }
