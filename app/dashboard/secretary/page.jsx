@@ -1,6 +1,6 @@
 'use client'
 
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'; // need this on all pages
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import React from "react";
@@ -9,11 +9,11 @@ import Sidebar from '../../components/dashboard components/sidebar';
 
 export default function SecretaryPage() {
 
-    const supabase = createClientComponentClient();
+    const supabase = createClientComponentClient(); // need this on all pages
     const router = useRouter();
     const [loading, setLoading] = useState(true);
-    
-    useEffect(() => {
+
+    useEffect(() => { // need this on all pages
         async function getUser() {
             const { data: { user } } = await supabase.auth.getUser();
             if (user) {
