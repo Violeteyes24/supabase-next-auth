@@ -60,17 +60,17 @@ export default function MessagePage() {
     const mockMessageList = [
         {
             sender: "John Doe",
-            summary: "Hey, I need help with my account!",
+            summary: "Hey, I'm depressed",
             timestamp: "2m ago",
         },
         {
             sender: "Jane Smith",
-            summary: "My app keeps crashing. What should I do?",
+            summary: "My head keeps crashing. What should I do?",
             timestamp: "5m ago",
         },
         {
             sender: "System",
-            summary: "Welcome to the support center! How can I help you?",
+            summary: "Welcome to the support center! How can you help me?",
             timestamp: "10m ago",
         },
     ];
@@ -102,7 +102,7 @@ export default function MessagePage() {
             <div className="flex-1 flex flex-col bg-gray-200">
                 {/* Header */}
                 <div className="bg-gray-900 text-white text-xl py-4 px-6 font-bold shadow-md">
-                    Support Chat
+                    Name of the Person
                 </div>
 
                 {/* Chat Messages */}
