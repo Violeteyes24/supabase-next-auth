@@ -1,3 +1,21 @@
+'use client';
+
+import React from 'react';
+import DemographicsChart from '../components/report components/demographics';
+import FeedbackChart from '../components/report components/user_feedback';
+
+export default function TestPage() {
+    return (
+        <div style={{ background: '#282c34', height: '100vh', padding: '20px' }}>
+            <h1 style={{ color: 'white', textAlign: 'center' }}>Test Page</h1>
+            <DemographicsChart />
+            <FeedbackChart />
+        </div>
+    );
+}
+
+
+
 /*
 State variables and functions can be extracted as HOC
 
@@ -48,5 +66,6 @@ function Person2 ({money, handleIncrease}) {
 }
 
 export default UpdatedComponent(Person2);
+
 
 */

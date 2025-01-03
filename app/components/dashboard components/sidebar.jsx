@@ -50,7 +50,7 @@ const Sidebar = ({ handleLogout }) => {
                         {menuItems.map((item, index) => (
                             <ListItem
                                 key={index}
-                                button
+                                button={true} // Pass boolean explicitly
                                 onClick={item.action} // Dynamic action
                                 sx={{
                                     "&:hover": {

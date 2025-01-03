@@ -10,7 +10,7 @@ export async function middleware(req) {
 
     // Redirect unauthenticated users to login
     if (!session) {
-        return NextResponse.redirect(new URL('/login', req.url));
+        return NextResponse.redirect(new URL('/login', req.url)); 
     }
 
     return res; // Allow the request to proceed

@@ -1,12 +1,13 @@
 'use client';
 
-import dynamic from 'next/dynamic';
+// import dynamic from 'next/dynamic';
 import React from 'react';
+import { PieChart, Pie, Cell, Tooltip } from 'recharts';
 
-const PieChart = dynamic(() => import('recharts').then((mod) => mod.PieChart), { ssr: false });
-const Pie = dynamic(() => import('recharts').then((mod) => mod.Pie), { ssr: false });
-const Cell = dynamic(() => import('recharts').then((mod) => mod.Cell), { ssr: false });
-const Tooltip = dynamic(() => import('recharts').then((mod) => mod.Tooltip), { ssr: false });
+// const PieChart = dynamic(() => import('recharts').then((mod) => mod.PieChart), { ssr: false });
+// const Pie = dynamic(() => import('recharts').then((mod) => mod.Pie), { ssr: false });
+// const Cell = dynamic(() => import('recharts').then((mod) => mod.Cell), { ssr: false });
+// const Tooltip = dynamic(() => import('recharts').then((mod) => mod.Tooltip), { ssr: false });
 
 const DemographicsChart = () => {
     const demographicData = [
