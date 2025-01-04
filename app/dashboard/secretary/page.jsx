@@ -1,44 +1,19 @@
-'use client'
+'use client';
 
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'; // need this on all pages
-import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
-import React from "react";
-// import LogOutButton from '../../components/login components/log_out_button'
+import React from 'react';
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import { useRouter } from "next/navigation";
+import { Container } from '@mui/material';
+
 import Sidebar from '../../components/dashboard components/sidebar';
+import KPISection from '../../components/dashboard components/kpi_section';
+import Charts from '../../components/dashboard components/charts';
 
-export default function SecretaryPage() {
-
-    const supabase = createClientComponentClient(); // need this on all pages
+export default function CounselorPage() {
+    const supabase = createClientComponentClient();
     const router = useRouter();
-    const [loading, setLoading] = useState(true);
 
-    useEffect(() => { // need this on all pages
-        async function getUser() {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (user) {
-                const { data: profile, error } = await supabase
-                    .from('users') // Use "users" table
-                    .select('user_type') // Fetch the "user_type" column
-                    .eq('id', user.id)
-                    .single();
-
-                if (error) {
-                    console.error('Error fetching user role:', error);
-                    setError('Unable to fetch user role. Please try again.');
-                    return;
-                }
-
-                setUser({ ...user, role: profile.user_type });
-                setLoading(false); // Stop loading if the user is authenticated
-            } else {
-                setLoading(false); // Stop loading if no user is found
-            }
-        }
-
-        getUser();
-    }, []); // Runs once after initial mount (and after magic link is clicked)
-
+    // Logout function
     const handleLogout = async () => {
         const { error } = await supabase.auth.signOut();
         if (error) {
@@ -48,12 +23,40 @@ export default function SecretaryPage() {
         router.push('/login');
     };
 
+    const kpiData = [
+        { title: 'Total Users', value: 1024 },
+        { title: 'Appointments This Month', value: 234 },
+        { title: 'Active Counselors', value: 12 },
+        { title: 'Average Mood Score', value: 7.8 },
+    ];
+
+    const chartData = [
+        { day: 'Monday', mood: 6 },
+        { day: 'Tuesday', mood: 7 },
+        { day: 'Wednesday', mood: 8 },
+        { day: 'Thursday', mood: 7.5 },
+        { day: 'Friday', mood: 9 },
+    ];
+
     return (
-        <div>
-            <Sidebar handleLogout={handleLogout}/>
-            <h1>Welcome, Secretary!</h1>
-            <p>You are logged in as a secretary. This is your dashboard.</p>
-            {/* <LogOutButton handleLogout={handleLogout} /> */}
-        </div>
+        <main className="h-screen bg-gray-800 p-2 rounded-lg shadow-md">
+            {/* Pass the handleLogout prop to Sidebar */}
+            <Sidebar handleLogout={handleLogout} />
+
+            <Container sx={{ marginTop: '16px', textAlign: 'center' }}>
+                <h1 className="mb-4 text-3xl font-extrabold text-gray-900 darkv :text-white py-5">
+                    <span className="text-transparent bg-clip-text bg-gradient-to-r to-emerald-600 from-sky-400">
+                        Welcome Counselor!
+                    </span>
+                    <mark className="ml-3 px-2 text-white bg-emerald-600 rounded dark:bg-emerald-300">
+                        Kapoyag atiman ani nila oi
+                    </mark>
+                </h1>
+                <KPISection data={kpiData} />
+                <div style={{ marginTop: '32px' }}>
+                    <Charts data={chartData} />
+                </div>
+            </Container>
+        </main>
     );
 }

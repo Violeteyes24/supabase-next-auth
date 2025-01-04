@@ -20,6 +20,7 @@ const Sidebar = ({ handleLogout }) => {
         { text: 'Appointments', action: () => (window.location.href = '/appointment') },
         { text: 'Messages', action: () => (window.location.href = '/messages') },
         { text: 'Notifications', action: () => (window.location.href = '/notifications')},
+        { text: 'Approve and Deny', action: () => (window.location.href = '/approveDeny') },
         { text: 'Logout', action: handleLogout }, // Attach the logout function here
     ];
 

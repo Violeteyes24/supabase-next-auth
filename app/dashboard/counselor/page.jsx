@@ -1,13 +1,15 @@
+// Import necessary dependencies
 'use client';
 
 import React from 'react';
+import { Container, Grid } from '@mui/material';
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { useRouter } from "next/navigation";
-import { Container } from '@mui/material';
 
 import Sidebar from '../../components/dashboard components/sidebar';
 import KPISection from '../../components/dashboard components/kpi_section';
 import Charts from '../../components/dashboard components/charts';
+import AppointmentCard from '../../components/appointment components/appointment_card';
 
 export default function CounselorPage() {
     const supabase = createClientComponentClient();
@@ -39,12 +41,12 @@ export default function CounselorPage() {
     ];
 
     return (
-        <main className="h-screen bg-gray-800 p-2 rounded-lg shadow-md">
-            {/* Pass the handleLogout prop to Sidebar */}
+        <main className="h-screen bg-gray-800 flex">
+            {/* Sidebar */}
             <Sidebar handleLogout={handleLogout} />
 
             <Container sx={{ marginTop: '16px', textAlign: 'center' }}>
-                <h1 className="mb-4 text-3xl font-extrabold text-gray-900 darkv :text-white py-5">
+                <h1 className="mb-4 text-3xl font-extrabold text-gray-900 dark:text-white py-5">
                     <span className="text-transparent bg-clip-text bg-gradient-to-r to-emerald-600 from-sky-400">
                         Welcome Counselor!
                     </span>
@@ -52,10 +54,28 @@ export default function CounselorPage() {
                         Kapoyag atiman ani nila oi
                     </mark>
                 </h1>
+
+                {/* KPI Section */}
                 <KPISection data={kpiData} />
-                <div style={{ marginTop: '32px' }}>
-                    <Charts data={chartData} />
-                </div>
+
+                {/* Grid Layout */}
+                <Grid container spacing={4} sx={{ marginTop: '32px' }}>
+                    <Grid item xs={12} sm={6}>
+                        <div className="mt-10">
+                            <AppointmentCard
+                                name="Zachary Albert Legaria"
+                                reason="Mental Disorder: Depression because of Capstone"
+                                date="January 1, 2024"
+                                time="12:00am"
+                            />
+                        </div>
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                        <div className="mt-10">
+                            <Charts data={chartData} />
+                        </div>
+                    </Grid>
+                </Grid>
             </Container>
         </main>
     );
