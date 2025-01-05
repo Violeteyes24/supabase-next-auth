@@ -1,7 +1,6 @@
-// Import necessary dependencies
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Container, Grid } from '@mui/material';
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { useRouter } from "next/navigation";
@@ -13,9 +12,43 @@ import AppointmentCard from '../../components/appointment components/appointment
 
 export default function CounselorPage() {
     const supabase = createClientComponentClient();
+    const [userName, setUserName] = useState('');
     const router = useRouter();
 
-    // Logout function
+    useEffect(() => {
+        async function getUser() {
+            try {
+                const { data: { user }, error: userError } = await supabase.auth.getUser();
+                console.log('Dashboard User:', user);
+
+                if (userError) {
+                    console.error('Error fetching user:', userError);
+                    return;
+                }
+
+                if (user) {
+                    const { data: profile, error: profileError } = await supabase
+                        .from('users')
+                        .select('name')
+                        .eq('user_id', user.id) // Assuming 'user_id' matches in your table
+                        .single();
+
+                    if (profileError) {
+                        console.error('Error fetching profile:', profileError);
+                        return;
+                    }
+
+                    console.log('Dashboard Profile:', profile);
+                    setUserName(profile?.name || ''); // Set userName or empty string
+                }
+            } catch (err) {
+                console.error('Unexpected error fetching user:', err);
+            }
+        }
+
+        getUser();
+    }, []);
+
     const handleLogout = async () => {
         const { error } = await supabase.auth.signOut();
         if (error) {
@@ -42,38 +75,28 @@ export default function CounselorPage() {
 
     return (
         <main className="h-screen bg-gray-800 flex">
-            {/* Sidebar */}
             <Sidebar handleLogout={handleLogout} />
-
             <Container sx={{ marginTop: '16px', textAlign: 'center' }}>
-                <h1 className="mb-4 text-3xl font-extrabold text-gray-900 dark:text-white py-5">
+                <h1 className="mb-4 text-3xl font-extrabold text-gray-900 darkv :text-white py-5">
                     <span className="text-transparent bg-clip-text bg-gradient-to-r to-emerald-600 from-sky-400">
-                        Welcome Counselor!
+                        Welcome {userName}!
                     </span>
                     <mark className="ml-3 px-2 text-white bg-emerald-600 rounded dark:bg-emerald-300">
                         Kapoyag atiman ani nila oi
                     </mark>
                 </h1>
-
-                {/* KPI Section */}
                 <KPISection data={kpiData} />
-
-                {/* Grid Layout */}
                 <Grid container spacing={4} sx={{ marginTop: '32px' }}>
                     <Grid item xs={12} sm={6}>
-                        <div className="mt-10">
-                            <AppointmentCard
-                                name="Zachary Albert Legaria"
-                                reason="Mental Disorder: Depression because of Capstone"
-                                date="January 1, 2024"
-                                time="12:00am"
-                            />
-                        </div>
+                        <AppointmentCard
+                            name="Zachary Albert Legaria"
+                            reason="Mental Disorder: Depression because of Capstone"
+                            date="January 1, 2024"
+                            time="12:00am"
+                        />
                     </Grid>
                     <Grid item xs={12} sm={6}>
-                        <div className="mt-10">
-                            <Charts data={chartData} />
-                        </div>
+                        <Charts data={chartData} />
                     </Grid>
                 </Grid>
             </Container>

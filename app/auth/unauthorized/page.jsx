@@ -1,11 +1,13 @@
+'use client'
+
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useRouter } from 'next/navigation';
 
 export default function UnauthorizedPage() {
-    const navigate = useNavigate();
+    const router = useRouter();
 
     const handleGoBack = () => {
-        navigate(-1); // Go back to the previous page
+        router.back(); // Navigates back to the previous page
     };
 
     return (
@@ -21,3 +23,10 @@ export default function UnauthorizedPage() {
         </div>
     );
 }
+
+/*
+
+Error:   × You're importing a component that needs `useRouter`. This React hook only works in a client component. 
+To fix, mark the file (or its parent) with the `"use client"` directive.
+
+*/
