@@ -1,6 +1,5 @@
-// Enhanced styling for AppointmentCard with Picture and Scrollable Table
 'use client';
-
+// will not hardcode values of props, should be extracted from the database
 import React from 'react';
 
 export default function AppointmentCard({ appointments = [] }) {

@@ -26,7 +26,7 @@ export default function LoginPage() {
                 const { data: profile, error } = await supabase
                     .from('users') // Use "users" table
                     .select('user_type') // Fetch the "user_type" column
-                    .eq('id', user.id)
+                    .eq('user_id', user.id)
                     .single();
 
                 if (error) {
