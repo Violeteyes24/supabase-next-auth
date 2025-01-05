@@ -44,6 +44,7 @@ export default function CounselorRegister() {
     // };
 
     const handleSignUp = async () => {
+        
         // Validate email format
         // if (!validateEmail(email)) {
         //     setError('Please enter a valid HNU email address.');
