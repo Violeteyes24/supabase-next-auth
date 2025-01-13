@@ -181,17 +181,14 @@ TO DO:
 
 1. Connect Supabase to React Native.
 2. Minimum UI requirements
-3. Practice UI at /test
-4. HOC / roles management 
-5. Update Log in functionality of React Native
+3. HOC / roles management 
+4. Update Log in functionality of React Native
 
 What's happening?
 
 - When clicking Sign up button, logs in and goes to /register/counselor or /register/secretary depending on where you Signed up as.
 - It still invokes the "Sign Up" Functionality, and appears on my authentication table.
 - I want to redirect them to the login page after signing up.
-- might put a link to /counselor/Dashboard home
-- when I log out, it  will go back to /register/counselor or /register/secretary or /login. It should only go to /login
 
 TO BE PERFECTED:
 

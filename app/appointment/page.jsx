@@ -1,5 +1,12 @@
 'use client';
+/*
+mobile
 
+1. fetch availability schedule
+2. interactable, change is_available to false
+3. update table 
+
+*/
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import React, { useState } from 'react';
 import Sidebar from "../components/dashboard components/sidebar";
