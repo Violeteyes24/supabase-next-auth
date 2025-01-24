@@ -74,7 +74,7 @@ export default function CounselorPage() {
     ];
 
     return (
-        <main className="h-screen bg-gray-800 flex">
+        <main className="h-screen bg-white flex">
             <Sidebar handleLogout={handleLogout} />
             <Container sx={{ marginTop: '16px', textAlign: 'center' }}>
                 <h1 className="mb-4 text-3xl font-extrabold text-gray-900 darkv :text-white py-5">

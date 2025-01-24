@@ -4,7 +4,7 @@ import React from 'react';
 
 export default function AppointmentCard({ appointments = [] }) {
     return (
-        <div className="border rounded-lg shadow-xl p-6 max-w-lg bg-gradient-to-r from-gray-900 via-gray-950 to-black overflow-auto max-h-96">
+        <div className="border rounded-lg shadow-xl p-6 max-w-lg bg-white overflow-auto max-h-96">
             {/* Header Section */}
             <div className="flex justify-between items-center mb-6">
                 <h2 className="text-2xl font-extrabold text-emerald-400 tracking-wide">Upcoming Appointments</h2>

@@ -90,16 +90,16 @@ export default function AppointmentPage() {
 
     return (
         <LocalizationProvider dateAdapter={AdapterDayjs}>
-            <div className="h-screen bg-gray-800 flex">
+            <div className="h-screen bg-white flex">
                 {/* Sidebar */}
                 <Sidebar handleLogout={handleLogout} />
 
                 {/* Main Content */}
-                <div className="flex-1 flex flex-col text-white ml-20">
+                <div className="flex-1 flex flex-col text-black ml-20">
                     <h1 className="text-3xl font-bold mt-10 mb-6">Appointment Page</h1>
 
                     {/* Calendar UI */}
-                    <div className="bg-gray-900 p-6 rounded-lg shadow-md">
+                    <div className="bg-white p-6 rounded-lg shadow-md">
                         <h2 className="text-xl font-semibold mb-4">Availability</h2>
 
                         {/* Days Navigation */}
@@ -108,8 +108,8 @@ export default function AppointmentPage() {
                                 <button
                                     key={index}
                                     className={`rounded-full px-4 py-2 ${selectedDate.format('dddd') === day
-                                        ? 'bg-yellow-500 text-black'
-                                        : 'bg-gray-700 text-white'
+                                        ? 'bg-emerald-500 text-black'
+                                        : 'bg-emerald-200 text-black'
                                         }`}
                                     onClick={() => setSelectedDate(dayjs().day(index + 1))} // `day()` takes a number: Sunday=0, Monday=1, etc.
                                 >
@@ -123,7 +123,7 @@ export default function AppointmentPage() {
                             {timeSlots.map((slot, index) => (
                                 <div
                                     key={index}
-                                    className="flex justify-between items-center bg-gray-700 p-4 rounded-lg"
+                                    className="flex justify-between items-center bg-emerald-200 p-4 rounded-lg"
                                 >
                                     <span>{slot.time}</span>
                                     <span className="flex items-center space-x-2">

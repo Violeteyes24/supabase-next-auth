@@ -8,7 +8,7 @@ export default function ApproveDenyPage() {
     const registrants = [
         {
             id: 1,
-            picture: "https://via.placeholder.com/50",
+            picture: "https://static.vecteezy.com/system/resources/previews/021/548/095/original/default-profile-picture-avatar-user-avatar-icon-person-icon-head-icon-profile-picture-icons-default-anonymous-user-male-and-female-businessman-photo-placeholder-social-network-avatar-portrait-free-vector.jpg",
             name: "John Doe",
             credentials: "PhD in Psychology",
             biography: "Experienced clinical psychologist with over 10 years of expertise in mental health services.",
@@ -16,7 +16,7 @@ export default function ApproveDenyPage() {
         },
         {
             id: 2,
-            picture: "https://via.placeholder.com/50",
+            picture: "https://static.vecteezy.com/system/resources/previews/021/548/095/original/default-profile-picture-avatar-user-avatar-icon-person-icon-head-icon-profile-picture-icons-default-anonymous-user-male-and-female-businessman-photo-placeholder-social-network-avatar-portrait-free-vector.jpg",
             name: "Jane Smith",
             credentials: "Master's in Counseling",
             biography: "Dedicated counselor specializing in adolescent therapy and family dynamics.",
@@ -24,7 +24,7 @@ export default function ApproveDenyPage() {
         },
         {
             id: 3,
-            picture: "https://via.placeholder.com/50",
+            picture: "https://static.vecteezy.com/system/resources/previews/021/548/095/original/default-profile-picture-avatar-user-avatar-icon-person-icon-head-icon-profile-picture-icons-default-anonymous-user-male-and-female-businessman-photo-placeholder-social-network-avatar-portrait-free-vector.jpg",
             name: "Alice Johnson",
             credentials: "Bachelor's in Social Work",
             biography: "Passionate social worker focused on community outreach and rehabilitation programs.",
@@ -43,25 +43,25 @@ export default function ApproveDenyPage() {
     };
 
     return (
-        <div className="h-screen bg-gray-800 flex">
+        <div className="h-screen bg-white flex">
             {/* Sidebar */}
             <Sidebar />
 
             {/* Main Content */}
-            <div className="flex-1 flex flex-col text-white ml-20 p-6">
+            <div className="flex-1 flex flex-col text-black ml-20 p-6">
                 <h1 className="text-3xl font-bold mt-4 mb-6">Approve or Deny Registrants</h1>
 
                 {/* Table */}
                 <div className="overflow-x-auto">
-                    <table className="min-w-full bg-gray-900 rounded-lg">
+                    <table className="min-w-full bg-emerald-200 rounded-lg">
                         <thead>
                             <tr>
-                                <th className="px-4 py-2 text-left text-gray-400">Picture</th>
-                                <th className="px-4 py-2 text-left text-gray-400">Name</th>
-                                <th className="px-4 py-2 text-left text-gray-400">Credentials</th>
-                                <th className="px-4 py-2 text-left text-gray-400">Biography</th>
-                                <th className="px-4 py-2 text-left text-gray-400">Department</th>
-                                <th className="px-4 py-2 text-center text-gray-400">Actions</th>
+                                <th className="px-4 py-2 text-left text-black">Picture</th>
+                                <th className="px-4 py-2 text-left text-black">Name</th>
+                                <th className="px-4 py-2 text-left text-black">Credentials</th>
+                                <th className="px-4 py-2 text-left text-black">Biography</th>
+                                <th className="px-4 py-2 text-left text-black">Department</th>
+                                <th className="px-4 py-2 text-center text-black">Actions</th>
                             </tr>
                         </thead>
                         <tbody>

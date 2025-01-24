@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Container, Grid } from '@mui/material';
+import { Container, Grid, Paper} from '@mui/material';
 import Sidebar from '../components/dashboard components/sidebar';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
@@ -26,31 +26,94 @@ export default function ReportsPage() {
         router.push('/login');
     };
 
-    return (
-        <main className="h-screen flex bg-gray-800">
-            <Sidebar handleLogout={handleLogout} />
-            <Container sx={{ marginTop: '32px' }}>
-                <h1 className="mb-8 text-3xl font-bold text-center text-gray-800 dark:text-white">
-                    Reports Dashboard
-                </h1>
+    const fetchReport = async() =>{
 
-                <Grid container spacing={4}>
-                    {/* Row 1 */}
-                    <Grid item xs={12} sm={6}>
+    }
+
+    return (
+        <main 
+        className="h-screen flex bg-white" 
+        style={{ 
+            flexDirection: 'column', 
+            flex: 1,
+            flexWrap: 'wrap', 
+            overflow: 'visible' 
+        }}
+    >
+        <Sidebar handleLogout={handleLogout} />
+        <Container sx={{ marginTop: '32px', flex: 1 }}>
+            <h1 className="mb-8 text-3xl font-bold text-center text-gray-800 dark:text-white">
+                Reports Dashboard
+            </h1>
+            <Grid container spacing={4}>
+                {/* Row 1 */}
+                <Grid item xs={12} sm={6}>
+                    <Paper 
+                        elevation={3} 
+                        sx={{ 
+                            padding: '16px', 
+                            borderRadius: '12px', 
+                            border: '1px solid #ccc', 
+                            backgroundColor: '#A7F3D0'
+                        }}
+                    >
                         <FrequencyChart />
-                    </Grid>
-                    <Grid item xs={12} sm={6}>
-                        <EmotionalStateChart />
-                    </Grid>
-                    {/* Row 2 */}
-                    <Grid item xs={12} sm={6}>
-                        <DemographicChart />
-                    </Grid>
-                    <Grid item xs={12} sm={6}>
-                        <FeedbackChart />
-                    </Grid>
+                        <div className="text-center mt-4">
+                            <h1 className="text-2xl font-bold">Frequent Topics</h1>
+                        </div>
+                    </Paper>
                 </Grid>
-            </Container>
-        </main>
+                <Grid item xs={12} sm={6}>
+                    <Paper 
+                        elevation={3} 
+                        sx={{ 
+                            padding: '16px', 
+                            borderRadius: '12px', 
+                            border: '1px solid #ccc', 
+                            backgroundColor: '#A7F3D0'
+                        }}
+                    >
+                        <EmotionalStateChart />
+                        <div className="text-center mt-4">
+                            <h1 className="text-2xl font-bold">Overall Mood State</h1>
+                        </div>
+                    </Paper>
+                </Grid>
+                {/* Row 2 */}
+                <Grid item xs={12} sm={6}>
+                    <Paper 
+                        elevation={3} 
+                        sx={{ 
+                            padding: '16px', 
+                            borderRadius: '12px', 
+                            border: '1px solid #ccc', 
+                            backgroundColor: '#A7F3D0'
+                        }}
+                    >
+                        <DemographicChart />
+                        <div className="text-center mt-4">
+                            <h1 className="text-2xl font-bold">Demographic Report</h1>
+                        </div>
+                    </Paper>
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                    <Paper 
+                        elevation={3} 
+                        sx={{ 
+                            padding: '16px', 
+                            borderRadius: '12px', 
+                            border: '1px solid #ccc', 
+                            backgroundColor: '#A7F3D0'
+                        }}
+                    >
+                        <FeedbackChart />
+                        <div className="text-center mt-4">
+                            <h1 className="text-2xl font-bold">Feedback Report</h1>
+                        </div>
+                    </Paper>
+                </Grid>
+            </Grid>
+        </Container>
+    </main>
     );
 }

@@ -75,7 +75,7 @@ const Sidebar = ({ handleLogout }) => {
     return (
         <Box>
             {/* Menu Button */}
-            <IconButton edge="start" color="inherit" aria-label="menu" style={{ marginLeft: '5px' }} onClick={toggleDrawer(true)}>
+            <IconButton edge="start" color="black" aria-label="menu" style={{ marginLeft: '5px' }} onClick={toggleDrawer(true)}>
                 <MenuIcon />
             </IconButton>
 

@@ -124,8 +124,8 @@ export default function LoginPage() {
 
     // Main login form
     return (
-        <main className="h-screen flex items-center justify-center bg-gray-800 p-6">
-            <div className="bg-gray-900 p-8 rounded-lg shadow-md w-96">
+        <main className="h-screen flex items-center justify-center bg-emerald-200 p-6">
+            <div className="bg-gray-800 p-8 rounded-lg shadow-md w-96">
                 <h1 className="mb-4 text-3xl font-extrabold text-gray-900 dark:text-white py-5">
                     <span className="text-transparent bg-clip-text bg-gradient-to-r to-emerald-600 from-sky-400">Mental </span>
                     <mark className="px-2 text-white bg-emerald-600 rounded dark:bg-emerald-300">Help</mark>
