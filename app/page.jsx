@@ -4,7 +4,7 @@ import { cookies } from 'next/headers'
 import Link from 'next/link';
 
 export default async function Home() {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const supabase = createServerComponentClient({ cookies: () => cookieStore });
 
   const { data: { user } } = await supabase.auth.getUser()

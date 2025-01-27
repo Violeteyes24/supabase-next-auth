@@ -6,9 +6,9 @@ export async function GET(request) {
     const requestUrl = new URL(request.url);
     const code = requestUrl.searchParams.get('code');
     if (code) {
-        const cookieStore = cookies();
+        const cookieStore = await cookies();
         const supabase = createRouteHandlerClient({cookies: () => cookieStore})
         await supabase.auth.exchangeCodeForSession(code);
     }
     return NextResponse.redirect(requestUrl.origin)
-}
+} 
