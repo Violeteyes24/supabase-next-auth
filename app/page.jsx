@@ -7,7 +7,10 @@ export default async function Home() {
   const cookieStore = await cookies();
   const supabase = createServerComponentClient({ cookies: () => cookieStore });
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user }, error } = await supabase.auth.getUser();
+
+  console.log("User:", user); // Logs to the terminal
+  console.log("Error:", error);
 
   if (!user) {
     return (

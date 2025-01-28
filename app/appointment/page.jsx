@@ -1,12 +1,5 @@
 'use client';
-/*
-mobile
 
-1. fetch availability schedule
-2. interactable, change is_available to false
-3. update table 
-
-*/
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import React, { useState } from 'react';
 import Sidebar from "../components/dashboard components/sidebar";
@@ -15,16 +8,21 @@ import { Modal, Box, Button, TextField } from '@mui/material';
 import { DatePicker, TimePicker, LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs from 'dayjs';
-
+import { useRouter } from 'next/navigation';
 
 export default function AppointmentPage() {
 
     const supabase = createClientComponentClient();
     const [selectedDate, setSelectedDate] = useState(dayjs()); // Current date as default
     const [openModal, setOpenModal] = useState(false);
+    const [openConfirmModal, setOpenConfirmModal] = useState(false); // For confirmation
     const [startTime, setStartTime] = useState(dayjs());
     const [endTime, setEndTime] = useState(dayjs());
     const [error, setError] = useState(null);
+    const [successMessage, setSuccessMessage] = useState(null); // For success message
+    const [errorMessage, setErrorMessage] = useState('');
+    const [openErrorModal, setOpenErrorModal] = useState(false);
+
 
     const handleLogout = async () => {
         const { error } = await supabase.auth.signOut();
@@ -36,48 +34,100 @@ export default function AppointmentPage() {
     };
 
     const handleAddSchedule = async () => {
-        try {
-            setError(''); // Clear any previous errors
+    if (endTime.isBefore(startTime)) {
+        setError('End time must be after start time.');
+        return;
+    }
 
-            // Fetch the authenticated user
-            const { data: { user }, error: userError } = await supabase.auth.getUser();
+    setError(''); // Clear previous errors
 
-            if (userError || !user) {
-                setError('Unable to fetch user data. Please log in again.');
-                return;
-            }
+    // Check for time conflicts
+    const { data: existingSchedules, error: fetchError } = await supabase
+        .from('availability_schedules')
+        .select('*')
+        .eq('date', selectedDate.format('YYYY-MM-DD')) // Filter by the selected date
+        .gte('start_time', startTime.format('HH:mm')) // Ensure start time is not before the new time slot
+        .lt('end_time', endTime.format('HH:mm')); // Ensure end time does not overlap with existing schedules
 
-            const counselorId = user.id; // Use the user's ID as the counselor_id
+    if (fetchError) {
+        console.error('Error fetching existing schedules:', fetchError.message);
+        setError('An error occurred while checking for schedule conflicts.');
+        return;
+    }
 
-            // Insert availability schedule into the database
-            const { data, error } = await supabase
-                .from('availability_schedules')
-                .insert([
-                    {
-                        counselor_id: counselorId,
-                        start_time: startTime.format("HH:mm"),
-                        end_time: endTime.format("HH:mm"),
-                        date: selectedDate.format("YYYY-MM-DD"),
-                        is_available: true,
-                    },
-                ]);
+    if (existingSchedules.length > 0) {
+        setError('Hey, that schedule already exists.');
+        setOpenErrorModal(true);
+        return;
+    }
 
-            if (error) {
-                console.error('Error adding schedule:', error.message, error.details, error.hint);
-                setError('An error occurred while adding your availability schedule.');
-                return;
-            }
+    // Open confirmation modal if no conflicts
+    setOpenConfirmModal(true);
+};
 
-            console.log('Availability schedule added:', data);
-            setOpenModal(false); // Close the modal after a successful operation
-            setError('Schedule added successfully.');
-        } catch (error) {
-            console.error('Unexpected error:', error);
-            setError('An unexpected error occurred while adding the schedule.');
+    const handleConfirmAddSchedule = async () => {
+    try {
+        // Fetch the authenticated user
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+        if (userError || !user) {
+            setError('Unable to fetch user data. Please log in again.');
+            return;
         }
-    };
 
+        const counselorId = user.id; // Use the user's ID as the counselor_id
 
+        // Validate if there's already an existing schedule for the selected date and time range
+        const { data: existingSchedules, error: fetchError } = await supabase
+            .from('availability_schedules')
+            .select('*')
+            .eq('counselor_id', counselorId)
+            .eq('date', selectedDate.format('YYYY-MM-DD'))
+            .gte('start_time', startTime.format('HH:mm'))
+            .lt('end_time', endTime.format('HH:mm'));
+
+        if (fetchError) {
+            console.error('Error fetching existing schedules:', fetchError.message);
+            setError('An error occurred while checking for conflicts.');
+            return;
+        }
+
+        if (existingSchedules.length > 0) {
+            setError('Hey, that schedule already exists.');
+            setOpenErrorModal(true);  // Show the error modal if a conflict is found
+            return; // Prevent further execution
+        }
+
+        // Insert the availability schedule into the database if no conflicts
+        const { data, error } = await supabase
+            .from('availability_schedules')
+            .insert([
+                {
+                    counselor_id: counselorId,
+                    start_time: startTime.format("HH:mm"),
+                    end_time: endTime.format("HH:mm"),
+                    date: selectedDate.format("YYYY-MM-DD"),
+                    is_available: true,
+                },
+            ]);
+
+        if (error) {
+            console.error('Error adding schedule:', error.message, error.details, error.hint);
+            setError('An error occurred while adding your availability schedule.');
+            return;
+        }
+
+        console.log('Availability schedule added:', data);
+        setOpenModal(false); // Close the modal after a successful operation
+        setSuccessMessage('Schedule added successfully.');
+        setError(null); // Clear error message
+    } catch (error) {
+        console.error('Unexpected error:', error);
+        setError('An unexpected error occurred while adding the schedule.');
+    }
+
+    setOpenConfirmModal(false); // Close the confirmation modal
+};
 
     const timeSlots = [
         { time: "8:30 - 9:30", student: 8 },
@@ -157,6 +207,9 @@ export default function AppointmentPage() {
                         </Button>
                     </div>
 
+                    {/* Error or Success Message */}
+                    {error && <p className="text-red-500">{error}</p>}
+                    {successMessage && <p className="text-green-500">{successMessage}</p>}
                 </div>
 
                 {/* Modal for Adding Availability */}
@@ -202,6 +255,57 @@ export default function AppointmentPage() {
                         </div>
                     </Box>
                 </Modal>
+
+                {/* Confirmation Modal */}
+                <Modal open={openConfirmModal} onClose={() => setOpenConfirmModal(false)}>
+                    <Box
+                        sx={{
+                            position: 'absolute',
+                            top: '50%',
+                            left: '50%',
+                            transform: 'translate(-50%, -50%)',
+                            bgcolor: 'background.paper',
+                            boxShadow: 24,
+                            p: 4,
+                            width: 300,
+                        }}
+                    >
+                        <h2 className="mb-4 text-lg font-bold">Confirm Schedule</h2>
+                        <p>Are you sure you want to add the availability schedule from {startTime.format('HH:mm')} to {endTime.format('HH:mm')}?</p>
+                        <div className="mt-4 flex justify-between">
+                            <Button variant="contained" onClick={handleConfirmAddSchedule}>
+                                Yes
+                            </Button>
+                            <Button variant="outlined" onClick={() => setOpenConfirmModal(false)}>
+                                No
+                            </Button>
+                        </div>
+                    </Box>
+                </Modal>
+
+                <Modal open={openErrorModal} onClose={() => setOpenErrorModal(false)}>
+    <Box
+        sx={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            bgcolor: 'background.paper',
+            boxShadow: 24,
+            p: 4,
+            width: 300,
+        }}
+    >
+        <h2 className="mb-4 text-lg font-bold">Error</h2>
+        <p>{errorMessage}</p>
+        <div className="mt-4 flex justify-center">
+            <Button variant="outlined" onClick={() => setOpenErrorModal(false)}>
+                Close
+            </Button>
+        </div>
+    </Box>
+</Modal>
+
             </div>
         </LocalizationProvider>
     );
