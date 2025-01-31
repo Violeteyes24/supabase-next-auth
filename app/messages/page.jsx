@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Sidebar from "../components/dashboard components/sidebar";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import { FaPlus } from 'react-icons/fa'; // Import the plus icon from react-icons
 
 export default function MessagePage() {
 
@@ -14,6 +15,11 @@ export default function MessagePage() {
     const [conversations, setConversations] = useState([]);
     const [loading, setLoading] = useState(false);
     const [predefinedOptions, setPredefinedOptions] = useState([]);
+    const [currentParentId, setCurrentParentId] = useState(13); // Set the initial parent_id to 13
+    const [users, setUsers] = useState([]);
+    const [selectedUser, setSelectedUser] = useState(null);
+    const [showUserModal, setShowUserModal] = useState(false);
+    const [selectedMessage, setSelectedMessage] = useState(null); // Add state to store the selected message
 
     useEffect(() => {
         const getSession = async () => {
@@ -32,6 +38,12 @@ export default function MessagePage() {
         console.log("Predefined options state updated:", predefinedOptions);
     }, [predefinedOptions]);
 
+    useEffect(() => {
+        if (selectedMessage && selectedUser) {
+            sendMessage();
+        }
+    }, [selectedMessage, selectedUser]);
+
     const fetchMessages = async (id) => {
         console.log("Fetching messages for ID:", id);
         if (!id) return;
@@ -49,15 +61,19 @@ export default function MessagePage() {
             console.error("Error fetching messages:", error);
         } else {
             setMessages(data || []);
-            fetchPredefinedOptions();
+            fetchPredefinedOptions(currentParentId); // Fetch predefined options starting from the initial parent_id
         }
     };
 
-    const fetchPredefinedOptions = async () => {
-        console.log("Fetching predefined options");
-        const { data, error } = await supabase
-            .from("predefined_messages")
-            .select("*");
+    const fetchPredefinedOptions = async (parentId = 13) => {
+        console.log("Fetching predefined options for parent ID:", parentId);
+        let query = supabase.from("predefined_messages").select("*").eq("message_role", "counselor");
+        if (parentId !== null) {
+            query = query.eq("parent_id", parentId);
+        } else {
+            query = query.is("parent_id", null);
+        }
+        const { data, error } = await query;
 
         console.log("Fetched predefined messages:", data);
         console.log("Fetch predefined messages error:", error);
@@ -69,14 +85,24 @@ export default function MessagePage() {
         }
     };
 
-    const sendMessage = async (selectedMessage) => {
+    const sendMessage = async () => {
         console.log("Sending message:", selectedMessage);
+        if (!selectedMessage || !selectedUser) {
+            console.error("No message or user selected");
+            return;
+        }
         const { error } = await supabase.from("messages").insert([
             {
                 sender_id: session?.user.id, // User selecting the message
-                receiver_id: session?.user.id, // Assuming a predefined flow
-                message_content: selectedMessage.message_text,
+                receiver_id: selectedUser.user_id, // Send to the selected user
                 sent_at: new Date().toISOString(),
+                received_at: null,
+                is_read: false,
+                conversation_id: null,
+                message_type: 'text',
+                read_at: null,
+                is_delivered: false,
+                message_content_id: selectedMessage.message_content_id // Use message_content_id instead of message_content
             },
         ]);
 
@@ -151,12 +177,47 @@ export default function MessagePage() {
         }
     };
 
+    const fetchUsers = async () => {
+        console.log("Fetching users");
+        const { data, error } = await supabase
+            .from("users")
+            .select("user_id, name");
+
+        console.log("Fetched users:", data);
+        console.log("Fetch users error:", error);
+
+        if (error) {
+            console.error("Error fetching users:", error);
+        } else {
+            setUsers(data || []);
+        }
+    };
+
     useEffect(() => {
         if (session) {
             fetchConversations();
-            fetchPredefinedOptions(); // Ensure predefined options are fetched on load
+            fetchPredefinedOptions(currentParentId); // Ensure predefined options are fetched on load
         }
     }, [session]);
+
+    const handleOptionClick = (option) => {
+        console.log("Selected message:", option);
+        setCurrentParentId(option.message_content_id);
+        setSelectedMessage(option); // Store the selected message
+        fetchPredefinedOptions(option.message_content_id); // Fetch next set of options based on selected parent ID
+    };
+
+    const handlePlusClick = () => {
+        fetchUsers();
+        setShowUserModal(true);
+    };
+
+    const handleUserSelect = (user) => {
+        console.log("Selected user:", user);
+        setSelectedUser(user);
+        setShowUserModal(false);
+        fetchPredefinedOptions(currentParentId); // Fetch predefined options for the new conversation
+    };
 
     return (
         <div className="h-screen flex">
@@ -165,7 +226,10 @@ export default function MessagePage() {
 
             {/* Message Sidebar */}
             <div className="w-1/4 bg-gray-100 border-r overflow-y-auto">
-                <div className="p-4 font-bold text-gray-700">Messages</div>
+                <div className="p-4 font-bold text-gray-700 flex items-center justify-between">
+                    Messages
+                    <FaPlus className="cursor-pointer" onClick={handlePlusClick} />
+                </div>
                 {conversations.map((conversation, index) => (
                     <div
                         key={index}
@@ -184,7 +248,7 @@ export default function MessagePage() {
             <div className="flex-1 flex flex-col bg-gray-200">
                 {/* Header */}
                 <div className="bg-gray-900 text-white text-xl py-4 px-6 font-bold shadow-md">
-                    Name of the Person
+                    {selectedUser ? selectedUser.name : "Name of the Person"}
                 </div>
 
                 {/* Chat Messages */}
@@ -213,14 +277,40 @@ export default function MessagePage() {
                             <button
                                 key={index}
                                 className="bg-emerald-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-                                onClick={() => sendMessage(option)}
+                                onClick={() => handleOptionClick(option)}
                             >
-                                {option.message_text}
+                                {option.message_content}
                             </button>
                         ))}
                     </div>
                 </div>
             </div>
+
+            {/* User Selection Modal */}
+            {showUserModal && (
+                <div className="fixed inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center">
+                    <div className="bg-gray-700 p-4 rounded-lg shadow-lg">
+                        <h2 className="text-xl font-bold mb-4">Select User</h2>
+                        <ul>
+                            {users.map((user) => (
+                                <li
+                                    key={user.user_id}
+                                    className="cursor-pointer hover:bg-gray-200 p-2 rounded"
+                                    onClick={() => handleUserSelect(user)}
+                                >
+                                    {user.name}
+                                </li>
+                            ))}
+                        </ul>
+                        <button
+                            className="mt-4 bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
+                            onClick={() => setShowUserModal(false)}
+                        >
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
