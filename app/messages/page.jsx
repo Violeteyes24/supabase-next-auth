@@ -2,58 +2,38 @@
 
 import React, { useState, useEffect } from "react";
 import Sidebar from "../components/dashboard components/sidebar";
-import { supabase } from "../utils/supabaseClient"; // Ensure you have supabase client setup
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 
 export default function MessagePage() {
-    // Conversation flow
-    const conversationFlow = [
-        {
-            sender: "System",
-            message: "Welcome to the support center! How can I help you?",
-            options: [
-                { label: "Account Issues", next: 1 },
-                { label: "Technical Support", next: 2 },
-                { label: "Other", next: 3 },
-            ],
-        },
-        {
-            sender: "System",
-            message: "Please describe your account issue:",
-            options: [
-                { label: "Login Problem", next: 4 },
-                { label: "Account Locked", next: 4 },
-            ],
-        },
-        {
-            sender: "System",
-            message: "What technical issue are you facing?",
-            options: [
-                { label: "App Crash", next: 4 },
-                { label: "Slow Performance", next: 4 },
-            ],
-        },
-        {
-            sender: "System",
-            message: "Can you tell us more about your concern?",
-            options: [
-                { label: "Yes", next: 4 },
-                { label: "No", next: 4 },
-            ],
-        },
-        {
-            sender: "System",
-            message: "Thank you for your feedback! We'll get back to you shortly.",
-            options: [],
-        },
-    ];
 
-    const [currentStep, setCurrentStep] = useState(0);
+    const supabase = createClientComponentClient();
+    const [session, setSession] = useState(null);
+
+    // const [currentStep, setCurrentStep] = useState(0);
     const [messages, setMessages] = useState([]);
     const [conversations, setConversations] = useState([]);
     const [loading, setLoading] = useState(false);
     const [predefinedOptions, setPredefinedOptions] = useState([]);
 
+    useEffect(() => {
+        const getSession = async () => {
+            const { data: { session } } = await supabase.auth.getSession();
+            console.log("Session:", session);
+            setSession(session);
+        };
+        getSession();
+    }, []);
+
+    useEffect(() => {
+        console.log("Messages state updated:", messages);
+    }, [messages]);
+
+    useEffect(() => {
+        console.log("Predefined options state updated:", predefinedOptions);
+    }, [predefinedOptions]);
+
     const fetchMessages = async (id) => {
+        console.log("Fetching messages for ID:", id);
         if (!id) return;
 
         const { data, error } = await supabase
@@ -61,6 +41,9 @@ export default function MessagePage() {
             .select("*")
             .or(`sender_id.eq.${id},receiver_id.eq.${id}`)
             .order("sent_at", { ascending: true });
+        
+        console.log("Fetched messages:", data);
+        console.log("Fetch messages error:", error);
 
         if (error) {
             console.error("Error fetching messages:", error);
@@ -71,9 +54,13 @@ export default function MessagePage() {
     };
 
     const fetchPredefinedOptions = async () => {
+        console.log("Fetching predefined options");
         const { data, error } = await supabase
             .from("predefined_messages")
             .select("*");
+
+        console.log("Fetched predefined messages:", data);
+        console.log("Fetch predefined messages error:", error);
 
         if (error) {
             console.error("Error fetching predefined messages:", error);
@@ -83,23 +70,27 @@ export default function MessagePage() {
     };
 
     const sendMessage = async (selectedMessage) => {
+        console.log("Sending message:", selectedMessage);
         const { error } = await supabase.from("messages").insert([
             {
-                sender_id: id, // User selecting the message
-                receiver_id: id, // Assuming a predefined flow
+                sender_id: session?.user.id, // User selecting the message
+                receiver_id: session?.user.id, // Assuming a predefined flow
                 message_content: selectedMessage.message_text,
                 sent_at: new Date().toISOString(),
             },
         ]);
 
+        console.log("Send message error:", error);
+
         if (error) {
             console.error("Error sending message:", error);
         } else {
-            fetchMessages(id); // Refresh messages after sending
+            fetchMessages(session?.user.id); // Refresh messages after sending
         }
     };
 
     const fetchConversations = async () => {
+        console.log("Fetching conversations");
         setLoading(true);
         try {
             const currentUserId = session?.user.id;
@@ -109,6 +100,9 @@ export default function MessagePage() {
                 .select("sender_id, receiver_id, sent_at, predefined_messages!inner(message_content)")
                 .or(`sender_id.eq.${currentUserId}, receiver_id.eq.${currentUserId}`)
                 .order("sent_at", { ascending: false });
+
+            console.log("Fetched conversations:", data);
+            console.log("Fetch conversations error:", error);
 
             if (error) throw error;
 
@@ -135,6 +129,9 @@ export default function MessagePage() {
                         .select("user_id, name")
                         .in("user_id", userIds);
 
+                    console.log("Fetched users:", users);
+                    console.log("Fetch users error:", userError);
+
                     if (!userError && users) {
                         users.forEach((user) => {
                             if (uniqueConversations[user.user_id]) {
@@ -155,8 +152,11 @@ export default function MessagePage() {
     };
 
     useEffect(() => {
-        fetchConversations();
-    }, []);
+        if (session) {
+            fetchConversations();
+            fetchPredefinedOptions(); // Ensure predefined options are fetched on load
+        }
+    }, [session]);
 
     return (
         <div className="h-screen flex">
@@ -192,10 +192,10 @@ export default function MessagePage() {
                     {messages.map((msg, index) => (
                         <div
                             key={index}
-                            className={`flex ${msg.sender_id === id ? "justify-end" : "justify-start"}`}
+                            className={`flex ${msg.sender_id === session?.user.id ? "justify-end" : "justify-start"}`}
                         >
                             <div
-                                className={`p-4 rounded-lg shadow-md ${msg.sender_id === id
+                                className={`p-4 rounded-lg shadow-md ${msg.sender_id === session?.user.id
                                     ? "bg-blue-600 text-white"
                                     : "bg-gray-200 text-black"
                                     } max-w-sm`}
