@@ -1,144 +1,84 @@
-'use client'
+'use client';
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import Sidebar from "../components/dashboard components/sidebar";
 
-export default function MessagePage() {
-    // Conversation flow
-    const conversationFlow = [
-        {
-            sender: "System",
-            message: "Welcome to the support center! How can I help you?",
-            options: [
-                { label: "Account Issues", next: 1 },
-                { label: "Technical Support", next: 2 },
-                { label: "Other", next: 3 },
-            ],
-        },
-        {
-            sender: "System",
-            message: "Please describe your account issue:",
-            options: [
-                { label: "Login Problem", next: 4 },
-                { label: "Account Locked", next: 4 },
-            ],
-        },
-        {
-            sender: "System",
-            message: "What technical issue are you facing?",
-            options: [
-                { label: "App Crash", next: 4 },
-                { label: "Slow Performance", next: 4 },
-            ],
-        },
-        {
-            sender: "System",
-            message: "Can you tell us more about your concern?",
-            options: [
-                { label: "Yes", next: 4 },
-                { label: "No", next: 4 },
-            ],
-        },
-        {
-            sender: "System",
-            message: "Thank you for your feedback! We'll get back to you shortly.",
-            options: [],
-        },
-    ];
+// Initialize Supabase Client
+const supabase = createClientComponentClient();
 
-    const [currentStep, setCurrentStep] = useState(0);
-    const [messages, setMessages] = useState([
-        { sender: "System", message: conversationFlow[0].message },
-    ]);
+export default function NotificationsPage() {
+    const [notifications, setNotifications] = useState([]);
 
-    const handleOptionClick = (nextStep) => {
-        const nextMessage = conversationFlow[nextStep];
-        setMessages([...messages, { sender: "System", message: nextMessage.message }]);
-        setCurrentStep(nextStep);
-    };
+    // Fetch notifications from Supabase
+    useEffect(() => {
+        const fetchNotifications = async () => {
+            const { data, error } = await supabase
+                .from("notifications")
+                .select("*")
+                .order("sent_at", { ascending: false });
 
-    const mockMessageList = [
-        {
-            sender: "John Doe",
-            summary: "Hey, I'm depressed",
-            timestamp: "2m ago",
-        },
-        {
-            sender: "Jane Smith",
-            summary: "My head keeps crashing. What should I do?",
-            timestamp: "5m ago",
-        },
-        {
-            sender: "System",
-            summary: "Welcome to the support center! How can you help me?",
-            timestamp: "10m ago",
-        },
-    ];
+            if (error) {
+                console.error("Error fetching notifications:", error);
+            } else {
+                setNotifications(data);
+            }
+        };
+
+        fetchNotifications();
+
+        // Set up real-time listener
+        const subscription = supabase
+            .channel("realtime-notifications")
+            .on(
+                "postgres_changes",
+                { event: "INSERT", schema: "public", table: "notifications" },
+                (payload) => {
+                    setNotifications((prevNotifications) => [
+                        { ...payload.new },
+                        ...prevNotifications,
+                    ]);
+                }
+            )
+            .subscribe();
+
+        // Cleanup subscription on component unmount
+        return () => {
+            supabase.removeChannel(subscription);
+        };
+    }, []);
 
     return (
         <div className="h-screen flex">
             {/* Navigation Sidebar */}
             <Sidebar />
 
-            {/* Message Sidebar */}
+            {/* Notifications Panel */}
             <div className="w-1/4 bg-gray-100 border-r overflow-y-auto">
                 <div className="p-4 font-bold text-gray-700">Notifications</div>
-                {mockMessageList.map((message, index) => (
-                    <div
-                        key={index}
-                        className="flex items-center px-4 py-2 hover:bg-gray-200 cursor-pointer"
-                    >
-                        <div className="w-12 h-12 bg-gray-300 rounded-full flex-shrink-0"></div>
-                        <div className="ml-4">
-                            <div className="font-bold text-gray-800">{message.sender}</div>
-                            <div className="text-sm text-gray-600">{message.summary}</div>
-                            <div className="text-xs text-gray-400">{message.timestamp}</div>
-                        </div>
-                    </div>
-                ))}
-            </div>
-
-            {/* Main Chat Area */}
-            <div className="flex-1 flex flex-col bg-gray-200">
-                {/* Header */}
-                <div className="bg-gray-900 text-white text-xl py-4 px-6 font-bold shadow-md">
-                    Name of the Person
-                </div>
-
-                {/* Chat Messages */}
-                <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                    {messages.map((msg, index) => (
+                {notifications.length > 0 ? (
+                    notifications.map((notification, index) => (
                         <div
                             key={index}
-                            className={`flex ${msg.sender === "System" ? "justify-start" : "justify-end"
-                                }`}
+                            className="flex items-center px-4 py-2 hover:bg-gray-200 cursor-pointer"
                         >
-                            <div
-                                className={`p-4 rounded-lg shadow-md ${msg.sender === "System"
-                                    ? "bg-gray-200 text-black"
-                                    : "bg-blue-600 text-white"
-                                    } max-w-sm`}
-                            >
-                                {msg.message}
+                            <div className="w-12 h-12 bg-gray-300 rounded-full flex-shrink-0"></div>
+                            <div className="ml-4">
+                                <div className="font-bold text-gray-800">
+                                    {notification.user_id || "System"}
+                                </div>
+                                <div className="text-sm text-gray-600">
+                                    {notification.notification_content}
+                                </div>
+                                <div className="text-xs text-gray-400">
+                                    {new Date(notification.sent_at).toLocaleString()}
+                                </div>
                             </div>
                         </div>
-                    ))}
-                </div>
-
-                {/* Footer with Options */}
-                <div className="bg-gray-900 p-4">
-                    <div className="flex space-x-4 justify-center">
-                        {conversationFlow[currentStep]?.options.map((option, index) => (
-                            <button
-                                key={index}
-                                className="bg-emerald-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-                                onClick={() => handleOptionClick(option.next)}
-                            >
-                                {option.label}
-                            </button>
-                        ))}
-                    </div>
-                </div>
+                    ))
+                ) : (
+                    <div className="p-4 text-gray-600">No notifications yet.</div>
+                )}
             </div>
         </div>
     );
