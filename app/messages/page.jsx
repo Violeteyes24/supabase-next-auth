@@ -44,15 +44,26 @@ export default function MessagePage() {
         }
     }, [selectedMessage, selectedUser]);
 
+    useEffect(() => {
+        if (session) {
+            fetchConversations();
+            fetchPredefinedOptions(currentParentId); // Ensure predefined options are fetched on load
+            fetchMessages(); // Fetch messages when session is set
+        }
+    }, [session]);
+
     const fetchMessages = async () => {
-
         const { data, error } = await supabase
-        .from("messages")
-        .select("*")
-        .or(`sender_id.eq.${session?.user.id},receiver_id.eq.${session?.user.id}`)
-        .order("sent_at", { ascending: true });
+            .from("messages")
+            .select(`
+                *,
+                predefined_messages (
+                    message_content
+                )
+            `)
+            .or(`sender_id.eq.${session?.user.id},receiver_id.eq.${session?.user.id}`)
+            .order("sent_at", { ascending: true });
 
-        
         console.log("Fetched messages:", data);
         console.log("Fetch messages error:", error);
 
@@ -75,7 +86,7 @@ export default function MessagePage() {
         const { data, error } = await query;
 
         console.log("Fetched predefined messages:", data);
-        console.log("Fetch predefined messages error:", error);
+        // console.log("Fetch predefined messages error:", error);
 
         if (error) {
             console.error("Error fetching predefined messages:", error);
@@ -115,7 +126,7 @@ export default function MessagePage() {
     };
 
     const fetchConversations = async () => {
-        console.log("Fetching conversations");
+        // console.log("Fetching conversations");
         setLoading(true);
         try {
             const currentUserId = session?.user.id;
@@ -163,7 +174,7 @@ export default function MessagePage() {
                         .in("user_id", userIds);
 
                     console.log("Fetched users:", users);
-                    console.log("Fetch users error:", userError);
+                    // console.log("Fetch users error:", userError);
 
                     if (!userError && users) {
                         users.forEach((user) => {
@@ -238,11 +249,11 @@ export default function MessagePage() {
                     Messages
                     <FaPlus className="cursor-pointer" onClick={handlePlusClick} />
                 </div>
-                {conversations.map((conversation, index, user) => (
+                {conversations.map((conversation, index) => (
                     <div
                         key={index}
                         className="flex items-center px-4 py-2 hover:bg-gray-200 cursor-pointer"
-                        onClick={() => handleUserSelect(user)}
+                        onClick={() => handleUserSelect(conversation)}
                     >
                         <div className="w-12 h-12 bg-gray-300 rounded-full flex-shrink-0"></div>
                         <div className="ml-4">
@@ -275,7 +286,7 @@ export default function MessagePage() {
                                     : "bg-gray-200 text-black"
                                     } max-w-sm`}
                             >
-                                {msg.message_content}
+                                {msg.predefined_messages ? msg.predefined_messages.message_content : "No content"}
                             </div>
                         </div>
                     ))}
