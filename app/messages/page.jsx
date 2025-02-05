@@ -24,7 +24,7 @@ export default function MessagePage() {
     useEffect(() => {
         const getSession = async () => {
             const { data: { session } } = await supabase.auth.getSession();
-            console.log("Session:", session);
+            // console.log("Session:", session);
             setSession(session);
         };
         getSession();
@@ -44,15 +44,14 @@ export default function MessagePage() {
         }
     }, [selectedMessage, selectedUser]);
 
-    const fetchMessages = async (id) => {
-        console.log("Fetching messages for ID:", id);
-        if (!id) return;
+    const fetchMessages = async () => {
 
         const { data, error } = await supabase
-            .from("messages")
-            .select("*")
-            .or(`sender_id.eq.${id},receiver_id.eq.${id}`)
-            .order("sent_at", { ascending: true });
+        .from("messages")
+        .select("*")
+        .or(`sender_id.eq.${session?.user.id},receiver_id.eq.${session?.user.id}`)
+        .order("sent_at", { ascending: true });
+
         
         console.log("Fetched messages:", data);
         console.log("Fetch messages error:", error);
@@ -111,7 +110,7 @@ export default function MessagePage() {
         if (error) {
             console.error("Error sending message:", error);
         } else {
-            fetchMessages(session?.user.id); // Refresh messages after sending
+            fetchMessages(); // Refresh messages after sending
         }
     };
 
@@ -123,14 +122,22 @@ export default function MessagePage() {
 
             let { data, error } = await supabase
                 .from("messages")
-                .select("sender_id, receiver_id, sent_at, predefined_messages!inner(message_content)")
-                .or(`sender_id.eq.${currentUserId}, receiver_id.eq.${currentUserId}`)
+                .select(`
+                    sender_id,
+                    receiver_id,
+                    sent_at,
+                    predefined_messages (
+                        message_content
+                    )
+                `)
+                .or(`sender_id.eq.${currentUserId},receiver_id.eq.${currentUserId}`)
                 .order("sent_at", { ascending: false });
 
             console.log("Fetched conversations:", data);
-            console.log("Fetch conversations error:", error);
-
-            if (error) throw error;
+            if (error) {
+                console.log("Fetch conversations error:", error);
+                return;
+            }
 
             if (!data || data.length === 0) {
                 setConversations([]);
@@ -143,7 +150,7 @@ export default function MessagePage() {
                         uniqueConversations[otherUserId] = {
                             user_id: otherUserId,
                             name: "Unknown", // To be updated later
-                            message_content: msg.predefined_messages?.[0]?.message_content ?? "No content",
+                            message_content: msg.predefined_messages ? msg.predefined_messages.message_content : "No content",
                         };
                     }
                 }
