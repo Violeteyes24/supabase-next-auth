@@ -224,6 +224,7 @@ export default function MessagePage() {
         setSelectedUser(user);
         setShowUserModal(false);
         fetchPredefinedOptions(currentParentId); // Fetch predefined options for the new conversation
+        fetchConversations(); // Fetch messages for the selected user
     };
 
     return (
@@ -237,15 +238,18 @@ export default function MessagePage() {
                     Messages
                     <FaPlus className="cursor-pointer" onClick={handlePlusClick} />
                 </div>
-                {conversations.map((conversation, index) => (
+                {conversations.map((conversation, index, user) => (
                     <div
                         key={index}
                         className="flex items-center px-4 py-2 hover:bg-gray-200 cursor-pointer"
+                        onClick={() => handleUserSelect(user)}
                     >
                         <div className="w-12 h-12 bg-gray-300 rounded-full flex-shrink-0"></div>
                         <div className="ml-4">
-                            <div className="font-bold text-gray-800">{conversation.name}</div>
+                            <div className="font-bold text-gray-800">{conversation.name}</div> 
                             <div className="text-sm text-gray-600">{conversation.message_content}</div>
+                            {/* This is the part where I display the last message of the conversation right? if I click this, this should 
+                            all display the messages of the conversation */}
                         </div>
                     </div>
                 ))}
