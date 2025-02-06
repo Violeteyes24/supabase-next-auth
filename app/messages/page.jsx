@@ -39,12 +39,6 @@ export default function MessagePage() {
     }, [predefinedOptions]);
 
     useEffect(() => {
-        if (selectedMessage && selectedUser) {
-            sendMessage();
-        }
-    }, [selectedMessage, selectedUser]);
-
-    useEffect(() => {
         if (session) {
             fetchConversations();
             fetchPredefinedOptions(currentParentId); // Ensure predefined options are fetched on load
@@ -120,8 +114,8 @@ export default function MessagePage() {
         }
         const { error } = await supabase.from("messages").insert([
             {
-                sender_id: session?.user.id, // User selecting the message
-                receiver_id: selectedUser.user_id, // Send to the selected user
+                sender_id: session?.user.id, 
+                receiver_id: selectedUser.user_id, 
                 sent_at: new Date().toISOString(),
                 received_at: null,
                 is_read: false,
@@ -129,7 +123,7 @@ export default function MessagePage() {
                 message_type: 'text',
                 read_at: null,
                 is_delivered: false,
-                message_content_id: selectedMessage.message_content_id // Use message_content_id instead of message_content
+                message_content_id: selectedMessage.message_content_id 
             },
         ]);
 
@@ -240,6 +234,9 @@ export default function MessagePage() {
         setCurrentParentId(option.message_content_id);
         setSelectedMessage(option); // Store the selected message
         fetchPredefinedOptions(option.message_content_id); // Fetch next set of options based on selected parent ID
+        if (selectedMessage && selectedUser) {
+            sendMessage();
+        }
     };
 
     const handlePlusClick = () => {
