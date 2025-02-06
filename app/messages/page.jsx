@@ -49,6 +49,23 @@ export default function MessagePage() {
             fetchConversations();
             fetchPredefinedOptions(currentParentId); // Ensure predefined options are fetched on load
             fetchMessages(); // Fetch messages when session is set
+
+            const messageChannel = supabase.channel('message-changes')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, () => {
+                    fetchMessages(); // Refetch messages on any change
+                })
+                .subscribe();
+
+            const predefinedMessageChannel = supabase.channel('predefined-message-changes')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'predefined_messages' }, () => {
+                    fetchPredefinedOptions(currentParentId); // Refetch predefined options on any change
+                })
+                .subscribe();
+
+            return () => {
+                supabase.removeChannel(messageChannel);
+                supabase.removeChannel(predefinedMessageChannel);
+            };
         }
     }, [session]);
 
