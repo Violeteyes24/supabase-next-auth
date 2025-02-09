@@ -1,36 +1,31 @@
 // Import necessary dependencies
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Sidebar from "../components/dashboard components/sidebar";
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 
 export default function ApproveDenyPage() {
-    const registrants = [
-        {
-            id: 1,
-            picture: "https://static.vecteezy.com/system/resources/previews/021/548/095/original/default-profile-picture-avatar-user-avatar-icon-person-icon-head-icon-profile-picture-icons-default-anonymous-user-male-and-female-businessman-photo-placeholder-social-network-avatar-portrait-free-vector.jpg",
-            name: "John Doe",
-            credentials: "PhD in Psychology",
-            biography: "Experienced clinical psychologist with over 10 years of expertise in mental health services.",
-            department: "Psychology",
-        },
-        {
-            id: 2,
-            picture: "https://static.vecteezy.com/system/resources/previews/021/548/095/original/default-profile-picture-avatar-user-avatar-icon-person-icon-head-icon-profile-picture-icons-default-anonymous-user-male-and-female-businessman-photo-placeholder-social-network-avatar-portrait-free-vector.jpg",
-            name: "Jane Smith",
-            credentials: "Master's in Counseling",
-            biography: "Dedicated counselor specializing in adolescent therapy and family dynamics.",
-            department: "Counseling",
-        },
-        {
-            id: 3,
-            picture: "https://static.vecteezy.com/system/resources/previews/021/548/095/original/default-profile-picture-avatar-user-avatar-icon-person-icon-head-icon-profile-picture-icons-default-anonymous-user-male-and-female-businessman-photo-placeholder-social-network-avatar-portrait-free-vector.jpg",
-            name: "Alice Johnson",
-            credentials: "Bachelor's in Social Work",
-            biography: "Passionate social worker focused on community outreach and rehabilitation programs.",
-            department: "Social Work",
-        },
-    ];
+    const supabase = createClientComponentClient();
+    const [registrants, setRegistrants] = useState([]);
+
+    useEffect(() => {
+        fetchRegistrants();
+    }, []);
+
+    const fetchRegistrants = async () => {
+        const { data, error } = await supabase
+            .from("users")
+            .select("user_id, name, credentials, department_assigned, short_biography, user_type") // Adjust the columns to match your table schema
+            .in("user_type", ["counselor", "secretary"]);
+
+        console.log("Fetched registrants:", data);
+        if (error) {
+            console.error("Fetch registrants error:", error.message, error.details, error.hint);
+        } else {
+            setRegistrants(data || []);
+        }
+    };
 
     const handleApprove = (id) => {
         console.log(`Approved registrant with ID: ${id}`);
@@ -58,6 +53,7 @@ export default function ApproveDenyPage() {
                             <tr>
                                 <th className="px-4 py-2 text-left text-black">Picture</th>
                                 <th className="px-4 py-2 text-left text-black">Name</th>
+                                <th className="px-4 py-2 text-left text-black">User Type</th>
                                 <th className="px-4 py-2 text-left text-black">Credentials</th>
                                 <th className="px-4 py-2 text-left text-black">Biography</th>
                                 <th className="px-4 py-2 text-left text-black">Department</th>
@@ -66,28 +62,29 @@ export default function ApproveDenyPage() {
                         </thead>
                         <tbody>
                             {registrants.map((registrant) => (
-                                <tr key={registrant.id} className="border-b border-gray-700">
+                                <tr key={registrant.user_id} className="border-b border-gray-700">
                                     <td className="px-4 py-2">
                                         <img
-                                            src={registrant.picture}
+                                            src="https://static.vecteezy.com/system/resources/previews/021/548/095/original/default-profile-picture-avatar-user-avatar-icon-person-icon-head-icon-profile-picture-icons-default-anonymous-user-male-and-female-businessman-photo-placeholder-social-network-avatar-portrait-free-vector.jpg"
                                             alt="Profile"
                                             className="w-12 h-12 rounded-full"
                                         />
                                     </td>
                                     <td className="px-4 py-2">{registrant.name}</td>
+                                    <td className="px-4 py-2">{registrant.user_type}</td>
                                     <td className="px-4 py-2">{registrant.credentials}</td>
-                                    <td className="px-4 py-2">{registrant.biography}</td>
-                                    <td className="px-4 py-2">{registrant.department}</td>
+                                    <td className="px-4 py-2">{registrant.short_biography}</td>
+                                    <td className="px-4 py-2">{registrant.department_assigned}</td>
                                     <td className="px-4 py-2 flex justify-center space-x-4">
                                         <button
                                             className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
-                                            onClick={() => handleApprove(registrant.id)}
+                                            onClick={() => handleApprove(registrant.user_id)}
                                         >
                                             Approve
                                         </button>
                                         <button
                                             className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600"
-                                            onClick={() => handleDeny(registrant.id)}
+                                            onClick={() => handleDeny(registrant.user_id)}
                                         >
                                             Deny
                                         </button>
