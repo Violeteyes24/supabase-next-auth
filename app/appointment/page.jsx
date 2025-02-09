@@ -16,6 +16,8 @@ export default function AppointmentPage() {
     const [selectedDate, setSelectedDate] = useState(dayjs()); // Current date as default
     const [openModal, setOpenModal] = useState(false);
     const [openConfirmModal, setOpenConfirmModal] = useState(false); // For confirmation
+    const [openRescheduleModal, setOpenRescheduleModal] = useState(false); // For rescheduling
+    const [openCancelModal, setOpenCancelModal] = useState(false); // For canceling
     const [startTime, setStartTime] = useState(dayjs());
     const [endTime, setEndTime] = useState(dayjs());
     const [error, setError] = useState(null);
@@ -23,6 +25,7 @@ export default function AppointmentPage() {
     const [errorMessage, setErrorMessage] = useState('');
     const [openErrorModal, setOpenErrorModal] = useState(false);
     const [availabilitySchedules, setAvailabilitySchedules] = useState([]);
+    const [selectedSchedule, setSelectedSchedule] = useState(null); // For rescheduling and canceling
 
     useEffect(() => {
         fetchAvailabilitySchedules();
@@ -148,7 +151,74 @@ export default function AppointmentPage() {
         setOpenConfirmModal(false); // Close the confirmation modal
     };
 
+    const handleReschedule = (schedule) => {
+        setSelectedSchedule(schedule);
+        setStartTime(dayjs(schedule.start_time, 'HH:mm'));
+        setEndTime(dayjs(schedule.end_time, 'HH:mm'));
+        setOpenRescheduleModal(true);
+    };
+
+    const handleConfirmReschedule = async () => {
+        try {
+            const { data, error } = await supabase
+                .from('availability_schedules')
+                .update({
+                    start_time: startTime.format("HH:mm"),
+                    end_time: endTime.format("HH:mm"),
+                })
+                .eq('availability_schedule_id', selectedSchedule.availability_schedule_id);
+
+            if (error) {
+                console.error('Error rescheduling:', error.message, error.details, error.hint);
+                setError('An error occurred while rescheduling.');
+                return;
+            }
+
+            console.log('Schedule rescheduled:', data);
+            setOpenRescheduleModal(false); // Close the modal after a successful operation
+            setSuccessMessage('Schedule rescheduled successfully.');
+            setError(null); // Clear error message
+            fetchAvailabilitySchedules(); // Refresh the availability schedules
+        } catch (error) {
+            console.error('Unexpected error:', error);
+            setError('An unexpected error occurred while rescheduling.');
+        }
+    };
+
+    const handleCancel = (schedule) => {
+        setSelectedSchedule(schedule);
+        setOpenCancelModal(true);
+    };
+
+    const handleConfirmCancel = async () => {
+        try {
+            const { data, error } = await supabase
+                .from('availability_schedules')
+                .delete()
+                .eq('availability_schedule_id', selectedSchedule.availability_schedule_id);
+
+            if (error) {
+                console.error('Error canceling schedule:', error.message, error.details, error.hint);
+                setError('An error occurred while canceling the schedule.');
+                return;
+            }
+
+            console.log('Schedule canceled:', data);
+            setOpenCancelModal(false); // Close the modal after a successful operation
+            setSuccessMessage('Schedule canceled successfully.');
+            setError(null); // Clear error message
+            fetchAvailabilitySchedules(); // Refresh the availability schedules
+        } catch (error) {
+            console.error('Unexpected error:', error);
+            setError('An unexpected error occurred while canceling the schedule.');
+        }
+    };
+
     const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+    const formatTime = (time) => {
+        return dayjs(time, 'HH:mm').format('hh:mm A');
+    };
 
     return (
         <LocalizationProvider dateAdapter={AdapterDayjs}>
@@ -188,10 +258,11 @@ export default function AppointmentPage() {
                                     key={index}
                                     className="flex justify-between items-center bg-emerald-200 p-4 rounded-lg"
                                 >
-                                    <span>{`${schedule.start_time} - ${schedule.end_time}`}</span>
+                                    <span>{`${formatTime(schedule.start_time)} - ${formatTime(schedule.end_time)}`}</span>
                                     <span className="flex items-center space-x-2">
                                         <span>{schedule.is_available ? 'Available' : 'Not Available'}</span>
-                                        <span className="text-gray-400">...</span>
+                                        <Button variant="outlined" onClick={() => handleReschedule(schedule)}>Reschedule</Button>
+                                        <Button variant="outlined" color="error" onClick={() => handleCancel(schedule)}>Cancel</Button>
                                     </span>
                                 </div>
                             ))}
@@ -290,6 +361,71 @@ export default function AppointmentPage() {
                                 Yes
                             </Button>
                             <Button variant="outlined" onClick={() => setOpenConfirmModal(false)}>
+                                No
+                            </Button>
+                        </div>
+                    </Box>
+                </Modal>
+
+                {/* Reschedule Modal */}
+                <Modal open={openRescheduleModal} onClose={() => setOpenRescheduleModal(false)}>
+                    <Box
+                        sx={{
+                            position: 'absolute',
+                            top: '50%',
+                            left: '50%',
+                            transform: 'translate(-50%, -50%)',
+                            bgcolor: 'background.paper',
+                            boxShadow: 24,
+                            p: 4,
+                            width: 300,
+                        }}
+                    >
+                        <h2 className="mb-4 text-lg font-bold">Reschedule Availability</h2>
+                        <TimePicker
+                            label="Start Time"
+                            value={startTime}
+                            onChange={(newValue) => setStartTime(newValue)}
+                            renderInput={(params) => <TextField {...params} fullWidth />}
+                        />
+                        <TimePicker
+                            label="End Time"
+                            value={endTime}
+                            onChange={(newValue) => setEndTime(newValue)}
+                            renderInput={(params) => <TextField {...params} fullWidth />}
+                        />
+                        <div className="mt-4 flex justify-between">
+                            <Button variant="contained" onClick={handleConfirmReschedule}>
+                                Confirm
+                            </Button>
+                            <Button variant="outlined" onClick={() => setOpenRescheduleModal(false)}>
+                                Cancel
+                            </Button>
+                        </div>
+                    </Box>
+                </Modal>
+
+                {/* Cancel Modal */}
+                <Modal open={openCancelModal} onClose={() => setOpenCancelModal(false)}>
+                    <Box
+                        sx={{
+                            position: 'absolute',
+                            top: '50%',
+                            left: '50%',
+                            transform: 'translate(-50%, -50%)',
+                            bgcolor: 'background.paper',
+                            boxShadow: 24,
+                            p: 4,
+                            width: 300,
+                        }}
+                    >
+                        <h2 className="mb-4 text-lg font-bold">Cancel Availability</h2>
+                        <p>Are you sure you want to cancel the availability schedule from {selectedSchedule?.start_time} to {selectedSchedule?.end_time}?</p>
+                        <div className="mt-4 flex justify-between">
+                            <Button variant="contained" color="error" onClick={handleConfirmCancel}>
+                                Yes
+                            </Button>
+                            <Button variant="outlined" onClick={() => setOpenCancelModal(false)}>
                                 No
                             </Button>
                         </div>
