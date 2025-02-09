@@ -11,12 +11,22 @@ export default function ApproveDenyPage() {
 
     useEffect(() => {
         fetchRegistrants();
+
+        const userChannel = supabase.channel('user-changes')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, () => {
+                fetchRegistrants(); // Refetch registrants on any change
+            })
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(userChannel);
+        };
     }, []);
 
     const fetchRegistrants = async () => {
         const { data, error } = await supabase
             .from("users")
-            .select("user_id, name, credentials, department_assigned, short_biography, user_type") // Adjust the columns to match your table schema
+            .select("user_id, name, credentials, department_assigned, short_biography, user_type, approval_status") // Adjust the columns to match your table schema
             .in("user_type", ["counselor", "secretary"]);
 
         console.log("Fetched registrants:", data);
@@ -27,14 +37,39 @@ export default function ApproveDenyPage() {
         }
     };
 
-    const handleApprove = (id) => {
+    const handleApprove = async (id) => {
         console.log(`Approved registrant with ID: ${id}`);
-        // Add your approval logic here
+
+        const { data, error } = await supabase
+            .from('users')
+            .update({ approval_status: 'approved' })
+            .eq('user_id', id)
+            .select(); // Ensure updated rows are returned
+
+        if (error) {
+            console.error("Error approving registrant:", error.message, error.details, error.hint);
+        } else {
+            console.log("Registrant approved:", data);
+            // No need to call fetchRegistrants() here as real-time updates will handle it
+        }
+
     };
 
-    const handleDeny = (id) => {
+    const handleDeny = async (id) => {
         console.log(`Denied registrant with ID: ${id}`);
-        // Add your denial logic here
+
+        const { data, error } = await supabase
+            .from('users')
+            .update({ approval_status: 'denied' })
+            .eq('user_id', id) // Update the approval status for the selected user
+            .select(); // Ensure updated rows are returned
+
+        if (error) {
+            console.error("Error denying registrant:", error.message, error.details, error.hint);
+        } else {
+            console.log("Registrant denied:", data);
+            // No need to call fetchRegistrants() here as real-time updates will handle it
+        }
     };
 
     return (
@@ -57,6 +92,7 @@ export default function ApproveDenyPage() {
                                 <th className="px-4 py-2 text-left text-black">Credentials</th>
                                 <th className="px-4 py-2 text-left text-black">Biography</th>
                                 <th className="px-4 py-2 text-left text-black">Department</th>
+                                <th className="px-4 py-2 text-left text-black">Approval Status</th>
                                 <th className="px-4 py-2 text-center text-black">Actions</th>
                             </tr>
                         </thead>
@@ -75,6 +111,7 @@ export default function ApproveDenyPage() {
                                     <td className="px-4 py-2">{registrant.credentials}</td>
                                     <td className="px-4 py-2">{registrant.short_biography}</td>
                                     <td className="px-4 py-2">{registrant.department_assigned}</td>
+                                    <td className="px-4 py-2">{registrant.approval_status}</td>
                                     <td className="px-4 py-2 flex justify-center space-x-4">
                                         <button
                                             className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
