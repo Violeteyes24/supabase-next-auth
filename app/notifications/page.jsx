@@ -41,7 +41,7 @@ export default function NotificationsPage() {
                 }
             )
             .subscribe();
-
+            
         // Cleanup subscription on component unmount
         return () => {
             supabase.removeChannel(subscription);
