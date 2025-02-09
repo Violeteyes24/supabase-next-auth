@@ -1,8 +1,31 @@
 'use client';
-// will not hardcode values of props, should be extracted from the database
-import React from 'react';
 
-export default function AppointmentCard({ appointments = [] }) {
+import React, { useEffect, useState } from 'react';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+
+export default function AppointmentCard() {
+    const [appointments, setAppointments] = useState([]);
+    const supabase = createClientComponentClient();
+
+    useEffect(() => {
+        fetchAppointments();
+    }, []);
+
+    const fetchAppointments = async () => {
+        const { data, error } = await supabase
+            .from('availability_schedules')
+            .select('*')
+            .eq('is_available', true)
+            .order('date', { ascending: true });
+
+        if (error) {
+            console.error('Error fetching appointments:', error.message);
+            return;
+        }
+
+        setAppointments(data);
+    };
+
     return (
         <div className="border rounded-lg shadow-xl p-6 max-w-lg bg-white overflow-auto max-h-96">
             {/* Header Section */}
@@ -24,18 +47,18 @@ export default function AppointmentCard({ appointments = [] }) {
                     </thead>
                     <tbody>
                         {appointments.map((appointment, index) => (
-                            <tr key={index} className="hover:bg-gray-800 transition duration-200">
+                            <tr key={index} className="hover:bg-emerald-400 transition duration-200">
                                 <td className="px-4 py-3 border-b text-gray-100 text-sm">
                                     <img
-                                        src={appointment.picture}
+                                        src="https://static.vecteezy.com/system/resources/previews/021/548/095/original/default-profile-picture-avatar-user-avatar-icon-person-icon-head-icon-profile-picture-icons-default-anonymous-user-male-and-female-businessman-photo-placeholder-social-network-avatar-portrait-free-vector.jpg"
                                         alt="Profile Picture"
                                         className="w-12 h-12 rounded-full border-2 border-emerald-400"
                                     />
                                 </td>
-                                <td className="px-4 py-3 border-b text-gray-100 text-sm">{appointment.name}</td>
-                                <td className="px-4 py-3 border-b text-gray-100 text-sm">{appointment.reason}</td>
-                                <td className="px-4 py-3 border-b text-gray-100 text-sm">{appointment.date}</td>
-                                <td className="px-4 py-3 border-b text-gray-100 text-sm">{appointment.time}</td>
+                                <td className="px-4 py-3 border-b text-black text-sm">{appointment.name}</td>
+                                <td className="px-4 py-3 border-b text-black text-sm">{appointment.reason}</td>
+                                <td className="px-4 py-3 border-b text-black text-sm">{appointment.date}</td>
+                                <td className="px-4 py-3 border-b text-black text-sm">{appointment.time}</td>
                             </tr>
                         ))}
                     </tbody>
