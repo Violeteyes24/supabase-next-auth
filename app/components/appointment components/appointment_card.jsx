@@ -27,7 +27,7 @@ export default function AppointmentCard() {
     };
 
     return (
-        <div className="border rounded-lg shadow-xl p-6 max-w-lg bg-white overflow-auto max-h-96">
+        <div className="border rounded-lg shadow-xl p-6 max-w-lg bg-white">
             {/* Header Section */}
             <div className="flex justify-between items-center mb-6">
                 <h2 className="text-2xl font-extrabold text-emerald-400 tracking-wide">Upcoming Appointments</h2>
@@ -35,34 +35,36 @@ export default function AppointmentCard() {
 
             {/* Table Section */}
             {appointments.length > 0 ? (
-                <table className="table-auto w-full text-left border-collapse">
-                    <thead>
-                        <tr className="bg-gray-900">
-                            <th className="px-4 py-3 border-b font-semibold text-gray-300 text-sm">Picture</th>
-                            <th className="px-4 py-3 border-b font-semibold text-gray-300 text-sm">Name</th>
-                            <th className="px-4 py-3 border-b font-semibold text-gray-300 text-sm">Reason</th>
-                            <th className="px-4 py-3 border-b font-semibold text-gray-300 text-sm">Date</th>
-                            <th className="px-4 py-3 border-b font-semibold text-gray-300 text-sm">Time</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {appointments.map((appointment, index) => (
-                            <tr key={index} className="hover:bg-emerald-400 transition duration-200">
-                                <td className="px-4 py-3 border-b text-gray-100 text-sm">
-                                    <img
-                                        src="https://static.vecteezy.com/system/resources/previews/021/548/095/original/default-profile-picture-avatar-user-avatar-icon-person-icon-head-icon-profile-picture-icons-default-anonymous-user-male-and-female-businessman-photo-placeholder-social-network-avatar-portrait-free-vector.jpg"
-                                        alt="Profile Picture"
-                                        className="w-12 h-12 rounded-full border-2 border-emerald-400"
-                                    />
-                                </td>
-                                <td className="px-4 py-3 border-b text-black text-sm">{appointment.name}</td>
-                                <td className="px-4 py-3 border-b text-black text-sm">{appointment.reason}</td>
-                                <td className="px-4 py-3 border-b text-black text-sm">{appointment.date}</td>
-                                <td className="px-4 py-3 border-b text-black text-sm">{appointment.time}</td>
+                <div className="overflow-auto max-h-96">
+                    <table className="table-auto w-full text-left border-collapse">
+                        <thead>
+                            <tr className="bg-gray-900">
+                                <th className="px-4 py-3 border-b font-semibold text-gray-300 text-sm">Picture</th>
+                                <th className="px-4 py-3 border-b font-semibold text-gray-300 text-sm">Name</th>
+                                <th className="px-4 py-3 border-b font-semibold text-gray-300 text-sm">Reason</th>
+                                <th className="px-4 py-3 border-b font-semibold text-gray-300 text-sm">Date</th>
+                                <th className="px-4 py-3 border-b font-semibold text-gray-300 text-sm">Time</th>
                             </tr>
-                        ))}
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody>
+                            {appointments.map((appointment, index) => (
+                                <tr key={index} className="hover:bg-emerald-400 transition duration-200">
+                                    <td className="px-4 py-3 border-b text-gray-100 text-sm">
+                                        <img
+                                            src="https://static.vecteezy.com/system/resources/previews/021/548/095/original/default-profile-picture-avatar-user-avatar-icon-person-icon-head-icon-profile-picture-icons-default-anonymous-user-male-and-female-businessman-photo-placeholder-social-network-avatar-portrait-free-vector.jpg"
+                                            alt="Profile Picture"
+                                            className="w-12 h-12 rounded-full border-2 border-emerald-400"
+                                        />
+                                    </td>
+                                    <td className="px-4 py-3 border-b text-black text-sm">{appointment.name}</td>
+                                    <td className="px-4 py-3 border-b text-black text-sm">{appointment.reason}</td>
+                                    <td className="px-4 py-3 border-b text-black text-sm">{appointment.date}</td>
+                                    <td className="px-4 py-3 border-b text-black text-sm">{appointment.time}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
             ) : (
                 <p className="text-gray-400 text-sm text-center">No upcoming appointments available.</p>
             )}
