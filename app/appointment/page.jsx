@@ -4,11 +4,12 @@ import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import React, { useState, useEffect } from 'react';
 import Sidebar from "../components/dashboard components/sidebar";
 import AppointmentCard from "../components/appointment components/appointment_card";
-import { Modal, Box, Button, TextField } from '@mui/material';
+import { Modal, Box, Button, TextField, IconButton } from '@mui/material';
 import { DatePicker, TimePicker, LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs from 'dayjs';
 import { useRouter } from 'next/navigation';
+import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 
 export default function AppointmentPage() {
 
@@ -26,6 +27,7 @@ export default function AppointmentPage() {
     const [openErrorModal, setOpenErrorModal] = useState(false);
     const [availabilitySchedules, setAvailabilitySchedules] = useState([]);
     const [selectedSchedule, setSelectedSchedule] = useState(null); // For rescheduling and canceling
+    const [openDatePicker, setOpenDatePicker] = useState(false); // For date picker
 
     useEffect(() => {
         fetchAvailabilitySchedules();
@@ -233,7 +235,12 @@ export default function AppointmentPage() {
                     {/* Calendar UI */}
                     <div className="bg-white p-6 rounded-lg shadow-md">
                         <h2 className="text-xl font-semibold mb-4">Availability</h2>
-                        <h3 className="text-lg mb-4">{selectedDate.format('MMMM YYYY')}</h3>
+                        <div className="flex items-center mb-4">
+                            <h3 className="text-lg">{selectedDate.format('MMMM YYYY')}</h3>
+                            <IconButton onClick={() => setOpenDatePicker(true)}>
+                                <CalendarTodayIcon />
+                            </IconButton>
+                        </div>
 
                         {/* Days Navigation */}
                         <div className="flex space-x-4 mb-4 overflow-x-auto">
@@ -337,6 +344,32 @@ export default function AppointmentPage() {
                                 Cancel
                             </Button>
                         </div>
+                    </Box>
+                </Modal>
+
+                {/* Date Picker Modal */}
+                <Modal open={openDatePicker} onClose={() => setOpenDatePicker(false)}>
+                    <Box
+                        sx={{
+                            position: 'absolute',
+                            top: '50%',
+                            left: '50%',
+                            transform: 'translate(-50%, -50%)',
+                            bgcolor: 'background.paper',
+                            boxShadow: 24,
+                            p: 4,
+                            width: 300,
+                        }}
+                    >
+                        <DatePicker
+                            label="Select Date"
+                            value={selectedDate}
+                            onChange={(newValue) => {
+                                setSelectedDate(newValue);
+                                setOpenDatePicker(false);
+                            }}
+                            renderInput={(params) => <TextField {...params} fullWidth />}
+                        />
                     </Box>
                 </Modal>
 
