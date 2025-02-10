@@ -31,6 +31,16 @@ export default function AppointmentPage() {
 
     useEffect(() => {
         fetchAvailabilitySchedules();
+
+        const scheduleChannel = supabase.channel('schedule-changes')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'availability_schedules' }, () => {
+                fetchAvailabilitySchedules(); // Refetch availability schedules on any change
+            })
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(scheduleChannel);
+        };
     }, [selectedDate]);
 
     const fetchAvailabilitySchedules = async () => {
