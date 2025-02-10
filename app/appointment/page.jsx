@@ -10,6 +10,7 @@ import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs from 'dayjs';
 import { useRouter } from 'next/navigation';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
+import GroupAppointmentsManager from '../components/appointment components/groupAppointmentManager';
 
 export default function AppointmentPage() {
     const supabase = createClientComponentClient();
@@ -312,8 +313,9 @@ export default function AppointmentPage() {
                     </div>
 
                     {/* Appointment Card */}
-                    <div className="mt-10">
+                    <div className="mt-10 flex flex-col space-y-4">
                         <AppointmentCard/>
+                        <GroupAppointmentsManager />
                     </div>
 
                     {/* Add Schedule Button */}
