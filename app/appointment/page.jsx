@@ -12,30 +12,38 @@ import { useRouter } from 'next/navigation';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 
 export default function AppointmentPage() {
-
     const supabase = createClientComponentClient();
-    const [selectedDate, setSelectedDate] = useState(dayjs()); // Current date as default
+    const router = useRouter();
+    const [selectedDate, setSelectedDate] = useState(dayjs());
     const [openModal, setOpenModal] = useState(false);
-    const [openConfirmModal, setOpenConfirmModal] = useState(false); // For confirmation
-    const [openRescheduleModal, setOpenRescheduleModal] = useState(false); // For rescheduling
-    const [openCancelModal, setOpenCancelModal] = useState(false); // For canceling
+    const [openConfirmModal, setOpenConfirmModal] = useState(false);
+    const [openRescheduleModal, setOpenRescheduleModal] = useState(false);
+    const [openCancelModal, setOpenCancelModal] = useState(false);
     const [startTime, setStartTime] = useState(dayjs());
     const [endTime, setEndTime] = useState(dayjs());
     const [error, setError] = useState(null);
-    const [successMessage, setSuccessMessage] = useState(null); // For success message
+    const [successMessage, setSuccessMessage] = useState(null);
     const [errorMessage, setErrorMessage] = useState('');
     const [openErrorModal, setOpenErrorModal] = useState(false);
-    const [availabilitySchedules, setAvailabilitySchedules] = useState([]);
-    const [selectedSchedule, setSelectedSchedule] = useState(null); // For rescheduling and canceling
-    const [openDatePicker, setOpenDatePicker] = useState(false); // For date picker
+    const [availabilitySchedules, setAvailabilitySchedules] = useState([]); // Initialize as empty array
+    const [selectedSchedule, setSelectedSchedule] = useState(null);
+    const [openDatePicker, setOpenDatePicker] = useState(false);
+    const [isLoading, setIsLoading] = useState(true); // Add loading state
 
     useEffect(() => {
         fetchAvailabilitySchedules();
 
         const scheduleChannel = supabase.channel('schedule-changes')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'availability_schedules' }, () => {
-                fetchAvailabilitySchedules(); // Refetch availability schedules on any change
-            })
+            .on('postgres_changes', 
+                { 
+                    event: '*', 
+                    schema: 'public', 
+                    table: 'availability_schedules' 
+                }, 
+                () => {
+                    fetchAvailabilitySchedules();
+                }
+            )
             .subscribe();
 
         return () => {
@@ -44,16 +52,25 @@ export default function AppointmentPage() {
     }, [selectedDate]);
 
     const fetchAvailabilitySchedules = async () => {
-        const { data, error } = await supabase
-            .from('availability_schedules')
-            .select('*')
-            .eq('date', selectedDate.format('YYYY-MM-DD'));
+        try {
+            setIsLoading(true);
+            const { data, error } = await supabase
+                .from('availability_schedules')
+                .select('*')
+                .eq('date', selectedDate.format('YYYY-MM-DD'));
 
-        if (error) {
-            console.error('Error fetching availability schedules:', error.message);
-            setError('An error occurred while fetching availability schedules.');
-        } else {
-            setAvailabilitySchedules(data || []);
+            if (error) {
+                console.error('Error fetching availability schedules:', error.message);
+                setError('An error occurred while fetching availability schedules.');
+                setAvailabilitySchedules([]); // Set to empty array on error
+            } else {
+                setAvailabilitySchedules(data || []); // Ensure we always have an array
+            }
+        } catch (err) {
+            console.error('Unexpected error:', err);
+            setAvailabilitySchedules([]); // Set to empty array on error
+        } finally {
+            setIsLoading(false);
         }
     };
 
@@ -254,26 +271,34 @@ export default function AppointmentPage() {
 
                         {/* Days Navigation */}
                         <div className="flex space-x-4 mb-4 overflow-x-auto">
-                            {days.map((day, index) => (
+                            {days && days.map((day, index) => (
                                 <button
                                     key={index}
-                                    className={`rounded-full px-4 py-2 ${selectedDate.format('dddd') === day
-                                        ? 'bg-emerald-500 text-black'
-                                        : 'bg-emerald-200 text-black'
-                                        }`}
-                                    onClick={() => setSelectedDate(dayjs().day(index + 1))} // `day()` takes a number: Sunday=0, Monday=1, etc.
+                                    className={`rounded-full px-4 py-2 ${
+                                        selectedDate.format('dddd') === day
+                                            ? 'bg-emerald-500 text-black'
+                                            : 'bg-emerald-200 text-black'
+                                    }`}
+                                    onClick={() => setSelectedDate(dayjs().day(index + 1))}
                                 >
                                     {day} ({dayjs().day(index + 1).format('DD')})
                                 </button>
                             ))}
                         </div>
 
+                        {/* Loading state */}
+                        {isLoading && (
+                            <div className="text-center py-4">Loading schedules...</div>
+                        )}
+
                         {/* Time Slots */}
                         <div className="space-y-4">
-                            {availabilitySchedules.map((schedule, index) => (
+                            {!isLoading && availabilitySchedules && availabilitySchedules.map((schedule, index) => (
                                 <div
                                     key={index}
-                                    className="flex justify-between items-center bg-emerald-200 p-4 rounded-lg"
+                                    className={`flex justify-between items-center p-4 rounded-lg ${
+                                        schedule.is_available ? 'bg-emerald-200' : 'bg-red-200'
+                                    }`}
                                 >
                                     <span>{`${formatTime(schedule.start_time)} - ${formatTime(schedule.end_time)}`}</span>
                                     <span className="flex items-center space-x-2">
@@ -288,12 +313,7 @@ export default function AppointmentPage() {
 
                     {/* Appointment Card */}
                     <div className="mt-10">
-                        <AppointmentCard
-                            name="Zachary Albert Legaria"
-                            reason="Mental Disorder: Depression because of Capstone"
-                            date="January 1, 2024"
-                            time="12:00am"
-                        />
+                        <AppointmentCard/>
                     </div>
 
                     {/* Add Schedule Button */}
