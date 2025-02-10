@@ -6,24 +6,51 @@ import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 export default function AppointmentCard() {
     const [appointments, setAppointments] = useState([]);
     const supabase = createClientComponentClient();
+    const [session, setSession] = useState(null);
 
     useEffect(() => {
+        const getSession = async () => {
+            const { data: { session } } = await supabase.auth.getSession();
+            setSession(session);
+        };
+        getSession();
         fetchAppointments();
     }, []);
 
     const fetchAppointments = async () => {
         const { data, error } = await supabase
-            .from('availability_schedules')
-            .select('*')
-            .eq('is_available', true)
-            .order('date', { ascending: true });
+            .from('appointments')
+            .select(`
+                appointment_id,
+                user_id,
+                counselor_id,
+                availability_schedule_id,
+                form_id,
+                response_id,
+                status,
+                appointment_type,
+                availability_schedules (
+                    date,
+                    start_time,
+                    end_time
+                ),
+                users!appointments_user_id_fkey (
+                    name
+                )
+            `)
+            .eq('status', 'pending')
+            // .order('availability_schedules.date', { ascending: true });
 
         if (error) {
             console.error('Error fetching appointments:', error.message);
             return;
         }
-
+        console.log(data)
         setAppointments(data);
+    };
+
+    const formatTime = (time) => {
+        return dayjs(time, 'HH:mm').format('hh:mm A');
     };
 
     return (
@@ -56,10 +83,12 @@ export default function AppointmentCard() {
                                             className="w-12 h-12 rounded-full border-2 border-emerald-400"
                                         />
                                     </td>
-                                    <td className="px-4 py-3 border-b text-black text-sm">{appointment.name}</td>
-                                    <td className="px-4 py-3 border-b text-black text-sm">{appointment.reason}</td>
-                                    <td className="px-4 py-3 border-b text-black text-sm">{appointment.date}</td>
-                                    <td className="px-4 py-3 border-b text-black text-sm">{appointment.time}</td>
+                                    <td className="px-4 py-3 border-b text-black text-sm">{appointment.users.name}</td>
+            <td className="px-4 py-3 border-b text-black text-sm">{appointment.reason}</td>
+            <td className="px-4 py-3 border-b text-black text-sm">{appointment.availability_schedules.date}</td>
+            <td className="px-4 py-3 border-b text-black text-sm">
+                {appointment.availability_schedules.start_time} - {appointment.availability_schedules.end_time}
+            </td>
                                 </tr>
                             ))}
                         </tbody>
