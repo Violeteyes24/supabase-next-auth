@@ -157,11 +157,15 @@ export default function AppointmentCard() {
                                                 className="w-12 h-12 rounded-full border-2 border-emerald-400"
                                             />
                                         </td>
-                                        <td className="px-4 py-3 border-b text-black text-sm">{appointment.users.name}</td>
-                                        <td className="px-4 py-3 border-b text-black text-sm">{appointment.reason}</td>
-                                        <td className="px-4 py-3 border-b text-black text-sm">{appointment.availability_schedules.date}</td>
                                         <td className="px-4 py-3 border-b text-black text-sm">
-                                            {appointment.availability_schedules.start_time} - {appointment.availability_schedules.end_time}
+                                            {appointment.users ? appointment.users.name : 'Unknown'}
+                                        </td>
+                                        <td className="px-4 py-3 border-b text-black text-sm">{appointment.reason}</td>
+                                        <td className="px-4 py-3 border-b text-black text-sm">
+                                            {appointment.availability_schedules ? appointment.availability_schedules.date : 'Unknown'}
+                                        </td>
+                                        <td className="px-4 py-3 border-b text-black text-sm">
+                                            {appointment.availability_schedules ? `${appointment.availability_schedules.start_time} - ${appointment.availability_schedules.end_time}` : 'Unknown'}
                                         </td>
                                         <td className="px-4 py-3 border-b text-black text-sm">
                                             <Button variant="outlined" onClick={() => handleReschedule(appointment)}>Reschedule</Button>
