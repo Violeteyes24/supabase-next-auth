@@ -3,37 +3,63 @@
 import React, { useState, useEffect } from "react";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import Sidebar from "../components/dashboard components/sidebar";
-import { FaPlus } from 'react-icons/fa'; // Import the plus icon from react-icons
+import { FaPlus, FaEdit, FaTrash, FaPaperPlane } from 'react-icons/fa';
+import { Switch } from '@mui/material';
 
-// Initialize Supabase Client
 const supabase = createClientComponentClient();
 
 export default function NotificationsPage() {
     const [notifications, setNotifications] = useState([]);
+    const [drafts, setDrafts] = useState([]);
     const [users, setUsers] = useState([]);
     const [selectedUser, setSelectedUser] = useState(null);
     const [showUserModal, setShowUserModal] = useState(false);
     const [notificationContent, setNotificationContent] = useState('');
-    const [targetGroup, setTargetGroup] = useState('all'); // Add state for target group
+    const [targetGroup, setTargetGroup] = useState('all');
+    const [status, setStatus] = useState('sent');
+    const [showNotifications, setShowNotifications] = useState(true);
+    const [selectedNotification, setSelectedNotification] = useState(null);
 
-    // Fetch notifications from Supabase
     useEffect(() => {
         const fetchNotifications = async () => {
-            const { data, error } = await supabase
+            const { data: sentNotifications, error: sentError } = await supabase
                 .from("notifications")
-                .select("*")
+                .select(`
+                    notification_id,
+                    user_id,
+                    notification_content,
+                    sent_at,
+                    status,
+                    target_group, 
+                    users (name)
+                `)
+                .eq("status", "sent")
                 .order("sent_at", { ascending: false });
 
-            if (error) {
-                console.error("Error fetching notifications:", error);
+            const { data: draftNotifications, error: draftError } = await supabase
+                .from("notifications")
+                .select(`
+                    notification_id,
+                    user_id,
+                    notification_content,
+                    sent_at,
+                    status,
+                    target_group, 
+                    users (name)
+                `)
+                .eq("status", "draft");
+
+            if (sentError || draftError) {
+                console.error("Error fetching notifications:", sentError || draftError);
             } else {
-                setNotifications(data);
+                setNotifications(groupByMessage(sentNotifications || []));
+                setDrafts(groupByMessage(draftNotifications || []));
             }
         };
 
         fetchNotifications();
+        fetchUsers();
 
-        // Set up real-time listener
         const subscription = supabase
             .channel("realtime-notifications")
             .on(
@@ -47,21 +73,16 @@ export default function NotificationsPage() {
                 }
             )
             .subscribe();
-            
-        // Cleanup subscription on component unmount
+
         return () => {
             supabase.removeChannel(subscription);
         };
-    }, []);
+    }, [users]);
 
     const fetchUsers = async () => {
-        console.log("Fetching users");
         const { data, error } = await supabase
             .from("users")
             .select("user_id, name, user_type");
-
-        console.log("Fetched users:", data);
-        console.log("Fetch users error:", error);
 
         if (error) {
             console.error("Error fetching users:", error);
@@ -70,132 +91,193 @@ export default function NotificationsPage() {
         }
     };
 
-    const handlePlusClick = () => {
-        fetchUsers();
-        setShowUserModal(true);
-    };
-
-    const handleUserSelect = (user) => {
-        console.log("Selected user:", user);
-        setSelectedUser(user);
-        setShowUserModal(false);
-    };
-
-    const sendNotification = async () => {
-        console.log("Sending notification:", notificationContent);
+    const saveNotification = async (newStatus) => {
         if (!notificationContent) {
             console.error("No notification content provided");
             return;
         }
 
         let targetUsers = [];
-
         switch (targetGroup) {
-            case 'all':
-                targetUsers = users;
-                break;
-            case 'counselors':
-                targetUsers = users.filter(user => user.user_type === 'counselor');
-                break;
-            case 'secretaries':
-                targetUsers = users.filter(user => user.user_type === 'secretary');
-                break;
-            case 'counselors_and_secretaries':
-                targetUsers = users.filter(user => user.user_type === 'counselor' || user.user_type === 'secretary');
-                break;
-            case 'students':
-                targetUsers = users.filter(user => user.user_type === 'student');
-                break;
-            default:
-                targetUsers = [];
+            case 'all': targetUsers = users; break;
+            case 'counselors': targetUsers = users.filter(user => user.user_type === 'counselor'); break;
+            case 'secretaries': targetUsers = users.filter(user => user.user_type === 'secretary'); break;
+            case 'counselors_and_secretaries': targetUsers = users.filter(user => user.user_type === 'counselor' || user.user_type === 'secretary'); break;
+            case 'students': targetUsers = users.filter(user => user.user_type === 'student'); break;
+            default: targetUsers = [];
         }
 
-        const notificationsToSend = targetUsers.map(user => ({
+        if (targetUsers.length === 0) {
+            console.error("No users found for the selected target group");
+            return;
+        }
+
+        const notificationsToInsert = targetUsers.map(user => ({
             user_id: user.user_id,
             notification_content: notificationContent,
-            sent_at: new Date().toISOString(),
+            sent_at: newStatus === "sent" ? new Date().toISOString() : null,
+            status: newStatus,
+            target_group: targetGroup // Add target group information
         }));
 
-        const { error } = await supabase.from("notifications").insert(notificationsToSend);
-
-        console.log("Send notification error:", error);
+        const { error } = await supabase.from("notifications").insert(notificationsToInsert);
 
         if (error) {
-            console.error("Error sending notification:", error);
+            console.error(`Error saving ${newStatus} notification:`, error);
         } else {
-            setNotificationContent(''); // Clear the input field after sending
+            console.log(`Notification ${newStatus} successfully:`, notificationsToInsert);
+            setNotificationContent('');
         }
+    };
+
+    const deleteDraft = async (draftId) => {
+        const { error } = await supabase
+            .from("notifications")
+            .delete()
+            .eq("notification_id", draftId);
+
+        if (error) {
+            console.error("Error deleting draft:", error);
+        } else {
+            setDrafts(drafts.filter(draft => draft.notification_id !== draftId));
+        }
+    };
+
+    const groupByMessage = (items) => {
+        const grouped = items.reduce((acc, item) => {
+            const message = item.notification_content;
+            if (!acc[message]) {
+                acc[message] = [];
+            }
+            acc[message].push(item);
+            return acc;
+        }, {});
+        return Object.entries(grouped).map(([message, items]) => ({ message, items }));
+    };
+
+    const handleNotificationClick = (notification) => {
+        setSelectedNotification(notification);
+    };
+
+    const getTargetGroupLabel = (targetGroup) => {
+        switch (targetGroup) {
+            case 'all': return 'All Users';
+            case 'counselors': return 'All Counselors';
+            case 'secretaries': return 'All Secretaries';
+            case 'counselors_and_secretaries': return 'All Counselors and Secretaries';
+            case 'students': return 'All Students';
+            default: return 'Unknown Group';
+        }
+    };
+
+    const handleCreateNewNotification = () => {
+        setSelectedNotification(null);
+        setNotificationContent('');
     };
 
     return (
         <div className="h-screen flex">
-            {/* Navigation Sidebar */}
             <Sidebar />
-
-            {/* Notifications Panel */}
-            <div className="w-1/4 bg-gray-100 border-r overflow-y-auto">
+            <div className="w-1/4 bg-gray-100 border-r overflow-y-auto relative">
                 <div className="p-4 font-bold text-gray-700 flex items-center justify-between">
-                    Notifications
-                    <FaPlus className="cursor-pointer" onClick={handlePlusClick} />
+                    <span>{showNotifications ? "Notifications" : "Drafts"}</span>
+                    <Switch
+                        checked={showNotifications}
+                        onChange={() => setShowNotifications(!showNotifications)}
+                        color="primary"
+                    />
                 </div>
-                {notifications.length > 0 ? (
-                    notifications.map((notification, index) => (
-                        <div
-                            key={index}
-                            className="flex items-center px-4 py-2 hover:bg-gray-200 cursor-pointer"
-                        >
-                            <div className="w-12 h-12 bg-gray-300 rounded-full flex-shrink-0"></div>
-                            <div className="ml-4">
-                                <div className="font-bold text-gray-800">
-                                    {notification.user_id || "System"}
-                                </div>
-                                <div className="text-sm text-gray-600">
-                                    {notification.notification_content}
-                                </div>
-                                <div className="text-xs text-gray-400">
-                                    {new Date(notification.sent_at).toLocaleString()}
+                {showNotifications ? (
+                    notifications.length > 0 ? (
+                        notifications.map((group, index) => (
+                            <div key={index} className="mb-4">
+                                <div className="text-xs text-gray-500 mb-2">{new Date(group.items[0].sent_at).toLocaleString()}</div>
+                                <div className="flex items-center px-4 py-2 hover:bg-gray-200 cursor-pointer rounded-lg shadow-md mb-2" onClick={() => handleNotificationClick(group)}>
+                                    <div className="w-12 h-12 bg-gray-300 rounded-full flex-shrink-0"></div>
+                                    <div className="ml-4 flex-1">
+                                        <div className="font-bold text-gray-800">{getTargetGroupLabel(group.items[0].target_group)}</div>
+                                        <div className="text-sm text-gray-600">{group.message}</div>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    ))
+                        ))
+                    ) : (
+                        <div className="p-4 text-gray-600">No notifications yet.</div>
+                    )
                 ) : (
-                    <div className="p-4 text-gray-600">No notifications yet.</div>
+                    drafts.length > 0 ? (
+                        drafts.map((group, index) => (
+                            <div key={index} className="mb-4">
+                                <div className="text-xs text-gray-500 mb-2">{new Date(group.items[0].sent_at).toLocaleString()}</div>
+                                <div className="flex items-center px-4 py-2 hover:bg-yellow-200 cursor-pointer rounded-lg shadow-md mb-2">
+                                    <div className="ml-4 flex-1">
+                                        <div className="font-bold text-gray-800">{getTargetGroupLabel(group.items[0].target_group)}</div>
+                                        <div className="text-sm text-gray-600">{group.message.slice(0, 30)}...</div>
+                                    </div>
+                                    <div className="flex space-x-2">
+                                        <button
+                                            className="bg-blue-500 text-white px-2 py-1 rounded"
+                                            onClick={() => setNotificationContent(group.message)}
+                                        >
+                                            <FaEdit />
+                                        </button>
+                                        <button
+                                            className="bg-red-500 text-white px-2 py-1 rounded"
+                                            onClick={() => deleteDraft(group.items[0].notification_id)}
+                                        >
+                                            <FaTrash />
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        ))
+                    ) : (
+                        <div className="p-4 text-gray-600">No drafts available.</div>
+                    )
                 )}
+                <button
+                    className="fixed bottom-4 right-4 bg-emerald-600 text-white p-2 rounded-full shadow-lg hover:bg-emerald-700"
+                    onClick={handleCreateNewNotification}
+                >
+                    <FaPlus />
+                </button>
             </div>
 
-            {/* Main Notification Area */}
+            {/* Notification Form */}
             <div className="flex-1 flex flex-col bg-gray-200">
-                {/* Header */}
                 <div className="bg-gray-900 text-white text-xl py-4 px-6 font-bold shadow-md">
-                    {selectedUser ? selectedUser.name : "Select a User"}
+                    {selectedUser ? selectedUser.name : "Compose Notification"}
                 </div>
 
-                {/* Notification Input */}
                 <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                    <textarea
-                        className="w-full p-4 rounded-lg shadow-md bg-white text-black"
-                        rows="4"
-                        placeholder="Type your notification here..."
-                        value={notificationContent}
-                        onChange={(e) => setNotificationContent(e.target.value)}
-                    />
+                    {selectedNotification ? (
+                        <div className="p-4 bg-white rounded-lg shadow-md">
+                            <div className="font-bold text-gray-800">{getTargetGroupLabel(selectedNotification.items[0].target_group)}</div>
+                            <div className="text-sm text-gray-600">{selectedNotification.message}</div>
+                            <div className="text-xs text-gray-500">{new Date(selectedNotification.items[0].sent_at).toLocaleString()}</div>
+                        </div>
+                    ) : (
+                        <textarea
+                            className="w-full p-4 rounded-lg shadow-md bg-white text-black"
+                            rows="4"
+                            placeholder="Type your notification here..."
+                            value={notificationContent}
+                            onChange={(e) => setNotificationContent(e.target.value)}
+                        />
+                    )}
                     <div className="flex space-x-4">
-                        <select
-                            className="p-2 rounded-lg shadow-md bg-white text-black"
-                            value={targetGroup}
-                            onChange={(e) => setTargetGroup(e.target.value)}
-                        >
+                        <select className="p-2 rounded-lg bg-white text-black" value={targetGroup} onChange={(e) => setTargetGroup(e.target.value)}>
                             <option value="all">All Users</option>
                             <option value="counselors">All Counselors</option>
                             <option value="secretaries">All Secretaries</option>
                             <option value="counselors_and_secretaries">All Counselors and Secretaries</option>
                             <option value="students">All Students</option>
                         </select>
-                        <button
-                            className="bg-emerald-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-                            onClick={sendNotification}
-                        >
-                            Send Notification
+                        <button className="bg-emerald-600 text-white px-4 py-2 rounded" onClick={() => saveNotification("sent")}>
+                            <FaPaperPlane className="inline mr-2" /> Send
+                        </button>
+                        <button className="bg-gray-500 text-white px-4 py-2 rounded" onClick={() => saveNotification("draft")}>
+                            <FaEdit className="inline mr-2" /> Save as Draft
                         </button>
                     </div>
                 </div>
