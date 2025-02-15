@@ -20,6 +20,7 @@ export default function MessagePage() {
     const [selectedUser, setSelectedUser] = useState(null);
     const [showUserModal, setShowUserModal] = useState(false);
     const [selectedMessage, setSelectedMessage] = useState(null); // Add state to store the selected message
+    const [newUser, setNewUser] = useState(null);
 
     useEffect(() => {
         const getSession = async () => {
@@ -44,13 +45,13 @@ export default function MessagePage() {
             fetchPredefinedOptions(currentParentId); // Ensure predefined options are fetched on load
             fetchMessages(); // Fetch messages when session is set
 
-            const messageChannel = supabase.channel('message-changes')
+            const messageChannel = supabase.channel('custom-all-channel')
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, () => {
                     fetchMessages(); // Refetch messages on any change
                 })
                 .subscribe();
 
-            const predefinedMessageChannel = supabase.channel('predefined-message-changes')
+            const predefinedMessageChannel = supabase.channel('custom-all-channel')
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'predefined_messages' }, () => {
                     fetchPredefinedOptions(currentParentId); // Refetch predefined options on any change
                 })
@@ -67,12 +68,9 @@ export default function MessagePage() {
         const { data, error } = await supabase
             .from("messages")
             .select(`
-                *,
-                predefined_messages (
-                    message_content
-                )
+                *
             `)
-            .or(`sender_id.eq.${session?.user.id},receiver_id.eq.${session?.user.id}`)
+            .eq("conversation_id", selectedUser?.conversation_id)
             .order("sent_at", { ascending: true });
 
         console.log("Fetched messages:", data);
@@ -106,27 +104,24 @@ export default function MessagePage() {
         }
     };
 
-    const sendMessage = async () => {
+    const sendMessage = async (option) => {
         console.log("Sending message:", selectedMessage);
-        if (!selectedMessage || !selectedUser) {
-            console.error("No message or user selected");
-            return;
-        }
-        const { error } = await supabase.from("messages").insert([
+
+        const { error, data } = await supabase.from("messages").insert([
             {
                 sender_id: session?.user.id, 
-                receiver_id: selectedUser.user_id, 
                 sent_at: new Date().toISOString(),
                 received_at: null,
                 is_read: false,
-                conversation_id: null,
+                conversation_id: selectedUser ? selectedUser.conversation_id: newUser.user_id,
                 message_type: 'text',
                 read_at: null,
                 is_delivered: false,
-                message_content_id: selectedMessage.message_content_id 
+                message_content: option.message_content,
             },
-        ]);
-
+        ])
+        .select()
+        console.log("Sent message:", data);
         console.log("Send message error:", error);
 
         if (error) {
@@ -145,14 +140,8 @@ export default function MessagePage() {
             let { data, error } = await supabase
                 .from("messages")
                 .select(`
-                    sender_id,
-                    receiver_id,
-                    sent_at,
-                    predefined_messages (
-                        message_content
-                    )
+                   *
                 `)
-                .or(`sender_id.eq.${currentUserId},receiver_id.eq.${currentUserId}`)
                 .order("sent_at", { ascending: false });
 
             console.log("Fetched conversations:", data);
@@ -164,40 +153,18 @@ export default function MessagePage() {
             if (!data || data.length === 0) {
                 setConversations([]);
             } else {
-                const uniqueConversations = {};
+                let uniqueConversations = [];
 
+            
                 for (const msg of data) {
-                    const otherUserId = msg.sender_id === currentUserId ? msg.receiver_id : msg.sender_id;
-                    if (!uniqueConversations[otherUserId]) {
-                        uniqueConversations[otherUserId] = {
-                            user_id: otherUserId,
-                            name: "Unknown", // To be updated later
-                            message_content: msg.predefined_messages ? msg.predefined_messages.message_content : "No content",
-                        };
-                    }
-                }
-
-                const userIds = Object.keys(uniqueConversations);
-                if (userIds.length > 0) {
-                    let { data: users, error: userError } = await supabase
-                        .from("users")
-                        .select("user_id, name")
-                        .in("user_id", userIds);
-
-                    console.log("Fetched users:", users);
-                    // console.log("Fetch users error:", userError);
-
-                    if (!userError && users) {
-                        users.forEach((user) => {
-                            if (uniqueConversations[user.user_id]) {
-                                uniqueConversations[user.user_id].name = user.name;
-                            }
-                        });
-                    }
-                }
-
-                setConversations(Object.values(uniqueConversations));
+                   if (msg.conversation_id && !uniqueConversations.some((conv) => conv.conversation_id === msg.conversation_id)) {
+                        uniqueConversations.push(msg);
+                }      
             }
+            console.log("Unique conversations:", uniqueConversations);
+            setConversations(uniqueConversations);
+
+        }
         } catch (err) {
             console.error("Error fetching messages:", err);
             setConversations([]);
@@ -229,27 +196,35 @@ export default function MessagePage() {
         }
     }, [session]);
 
+    const handleNewMessage = async (message) => {
+        setMessages([]);
+        setSelectedUser(null);
+        setShowUserModal(false);
+    };
+
     const handleOptionClick = (option) => {
         console.log("Selected message:", option);
         setCurrentParentId(option.message_content_id);
         setSelectedMessage(option); // Store the selected message
         fetchPredefinedOptions(option.message_content_id); // Fetch next set of options based on selected parent ID
-        if (selectedMessage && selectedUser) {
-            sendMessage();
-        }
+        sendMessage(option); // Send the selected message
     };
 
     const handlePlusClick = () => {
+
         fetchUsers();
         setShowUserModal(true);
     };
 
-    const handleUserSelect = (user) => {
-        console.log("Selected user:", user);
-        setSelectedUser(user);
+    async function handleUserSelect (conversation) {
+        console.log("Selected Conversation:", conversation);
+        setSelectedUser(conversation);
         setShowUserModal(false);
         fetchPredefinedOptions(currentParentId); // Fetch predefined options for the new conversation
-        fetchConversations(); // Fetch messages for the selected user
+        
+        const { data, error } = await supabase.from("messages").select("*").eq("conversation_id", conversation.conversation_id).order("sent_at", { ascending: true })
+        setMessages(data || []);
+        console.log(error)
     };
 
     return (
@@ -271,7 +246,7 @@ export default function MessagePage() {
                     >
                         <div className="w-12 h-12 bg-gray-300 rounded-full flex-shrink-0"></div>
                         <div className="ml-4">
-                            <div className="font-bold text-gray-800">{conversation.name}</div> 
+                            <div className="font-bold text-gray-800">{conversation.message_content}</div> 
                             <div className="text-sm text-gray-600">{conversation.message_content}</div>
                             {/* This is the part where I display the last message of the conversation right? if I click this, this should 
                             all display the messages of the conversation */}
@@ -300,7 +275,7 @@ export default function MessagePage() {
                                     : "bg-gray-200 text-black"
                                     } max-w-sm`}
                             >
-                                {msg.predefined_messages ? msg.predefined_messages.message_content : "No content"}
+                                {msg.message_content}
                             </div>
                         </div>
                     ))}
@@ -332,7 +307,10 @@ export default function MessagePage() {
                                 <li
                                     key={user.user_id}
                                     className="cursor-pointer hover:bg-gray-200 p-2 rounded"
-                                    onClick={() => handleUserSelect(user)}
+                                    onClick={() => {
+                                        handleNewMessage();
+                                        setNewUser(user);
+                                    }}
                                 >
                                     {user.name}
                                 </li>
