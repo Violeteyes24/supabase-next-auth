@@ -214,12 +214,23 @@ export default function MessagePage() {
 
     const handleOptionClick = async (option) => {
         console.log("Selected message:", option);
-        setCurrentParentId(option.message_content_id);
-        // Don't set selectedMessage here since we're using the option directly
-        fetchPredefinedOptions(option.message_content_id);
         await sendMessage(option);
-        // After sending, make sure to fetch the new predefined options
-        fetchPredefinedOptions(option.message_content_id);
+        
+        // Check if there are predefined options for the selected message_content_id
+        const { data } = await supabase
+            .from("predefined_messages")
+            .select("*")
+            .eq("message_role", "counselor")
+            .eq("parent_id", option.message_content_id);
+
+        // If there are no child options, go back to the root options (parent_id: 13)
+        if (!data || data.length === 0) {
+            setCurrentParentId(13);
+            fetchPredefinedOptions(13);
+        } else {
+            setCurrentParentId(option.message_content_id);
+            fetchPredefinedOptions(option.message_content_id);
+        }
     };
 
     const handlePlusClick = () => {
