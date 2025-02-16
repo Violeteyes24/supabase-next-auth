@@ -3,29 +3,25 @@
 import React, { useState, useEffect } from "react";
 import Sidebar from "../components/dashboard components/sidebar";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
-import { FaPlus } from 'react-icons/fa'; // Import the plus icon from react-icons
+import { FaPlus } from 'react-icons/fa';
 
 export default function MessagePage() {
-
     const supabase = createClientComponentClient();
     const [session, setSession] = useState(null);
-
-    // const [currentStep, setCurrentStep] = useState(0);
     const [messages, setMessages] = useState([]);
     const [conversations, setConversations] = useState([]);
     const [loading, setLoading] = useState(false);
     const [predefinedOptions, setPredefinedOptions] = useState([]);
-    const [currentParentId, setCurrentParentId] = useState(13); // Set the initial parent_id to 13
+    const [currentParentId, setCurrentParentId] = useState(13);
     const [users, setUsers] = useState([]);
     const [selectedUser, setSelectedUser] = useState(null);
     const [showUserModal, setShowUserModal] = useState(false);
-    const [selectedMessage, setSelectedMessage] = useState(null); // Add state to store the selected message
+    const [selectedMessage, setSelectedMessage] = useState(null);
     const [newUser, setNewUser] = useState(null);
 
     useEffect(() => {
         const getSession = async () => {
             const { data: { session } } = await supabase.auth.getSession();
-            // console.log("Session:", session);
             setSession(session);
         };
         getSession();
@@ -42,19 +38,40 @@ export default function MessagePage() {
     useEffect(() => {
         if (session) {
             fetchConversations();
-            fetchPredefinedOptions(currentParentId); // Ensure predefined options are fetched on load
-            fetchMessages(); // Fetch messages when session is set
+            fetchPredefinedOptions(currentParentId);
+            fetchMessages();
 
-            const messageChannel = supabase.channel('custom-all-channel')
-                .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, () => {
-                    fetchMessages(); // Refetch messages on any change
-                })
+            // Subscribe to all message changes
+            const messageChannel = supabase.channel('message-changes')
+                .on(
+                    'postgres_changes',
+                    { 
+                        event: '*', 
+                        schema: 'public', 
+                        table: 'messages',
+                        filter: `conversation_id=eq.${selectedUser?.conversation_id}`
+                    },
+                    (payload) => {
+                        console.log('Message change received:', payload);
+                        fetchMessages();
+                        fetchConversations();
+                    }
+                )
                 .subscribe();
 
-            const predefinedMessageChannel = supabase.channel('custom-all-channel')
-                .on('postgres_changes', { event: '*', schema: 'public', table: 'predefined_messages' }, () => {
-                    fetchPredefinedOptions(currentParentId); // Refetch predefined options on any change
-                })
+            // Subscribe to predefined messages changes
+            const predefinedMessageChannel = supabase.channel('predefined-changes')
+                .on(
+                    'postgres_changes',
+                    { 
+                        event: '*', 
+                        schema: 'public', 
+                        table: 'predefined_messages' 
+                    },
+                    () => {
+                        fetchPredefinedOptions(currentParentId);
+                    }
+                )
                 .subscribe();
 
             return () => {
@@ -62,25 +79,25 @@ export default function MessagePage() {
                 supabase.removeChannel(predefinedMessageChannel);
             };
         }
-    }, [session]);
+    }, [session, selectedUser]); // Add selectedUser to dependency array
 
     const fetchMessages = async () => {
+        if (!selectedUser?.conversation_id) return;
+
         const { data, error } = await supabase
             .from("messages")
             .select(`
-                *
+                *,
+                sender:sender_id(name),
+                recipient:conversation_id(name)
             `)
-            .eq("conversation_id", selectedUser?.conversation_id)
+            .eq("conversation_id", selectedUser.conversation_id)
             .order("sent_at", { ascending: true });
-
-        console.log("Fetched messages:", data);
-        console.log("Fetch messages error:", error);
 
         if (error) {
             console.error("Error fetching messages:", error);
         } else {
             setMessages(data || []);
-            fetchPredefinedOptions(currentParentId); // Fetch predefined options starting from the initial parent_id
         }
     };
 
@@ -94,9 +111,6 @@ export default function MessagePage() {
         }
         const { data, error } = await query;
 
-        console.log("Fetched predefined messages:", data);
-        // console.log("Fetch predefined messages error:", error);
-
         if (error) {
             console.error("Error fetching predefined messages:", error);
         } else {
@@ -105,66 +119,66 @@ export default function MessagePage() {
     };
 
     const sendMessage = async (option) => {
-        console.log("Sending message:", selectedMessage);
+        console.log("Sending message:", option); // Changed from selectedMessage to option
+        if (!option || !selectedUser) {
+            console.error("No message or user selected");
+            return;
+        }
 
         const { error, data } = await supabase.from("messages").insert([
             {
-                sender_id: session?.user.id, 
+                sender_id: session?.user.id,
                 sent_at: new Date().toISOString(),
                 received_at: null,
                 is_read: false,
-                conversation_id: selectedUser ? selectedUser.conversation_id: newUser.user_id,
+                conversation_id: selectedUser ? selectedUser.conversation_id : newUser.user_id,
                 message_type: 'text',
                 read_at: null,
                 is_delivered: false,
                 message_content: option.message_content,
             },
         ])
-        .select()
-        console.log("Sent message:", data);
-        console.log("Send message error:", error);
+        .select();
 
         if (error) {
             console.error("Error sending message:", error);
         } else {
-            fetchMessages(); // Refresh messages after sending
+            fetchMessages();
         }
     };
 
     const fetchConversations = async () => {
-        // console.log("Fetching conversations");
         setLoading(true);
         try {
             const currentUserId = session?.user.id;
 
-            let { data, error } = await supabase
+            let { data: messages, error } = await supabase
                 .from("messages")
                 .select(`
-                   *
+                    *,
+                    sender:sender_id(name),
+                    recipient:conversation_id(name)
                 `)
+                .eq("sender_id", currentUserId)
                 .order("sent_at", { ascending: false });
 
-            console.log("Fetched conversations:", data);
             if (error) {
                 console.log("Fetch conversations error:", error);
                 return;
             }
 
-            if (!data || data.length === 0) {
+            if (!messages || messages.length === 0) {
                 setConversations([]);
             } else {
-                let uniqueConversations = [];
+                const uniqueConversations = messages.reduce((acc, msg) => {
+                    if (!acc.some(conv => conv.conversation_id === msg.conversation_id)) {
+                        acc.push(msg);
+                    }
+                    return acc;
+                }, []);
 
-            
-                for (const msg of data) {
-                   if (msg.conversation_id && !uniqueConversations.some((conv) => conv.conversation_id === msg.conversation_id)) {
-                        uniqueConversations.push(msg);
-                }      
+                setConversations(uniqueConversations);
             }
-            console.log("Unique conversations:", uniqueConversations);
-            setConversations(uniqueConversations);
-
-        }
         } catch (err) {
             console.error("Error fetching messages:", err);
             setConversations([]);
@@ -174,13 +188,9 @@ export default function MessagePage() {
     };
 
     const fetchUsers = async () => {
-        console.log("Fetching users");
         const { data, error } = await supabase
             .from("users")
             .select("user_id, name");
-
-        console.log("Fetched users:", data);
-        console.log("Fetch users error:", error);
 
         if (error) {
             console.error("Error fetching users:", error);
@@ -192,7 +202,7 @@ export default function MessagePage() {
     useEffect(() => {
         if (session) {
             fetchConversations();
-            fetchPredefinedOptions(currentParentId); // Ensure predefined options are fetched on load
+            fetchPredefinedOptions(currentParentId);
         }
     }, [session]);
 
@@ -202,34 +212,46 @@ export default function MessagePage() {
         setShowUserModal(false);
     };
 
-    const handleOptionClick = (option) => {
+    const handleOptionClick = async (option) => {
         console.log("Selected message:", option);
         setCurrentParentId(option.message_content_id);
-        setSelectedMessage(option); // Store the selected message
-        fetchPredefinedOptions(option.message_content_id); // Fetch next set of options based on selected parent ID
-        sendMessage(option); // Send the selected message
+        // Don't set selectedMessage here since we're using the option directly
+        fetchPredefinedOptions(option.message_content_id);
+        await sendMessage(option);
+        // After sending, make sure to fetch the new predefined options
+        fetchPredefinedOptions(option.message_content_id);
     };
 
     const handlePlusClick = () => {
-
         fetchUsers();
         setShowUserModal(true);
     };
 
-    async function handleUserSelect (conversation) {
+    const handleUserSelect = async (conversation) => {
         console.log("Selected Conversation:", conversation);
         setSelectedUser(conversation);
         setShowUserModal(false);
-        fetchPredefinedOptions(currentParentId); // Fetch predefined options for the new conversation
+        fetchPredefinedOptions(currentParentId);
         
-        const { data, error } = await supabase.from("messages").select("*").eq("conversation_id", conversation.conversation_id).order("sent_at", { ascending: true })
-        setMessages(data || []);
-        console.log(error)
+        const { data, error } = await supabase
+            .from("messages")
+            .select(`
+                *,
+                sender:sender_id(name),
+                recipient:conversation_id(name)
+            `)
+            .eq("conversation_id", conversation.conversation_id)
+            .order("sent_at", { ascending: true });
+            
+        if (error) {
+            console.error("Error fetching conversation messages:", error);
+        } else {
+            setMessages(data || []);
+        }
     };
 
     return (
         <div className="h-screen flex">
-            {/* Navigation Sidebar */}
             <Sidebar />
 
             {/* Message Sidebar */}
@@ -246,10 +268,12 @@ export default function MessagePage() {
                     >
                         <div className="w-12 h-12 bg-gray-300 rounded-full flex-shrink-0"></div>
                         <div className="ml-4">
-                            <div className="font-bold text-gray-800">{conversation.message_content}</div> 
-                            <div className="text-sm text-gray-600">{conversation.message_content}</div>
-                            {/* This is the part where I display the last message of the conversation right? if I click this, this should 
-                            all display the messages of the conversation */}
+                            <div className="font-bold text-gray-800">
+                                {conversation.recipient?.name || "Unknown User"}
+                            </div>
+                            <div className="text-sm text-gray-600">
+                                {conversation.message_content}
+                            </div>
                         </div>
                     </div>
                 ))}
@@ -257,12 +281,10 @@ export default function MessagePage() {
 
             {/* Main Chat Area */}
             <div className="flex-1 flex flex-col bg-gray-200">
-                {/* Header */}
                 <div className="bg-gray-900 text-white text-xl py-4 px-6 font-bold shadow-md">
-                    {selectedUser ? selectedUser.name : "Name of the Person"}
+                    {selectedUser?.recipient?.name || "Select a conversation"}
                 </div>
 
-                {/* Chat Messages */}
                 <div className="flex-1 overflow-y-auto p-4 space-y-4">
                     {messages.map((msg, index) => (
                         <div
@@ -270,18 +292,21 @@ export default function MessagePage() {
                             className={`flex ${msg.sender_id === session?.user.id ? "justify-end" : "justify-start"}`}
                         >
                             <div
-                                className={`p-4 rounded-lg shadow-md ${msg.sender_id === session?.user.id
-                                    ? "bg-blue-600 text-white"
-                                    : "bg-gray-200 text-black"
-                                    } max-w-sm`}
+                                className={`p-4 rounded-lg shadow-md ${
+                                    msg.sender_id === session?.user.id
+                                        ? "bg-blue-600 text-white"
+                                        : "bg-gray-200 text-black"
+                                }`}
                             >
+                                <div className="text-sm opacity-75 mb-1">
+                                    {msg.sender?.name || "Unknown"}
+                                </div>
                                 {msg.message_content}
                             </div>
                         </div>
                     ))}
                 </div>
 
-                {/* Footer with Options */}
                 <div className="bg-gray-900 p-4">
                     <div className="flex space-x-4 justify-center">
                         {predefinedOptions.map((option, index) => (
@@ -301,12 +326,12 @@ export default function MessagePage() {
             {showUserModal && (
                 <div className="fixed inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center">
                     <div className="bg-gray-700 p-4 rounded-lg shadow-lg">
-                        <h2 className="text-xl font-bold mb-4">Select User</h2>
+                        <h2 className="text-xl font-bold mb-4 text-white">Select User</h2>
                         <ul>
                             {users.map((user) => (
                                 <li
                                     key={user.user_id}
-                                    className="cursor-pointer hover:bg-gray-200 p-2 rounded"
+                                    className="cursor-pointer hover:bg-gray-600 p-2 rounded text-white"
                                     onClick={() => {
                                         handleNewMessage();
                                         setNewUser(user);
