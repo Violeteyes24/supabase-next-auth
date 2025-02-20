@@ -11,6 +11,7 @@ import ChatIcon from '@mui/icons-material/Chat';
 import NotificationsIcon from '@mui/icons-material/Notifications';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ExitToAppIcon from '@mui/icons-material/ExitToApp';
+import PersonIcon from '@mui/icons-material/Person';
 
 const Sidebar = ({ handleLogout }) => {
     const supabase = createClientComponentClient();
@@ -53,6 +54,7 @@ const Sidebar = ({ handleLogout }) => {
 
     const menuItems = [
         { text: 'Dashboard', icon: <DashboardIcon />, action: () => (window.location.href = '/dashboard/counselor') },
+        { text: 'Profile', icon: <PersonIcon />, action: () => (window.location.href = '/profile') },
         { text: 'Reports', icon: <AssessmentIcon />, action: () => (window.location.href = '/reports') },
         { text: 'Appointments', icon: <EventIcon />, action: () => (window.location.href = '/appointment') },
         { text: 'Messages', icon: <ChatIcon />, action: () => (window.location.href = '/messages') },
