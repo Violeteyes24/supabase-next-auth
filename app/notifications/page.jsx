@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import Sidebar from "../components/dashboard components/sidebar";
 import { FaPlus, FaEdit, FaTrash, FaPaperPlane } from 'react-icons/fa';
-import { Switch } from '@mui/material';
+import { Switch, Snackbar, Alert } from '@mui/material';
 
 const supabase = createClientComponentClient();
 
@@ -19,6 +19,11 @@ export default function NotificationsPage() {
     const [status, setStatus] = useState('sent');
     const [showNotifications, setShowNotifications] = useState(true);
     const [selectedNotification, setSelectedNotification] = useState(null);
+    const [alert, setAlert] = useState({
+        open: false,
+        message: '',
+        severity: 'info' // 'error', 'warning', 'info', 'success'
+    });
 
     useEffect(() => {
         const fetchNotifications = async () => {
@@ -91,9 +96,21 @@ export default function NotificationsPage() {
         }
     };
 
+    const showAlert = (message, severity = 'info') => {
+        setAlert({
+            open: true,
+            message,
+            severity
+        });
+    };
+
+    const handleCloseAlert = () => {
+        setAlert(prev => ({ ...prev, open: false }));
+    };
+
     const saveNotification = async (newStatus) => {
-        if (!notificationContent) {
-            console.error("No notification content provided");
+        if (!notificationContent.trim()) {
+            showAlert('Please enter notification content', 'error');
             return;
         }
 
@@ -108,38 +125,52 @@ export default function NotificationsPage() {
         }
 
         if (targetUsers.length === 0) {
-            console.error("No users found for the selected target group");
+            showAlert(`No ${targetGroup} found to send notification to`, 'warning');
             return;
         }
 
-        const notificationsToInsert = targetUsers.map(user => ({
-            user_id: user.user_id,
-            notification_content: notificationContent,
-            sent_at: newStatus === "sent" ? new Date().toISOString() : null,
-            status: newStatus,
-            target_group: targetGroup // Add target group information
-        }));
+        try {
+            const notificationsToInsert = targetUsers.map(user => ({
+                user_id: user.user_id,
+                notification_content: notificationContent,
+                sent_at: newStatus === "sent" ? new Date().toISOString() : null,
+                status: newStatus,
+                target_group: targetGroup
+            }));
 
-        const { error } = await supabase.from("notifications").insert(notificationsToInsert);
+            const { error } = await supabase
+                .from("notifications")
+                .insert(notificationsToInsert);
 
-        if (error) {
-            console.error(`Error saving ${newStatus} notification:`, error);
-        } else {
-            console.log(`Notification ${newStatus} successfully:`, notificationsToInsert);
+            if (error) throw error;
+
+            showAlert(
+                `Notification ${newStatus === 'sent' ? 'sent' : 'saved as draft'} successfully to ${targetUsers.length} ${targetGroup}!`,
+                'success'
+            );
             setNotificationContent('');
+            
+        } catch (error) {
+            console.error(`Error saving notification:`, error);
+            showAlert(`Failed to ${newStatus === 'sent' ? 'send' : 'save'} notification: ${error.message}`, 'error');
         }
     };
 
     const deleteDraft = async (draftId) => {
-        const { error } = await supabase
-            .from("notifications")
-            .delete()
-            .eq("notification_id", draftId);
+        try {
+            const { error } = await supabase
+                .from("notifications")
+                .delete()
+                .eq("notification_id", draftId);
 
-        if (error) {
-            console.error("Error deleting draft:", error);
-        } else {
+            if (error) throw error;
+            
             setDrafts(drafts.filter(draft => draft.notification_id !== draftId));
+            showAlert('Draft deleted successfully', 'success');
+            
+        } catch (error) {
+            console.error("Error deleting draft:", error);
+            showAlert('Failed to delete draft: ' + error.message, 'error');
         }
     };
 
@@ -308,6 +339,23 @@ export default function NotificationsPage() {
                     </div>
                 </div>
             )}
+
+            <Snackbar 
+                open={alert.open} 
+                autoHideDuration={6000} 
+                onClose={handleCloseAlert}
+                anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+            >
+                <Alert 
+                    onClose={handleCloseAlert} 
+                    severity={alert.severity}
+                    sx={{ width: '100%' }}
+                >
+                    {alert.message}
+                </Alert>
+            </Snackbar>
         </div>
     );
 }
+
+// check notification feature and analyze group notification logic
