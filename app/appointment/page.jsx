@@ -8,6 +8,7 @@ import { Modal, Box, Button, TextField, IconButton } from '@mui/material';
 import { DatePicker, TimePicker, LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs from 'dayjs';
+import GroupAppointmentsManager from "../components/appointment components/groupAppointmentManager";  // Fixed import
 import { useRouter } from 'next/navigation';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 
@@ -289,12 +290,8 @@ export default function AppointmentPage() {
                     {/* Appointment Card */}
                     <div className="mt-10 flex justify-center">
                         <div className="w-full max-w-4xl">
-                            <AppointmentCard
-                                name="Zachary Albert Legaria"
-                                reason="Mental Disorder: Depression because of Capstone"
-                                date="January 1, 2024"
-                                time="12:00am"
-                            />
+                            <AppointmentCard/>
+                            <GroupAppointmentsManager /> {/* This should now work correctly */}
                         </div>
                     </div>
 

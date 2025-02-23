@@ -34,10 +34,15 @@ export default function GroupAppointmentsManager() {
   ]);
   const [selectedCategory, setSelectedCategory] = useState('');
   const [groupReason, setGroupReason] = useState('');
+  const [groupAppointments, setGroupAppointments] = useState([]);
+  const [selectedGroupAppointment, setSelectedGroupAppointment] = useState(null);
+  const [openRescheduleModal, setOpenRescheduleModal] = useState(false);
+  const [openCancelModal, setOpenCancelModal] = useState(false);
 
   useEffect(() => {
     fetchIndividualAppointments();
     fetchEligibleUsers();
+    fetchGroupAppointments();
   }, []);
 
   const fetchIndividualAppointments = async () => {
@@ -65,6 +70,27 @@ export default function GroupAppointmentsManager() {
       console.error('Error fetching users:', error);
     } else {
       setUsers(data || []);
+    }
+  };
+
+  const fetchGroupAppointments = async () => {
+    const { data, error } = await supabase
+      .from('appointments')
+      .select(`
+        *,
+        groupappointments (
+          user_id,
+          users (
+            name
+          )
+        )
+      `)
+      .eq('appointment_type', 'group');
+
+    if (error) {
+      console.error('Error fetching group appointments:', error);
+    } else {
+      setGroupAppointments(data || []);
     }
   };
 
@@ -122,14 +148,105 @@ export default function GroupAppointmentsManager() {
     }
   };
 
+  const handleRescheduleGroup = (appointment) => {
+    setSelectedGroupAppointment(appointment);
+    setOpenRescheduleModal(true);
+  };
+
+  const handleCancelGroup = (appointment) => {
+    setSelectedGroupAppointment(appointment);
+    setOpenCancelModal(true);
+  };
+
+  const handleConfirmReschedule = async () => {
+    try {
+      const { error } = await supabase
+        .from('appointments')
+        .update({ status: 'rescheduled' })
+        .eq('appointment_id', selectedGroupAppointment.appointment_id);
+
+      if (error) throw error;
+      
+      setOpenRescheduleModal(false);
+      fetchGroupAppointments();
+      alert('Group appointment rescheduled successfully');
+    } catch (error) {
+      console.error('Error rescheduling group appointment:', error);
+      alert('Failed to reschedule group appointment');
+    }
+  };
+
+  const handleConfirmCancel = async () => {
+    try {
+      const { error } = await supabase
+        .from('appointments')
+        .update({ status: 'cancelled' })
+        .eq('appointment_id', selectedGroupAppointment.appointment_id);
+
+      if (error) throw error;
+      
+      setOpenCancelModal(false);
+      fetchGroupAppointments();
+      alert('Group appointment cancelled successfully');
+    } catch (error) {
+      console.error('Error cancelling group appointment:', error);
+      alert('Failed to cancel group appointment');
+    }
+  };
+
   return (
     <div>
       <Button 
         variant="contained" 
         onClick={() => setOpenGroupModal(true)}
+        sx={{ mb: 2 }}
       >
         Create Group Appointment
       </Button>
+
+      <TableContainer component={Paper}>
+        <Table>
+          <TableHead>
+            <TableRow>
+              <TableCell>Appointment ID</TableCell>
+              <TableCell>Participants</TableCell>
+              <TableCell>Reason</TableCell>
+              <TableCell>Status</TableCell>
+              <TableCell>Actions</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {groupAppointments.map((appointment) => (
+              <TableRow key={appointment.appointment_id}>
+                <TableCell>{appointment.appointment_id}</TableCell>
+                <TableCell>
+                  {appointment.groupappointments?.map(ga => 
+                    ga.users?.name
+                  ).join(', ')}
+                </TableCell>
+                <TableCell>{appointment.reason}</TableCell>
+                <TableCell>{appointment.status}</TableCell>
+                <TableCell>
+                  <Button 
+                    variant="outlined" 
+                    onClick={() => handleRescheduleGroup(appointment)}
+                    sx={{ mr: 1 }}
+                  >
+                    Reschedule
+                  </Button>
+                  <Button 
+                    variant="outlined" 
+                    color="error"
+                    onClick={() => handleCancelGroup(appointment)}
+                  >
+                    Cancel
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </TableContainer>
 
       <Modal 
         open={openGroupModal} 
@@ -214,6 +331,68 @@ export default function GroupAppointmentsManager() {
               variant="outlined" 
               onClick={() => setOpenGroupModal(false)}
             >
+              Cancel
+            </Button>
+          </Box>
+        </Box>
+      </Modal>
+
+      <Modal 
+        open={openRescheduleModal} 
+        onClose={() => setOpenRescheduleModal(false)}
+      >
+        <Box sx={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          width: 400,
+          bgcolor: 'background.paper',
+          boxShadow: 24,
+          p: 4
+        }}>
+          <Typography variant="h6" gutterBottom>
+            Reschedule Group Appointment
+          </Typography>
+          <Typography>
+            Are you sure you want to reschedule this group appointment?
+          </Typography>
+          <Box sx={{ mt: 2, display: 'flex', justifyContent: 'space-between' }}>
+            <Button variant="contained" onClick={handleConfirmReschedule}>
+              Confirm Reschedule
+            </Button>
+            <Button variant="outlined" onClick={() => setOpenRescheduleModal(false)}>
+              Cancel
+            </Button>
+          </Box>
+        </Box>
+      </Modal>
+
+      <Modal 
+        open={openCancelModal} 
+        onClose={() => setOpenCancelModal(false)}
+      >
+        <Box sx={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          width: 400,
+          bgcolor: 'background.paper',
+          boxShadow: 24,
+          p: 4
+        }}>
+          <Typography variant="h6" gutterBottom>
+            Cancel Group Appointment
+          </Typography>
+          <Typography>
+            Are you sure you want to cancel this group appointment?
+          </Typography>
+          <Box sx={{ mt: 2, display: 'flex', justifyContent: 'space-between' }}>
+            <Button variant="contained" color="error" onClick={handleConfirmCancel}>
+              Confirm Cancel
+            </Button>
+            <Button variant="outlined" onClick={() => setOpenCancelModal(false)}>
               Cancel
             </Button>
           </Box>

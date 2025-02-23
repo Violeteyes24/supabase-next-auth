@@ -23,6 +23,7 @@ export default function CounselorRegister() {
     const [short_biography, setShortBiography] = useState ('')
     const [credentials, setCredentials] = useState('')
     const [imagePreview, setImagePreview] = useState(null);
+    const [imageFile, setImageFile] = useState(null);
     const [error, setError] = useState(null); 
 
 
@@ -70,6 +71,34 @@ export default function CounselorRegister() {
                 return;
             }
 
+            const userId = signUpData.user?.id;
+
+            if (!signUpData.user) {
+                setError("Sign-up failed. Please try again.");
+                return;
+            }
+
+             let imageUrl = null;
+        
+        // Upload Image if selected
+        if (imageFile) {
+            const { data, error: uploadError } = await supabase
+                .storage
+                .from('profile_pictures') // Ensure you have this storage bucket in Supabase
+                .upload(`users/${userId}-${Date.now()}`, imageFile, {
+                    cacheControl: '3600',
+                    upsert: false,
+                });
+
+            if (uploadError) {
+                console.error('Image Upload Error:', uploadError);
+                setError('Failed to upload image.');
+                return;
+            }
+
+            imageUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/profile_pictures/${data.path}`;
+        }
+
             console.log('Sign-Up Data:', signUpData);
 
             // Insert user data into the database
@@ -90,6 +119,7 @@ export default function CounselorRegister() {
                         department_assigned,
                         short_biography,
                         credentials,
+                        profile_image_url: imageUrl,
                     },
                 ]);
 
@@ -132,14 +162,15 @@ export default function CounselorRegister() {
     }
 
     const handleImageChange = (e) => {
-        const file = e.target.files[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = () => {
-                setImagePreview(reader.result);
-            };
-            reader.readAsDataURL(file); // Convert the file to a base64 string
-        }
+    const file = e.target.files[0];
+    if (file) {
+        setImageFile(file);
+        const reader = new FileReader();
+        reader.onload = () => {
+            setImagePreview(reader.result);
+        };
+        reader.readAsDataURL(file);
+    }
     };
 
     console.log({ loading, user })
