@@ -270,21 +270,21 @@ export default function AppointmentPage() {
                         </div>
 
                         {/* Time Slots */}
-                        <div className="space-y-4">
-                            {availabilitySchedules.map((schedule, index) => (
-                                <div
-                                    key={index}
-                                    className="flex justify-between items-center bg-emerald-200 p-4 rounded-lg"
-                                >
-                                    <span>{`${formatTime(schedule.start_time)} - ${formatTime(schedule.end_time)}`}</span>
-                                    <span className="flex items-center space-x-2">
-                                        <span>{schedule.is_available ? 'Available' : 'Not Available'}</span>
-                                        <Button variant="outlined" onClick={() => handleReschedule(schedule)}>Reschedule</Button>
-                                        <Button variant="outlined" color="error" onClick={() => handleCancel(schedule)}>Cancel</Button>
-                                    </span>
-                                </div>
-                            ))}
-                        </div>
+<div className="space-y-4">
+    {availabilitySchedules.map((schedule, index) => (
+        <div
+            key={index}
+            className={`flex justify-between items-center p-4 rounded-lg ${schedule.is_available ? 'bg-emerald-200' : 'bg-red-200'}`}
+        >
+            <span>{`${formatTime(schedule.start_time)} - ${formatTime(schedule.end_time)}`}</span>
+            <span className="flex items-center space-x-2">
+                <span>{schedule.is_available ? 'Available' : 'Not Available'}</span>
+                <Button variant="outlined" onClick={() => handleReschedule(schedule)}>Reschedule</Button>
+                <Button variant="outlined" color="error" onClick={() => handleCancel(schedule)}>Cancel</Button>
+            </span>
+        </div>
+    ))}
+</div>
                     </div>
 
                     {/* Appointment Card */}
