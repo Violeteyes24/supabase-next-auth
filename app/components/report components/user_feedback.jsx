@@ -1,17 +1,43 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
 const FeedbackChart = () => {
-    
-    const feedbackData = [
-        { rating: '1 Star', count: 10 },
-        { rating: '2 Stars', count: 15 },
-        { rating: '3 Stars', count: 30 },
-        { rating: '4 Stars', count: 45 },
-        { rating: '5 Stars', count: 50 },
-    ];
+    const [feedbackData, setFeedbackData] = useState([]);
+    const supabase = createClientComponentClient();
+
+    useEffect(() => {
+        const fetchData = async () => {
+            const { data, error } = await supabase
+                .from('app_ratings')
+                .select('rating, count:rating')
+                .order('rating', { ascending: true });
+
+            if (error) {
+                console.error('Error fetching data:', error);
+            } else {
+                const aggregatedData = data.reduce((acc, item) => {
+                    const existing = acc.find(d => d.rating === item.rating);
+                    if (existing) {
+                        existing.count += 1;
+                    } else {
+                        acc.push({ rating: item.rating, count: 1 });
+                    }
+                    return acc;
+                }, []);
+
+                const formattedData = aggregatedData.map(item => ({
+                    rating: `${item.rating} Star${item.rating > 1 ? 's' : ''}`,
+                    count: item.count,
+                }));
+                setFeedbackData(formattedData);
+            }
+        };
+
+        fetchData();
+    }, []);
 
     return (
         <div style={{ width: '100%', height: 300 }}>
