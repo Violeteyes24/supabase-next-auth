@@ -13,6 +13,25 @@ export async function middleware(req) {
         return NextResponse.redirect(new URL('/login', req.url)); 
     }
 
+    // Fetch user profile
+    const { data: profile, error } = await supabase
+        .from('users')
+        .select('approval_status')
+        .eq('user_id', session.user.id)
+        .single();
+
+    if (error) {
+        return NextResponse.redirect(new URL('/login', req.url));
+    }
+
+    if (profile.approval_status === 'denied') {
+        return NextResponse.redirect(new URL('/login?message=Your account has been denied.', req.url));
+    }
+
+    if (profile.approval_status === 'pending') {
+        return NextResponse.redirect(new URL('/login?message=Your account is pending approval.', req.url));
+    }
+
     return res; // Allow the request to proceed
 }
 

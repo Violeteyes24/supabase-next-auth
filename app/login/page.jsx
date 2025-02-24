@@ -1,7 +1,7 @@
 'use client';
 
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import RegisterLinks from '../components/login components/register_links'; // Function + JSX file
 
@@ -14,6 +14,8 @@ export default function LoginPage() {
     const [user, setUser] = useState(null);
     const [magicLinkSent, setMagicLinkSent] = useState(false);
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const messageFromMiddleware = searchParams.get('message');
     const supabase = createClientComponentClient();
 
     useEffect(() => {
@@ -37,7 +39,10 @@ export default function LoginPage() {
         }
 
         getUser();
-    }, []);
+        if (messageFromMiddleware) {
+            setError(messageFromMiddleware);
+        }
+    }, [messageFromMiddleware]);
 
     const handleSignIn = async () => {
         if (!email || !password) {
