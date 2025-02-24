@@ -1,11 +1,12 @@
-'use client'
-
+'use client';
+import { useRouter } from 'next/navigation';
 import React, { useState, useEffect } from "react";
 import Sidebar from "../components/dashboard components/sidebar";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { FaPlus } from 'react-icons/fa';
 
 export default function MessagePage() {
+    const router = useRouter();
     const supabase = createClientComponentClient();
     const [session, setSession] = useState(null);
     const [messages, setMessages] = useState([]);
@@ -261,9 +262,18 @@ export default function MessagePage() {
         }
     };
 
+    const handleLogout = async () => {
+        const { error } = await supabase.auth.signOut();
+        if (error) {
+            console.error('Error during sign out:', error);
+            return;
+        }
+        router.push('/login');
+    };
+
     return (
         <div className="h-screen flex">
-            <Sidebar />
+            <Sidebar handleLogout={handleLogout} />
 
             {/* Message Sidebar */}
             <div className="w-1/4 bg-gray-100 border-r overflow-y-auto">

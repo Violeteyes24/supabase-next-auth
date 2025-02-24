@@ -18,8 +18,10 @@ import {
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
 import dayjs from 'dayjs';
+import { useRouter } from 'next/navigation';
 
-export default function Profile() {
+export default function ProfilePage() {
+    const router = useRouter();
     const supabase = createClientComponentClient();
     const [message, setMessage] = useState('');
     const [severity, setSeverity] = useState('success');
@@ -108,12 +110,16 @@ export default function Profile() {
     };
 
     const handleLogout = async () => {
-        await supabase.auth.signOut();
-        window.location.href = '/';
+        const { error } = await supabase.auth.signOut();
+        if (error) {
+            console.error('Error during sign out:', error);
+            return;
+        }
+        router.push('/login');
     };
 
     return (
-        <Box sx={{ display: 'flex' }}>
+        <div className="flex h-screen">
             <Sidebar handleLogout={handleLogout} />
             <Container maxWidth="md" sx={{ py: 4 }}>
                 <Paper elevation={3} sx={{ p: 4 }}>
@@ -269,6 +275,6 @@ export default function Profile() {
                     </Alert>
                 </Snackbar>
             </Container>
-        </Box>
+        </div>
     );
 }

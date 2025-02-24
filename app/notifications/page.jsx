@@ -5,10 +5,11 @@ import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import Sidebar from "../components/dashboard components/sidebar";
 import { FaPlus, FaEdit, FaTrash, FaPaperPlane } from 'react-icons/fa';
 import { Switch, Snackbar, Alert } from '@mui/material';
-
-const supabase = createClientComponentClient();
+import { useRouter } from 'next/navigation';
 
 export default function NotificationsPage() {
+    const router = useRouter();
+    const supabase = createClientComponentClient();
     const [notifications, setNotifications] = useState([]);
     const [drafts, setDrafts] = useState([]);
     const [users, setUsers] = useState([]);
@@ -206,9 +207,18 @@ export default function NotificationsPage() {
         setNotificationContent('');
     };
 
+    const handleLogout = async () => {
+        const { error } = await supabase.auth.signOut();
+        if (error) {
+            console.error('Error during sign out:', error);
+            return;
+        }
+        router.push('/login');
+    };
+
     return (
-        <div className="h-screen flex">
-            <Sidebar />
+        <div className="flex h-screen">
+            <Sidebar handleLogout={handleLogout} />
             <div className="w-1/4 bg-gray-100 border-r overflow-y-auto relative">
                 <div className="p-4 font-bold text-gray-700 flex items-center justify-between">
                     <span>{showNotifications ? "Notifications" : "Drafts"}</span>

@@ -4,8 +4,10 @@
 import React, { useState, useEffect } from 'react';
 import Sidebar from "../components/dashboard components/sidebar";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import { useRouter } from 'next/navigation';
 
 export default function ApproveDenyPage() {
+    const router = useRouter();
     const supabase = createClientComponentClient();
     const [registrants, setRegistrants] = useState([]);
 
@@ -72,10 +74,18 @@ export default function ApproveDenyPage() {
         }
     };
 
+    const handleLogout = async () => {
+        const { error } = await supabase.auth.signOut();
+        if (error) {
+            console.error('Error during sign out:', error);
+            return;
+        }
+        router.push('/login');
+    };
+
     return (
-        <div className="h-screen bg-white flex">
-            {/* Sidebar */}
-            <Sidebar />
+        <div className="flex h-screen">
+            <Sidebar handleLogout={handleLogout} />
 
             {/* Main Content */}
             <div className="flex-1 flex flex-col text-black ml-20 p-6">

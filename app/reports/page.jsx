@@ -5,6 +5,9 @@ import { Container, Grid, Paper} from '@mui/material';
 import Sidebar from '../components/dashboard components/sidebar';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+    
+
 
 // Dynamically import components with SSR disabled
 const FrequencyChart = dynamic(() => import('../components/report components/frequent_topic'), { ssr: false });
@@ -14,7 +17,7 @@ const FeedbackChart = dynamic(() => import('../components/report components/user
 
 export default function ReportsPage() {
     const router = useRouter();
-
+    const supabase = createClientComponentClient();
     const handleLogout = async () => {
         const { error } = await supabase.auth.signOut();
 

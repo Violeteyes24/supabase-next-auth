@@ -9,11 +9,12 @@ import { DatePicker, TimePicker, LocalizationProvider } from '@mui/x-date-picker
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs from 'dayjs';
 import GroupAppointmentsManager from "../components/appointment components/groupAppointmentManager";  // Fixed import
-import { useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation';  // Add this import
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 
 export default function AppointmentPage() {
 
+    const router = useRouter();  // Add this line
     const supabase = createClientComponentClient();
     const [selectedDate, setSelectedDate] = useState(dayjs()); // Current date as default
     const [openModal, setOpenModal] = useState(false);
@@ -237,7 +238,7 @@ export default function AppointmentPage() {
         <LocalizationProvider dateAdapter={AdapterDayjs}>
             <div className="h-screen bg-white flex">
                 {/* Sidebar */}
-                <Sidebar handleLogout={handleLogout} />
+                <Sidebar handleLogout={handleLogout} /> {/* Make sure handleLogout is passed here */}
 
                 {/* Main Content */}
                 <div className="flex-1 flex flex-col text-black ml-20">
@@ -287,24 +288,11 @@ export default function AppointmentPage() {
 </div>
                     </div>
 
-                    {/* Appointments Section - Modified Layout */}
-                    <div className="mt-6 px-6">
-                        <div className="flex gap-6">
-                            {/* Individual Appointments */}
-                            <div className="flex-1">
-                                <h2 className="text-xl font-semibold mb-4">Upcoming Appointments</h2>
-                                <div className="bg-white rounded-lg shadow-md">
-                                    <AppointmentCard />
-                                </div>
-                            </div>
-
-                            {/* Group Appointments */}
-                            <div className="flex-1">
-                                <h2 className="text-xl font-semibold mb-4">Group Appointments</h2>
-                                <div className="bg-white rounded-lg shadow-md">
-                                    <GroupAppointmentsManager />
-                                </div>
-                            </div>
+                    {/* Appointment Card */}
+                    <div className="mt-10 flex justify-center">
+                        <div className="w-full max-w-4xl">
+                            <AppointmentCard/>
+                            <GroupAppointmentsManager /> {/* This should now work correctly */}
                         </div>
                     </div>
 
