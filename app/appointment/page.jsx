@@ -287,11 +287,24 @@ export default function AppointmentPage() {
 </div>
                     </div>
 
-                    {/* Appointment Card */}
-                    <div className="mt-10 flex justify-center">
-                        <div className="w-full max-w-4xl">
-                            <AppointmentCard/>
-                            <GroupAppointmentsManager /> {/* This should now work correctly */}
+                    {/* Appointments Section - Modified Layout */}
+                    <div className="mt-6 px-6">
+                        <div className="flex gap-6">
+                            {/* Individual Appointments */}
+                            <div className="flex-1">
+                                <h2 className="text-xl font-semibold mb-4">Upcoming Appointments</h2>
+                                <div className="bg-white rounded-lg shadow-md">
+                                    <AppointmentCard />
+                                </div>
+                            </div>
+
+                            {/* Group Appointments */}
+                            <div className="flex-1">
+                                <h2 className="text-xl font-semibold mb-4">Group Appointments</h2>
+                                <div className="bg-white rounded-lg shadow-md">
+                                    <GroupAppointmentsManager />
+                                </div>
+                            </div>
                         </div>
                     </div>
 
