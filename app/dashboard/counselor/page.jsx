@@ -174,6 +174,7 @@ export default function CounselorPage() {
                         />
                     </Grid>
                     <Grid item xs={12} sm={6}>
+                    <h3 className='text-black text-2xl'>Mood State Report this week</h3>
                         <Charts data={chartData} />
                     </Grid>
                 </Grid>

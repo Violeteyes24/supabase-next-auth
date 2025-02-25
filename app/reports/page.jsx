@@ -14,6 +14,8 @@ const FrequencyChart = dynamic(() => import('../components/report components/fre
 const EmotionalStateChart = dynamic(() => import('../components/report components/emotional_state'), { ssr: false });
 const DemographicChart = dynamic(() => import('../components/report components/demographics'), { ssr: false });
 const FeedbackChart = dynamic(() => import('../components/report components/user_feedback'), { ssr: false });
+const AppointmentTypeChart = dynamic(() => import('../components/report components/appointment_type'), { ssr: false });
+const DepartmentAppointmentChart = dynamic(() => import('../components/report components/department_appointments'), { ssr: false });
 
 export default function ReportsPage() {
     const router = useRouter();
@@ -112,6 +114,34 @@ export default function ReportsPage() {
                         <FeedbackChart />
                         <div className="text-center mt-4">
                             <h1 className="text-2xl font-bold">Feedback Report</h1>
+                        </div>
+                    </Paper>
+                    <Paper 
+                        elevation={3} 
+                        sx={{ 
+                            padding: '16px', 
+                            borderRadius: '12px', 
+                            border: '1px solid #ccc', 
+                            backgroundColor: '#A7F3D0'
+                        }}
+                    >
+                        <AppointmentTypeChart />
+                        <div className="text-center mt-4">
+                            <h1 className="text-2xl font-bold">Demographics - Appointment Type Report</h1>
+                        </div>
+                    </Paper>
+                    <Paper 
+                        elevation={3} 
+                        sx={{ 
+                            padding: '16px', 
+                            borderRadius: '12px', 
+                            border: '1px solid #ccc', 
+                            backgroundColor: '#A7F3D0'
+                        }}
+                    >
+                        <DepartmentAppointmentChart />
+                        <div className="text-center mt-4">
+                            <h1 className="text-2xl font-bold">Demographics - Department Report</h1>
                         </div>
                     </Paper>
                 </Grid>

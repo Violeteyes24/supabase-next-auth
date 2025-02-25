@@ -39,20 +39,19 @@ export default function CounselorRegister() {
         getUser();
     }, [])
 
-    // const validateEmail = (email) => {
-    //     const regex = /^[a-zA-Z0-9._%+-]+@hnu\.edu\.ph$/;
-    //     return regex.test(email);
-    // };
+    const validateEmail = (email) => {
+        const regex = /^[a-zA-Z0-9._%+-]+@hnu\.edu\.ph$/;
+        return regex.test(email);
+    };
 
     const handleSignUp = async () => {
 
-        // Validate email format
-        // if (!validateEmail(email)) {
-        //     setError('Please enter a valid HNU email address.');
-        //     return;
-        // }
+        if (!validateEmail(email)) {
+            setError('Please enter a valid HNU email address.');
+            return;
+        }
 
-        // setError('');
+        setError('');
         
         try {
             setError(''); // Clear any previous errors
