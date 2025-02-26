@@ -23,9 +23,9 @@ export default function CounselorRegister() {
     const [short_biography, setShortBiography] = useState ('')
     const [credentials, setCredentials] = useState('')
     const [imagePreview, setImagePreview] = useState(null);
-    const [imageFile, setImageFile] = useState(null);
-    const [error, setError] = useState(null); 
-
+    const [imageFile, setImageFile] = useState();
+    const [imageUrl, setImageUrl] = useState([])
+    const [error, setError] = useState(null);    
 
     const supabase = createClientComponentClient();
 
@@ -39,19 +39,19 @@ export default function CounselorRegister() {
         getUser();
     }, [])
 
-    const validateEmail = (email) => {
-        const regex = /^[a-zA-Z0-9._%+-]+@hnu\.edu\.ph$/;
-        return regex.test(email);
-    };
+    // const validateEmail = (email) => {
+    //     const regex = /^[a-zA-Z0-9._%+-]+@hnu\.edu\.ph$/;
+    //     return regex.test(email);
+    // };
 
     const handleSignUp = async () => {
 
-        if (!validateEmail(email)) {
-            setError('Please enter a valid HNU email address.');
-            return;
-        }
+        // if (!validateEmail(email)) {
+        //     setError('Please enter a valid HNU email address.');
+        //     return;
+        // }
 
-        setError('');
+        // setError('');
         
         try {
             setError(''); // Clear any previous errors
@@ -77,26 +77,29 @@ export default function CounselorRegister() {
                 return;
             }
 
-             let imageUrl = null;
-        
-        // Upload Image if selected
-        if (imageFile) {
-            const { data, error: uploadError } = await supabase
-                .storage
-                .from('profile_pictures') // Ensure you have this storage bucket in Supabase
-                .upload(`users/${userId}-${Date.now()}`, imageFile, {
-                    cacheControl: '3600',
-                    upsert: false,
-                });
+            let imageUrl = null;
 
-            if (uploadError) {
-                console.error('Image Upload Error:', uploadError);
-                setError('Failed to upload image.');
-                return;
+            // Upload Image if selected
+            if (imageFile) {
+                const { data, error: uploadError } = await supabase
+                    .storage
+                    .from('profile_pictures') // Ensure you have this storage bucket in Supabase
+                    .upload(`users/${userId}-${Date.now()}`, imageFile, {
+                        cacheControl: '3600',
+                        upsert: false,
+                    });
+
+                if (uploadError) {
+                    console.error('Image Upload Error:', uploadError);
+                    console.error('Upload Error Details:', uploadError.details);
+                    console.error('Upload Error Message:', uploadError.message);
+                    console.error('Upload Error Hint:', uploadError.hint);
+                    setError('Failed to upload image.');
+                    return;
+                }
+
+                imageUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/profile_pictures/${data.path}`;
             }
-
-            imageUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/profile_pictures/${data.path}`;
-        }
 
             console.log('Sign-Up Data:', signUpData);
 
@@ -143,17 +146,6 @@ export default function CounselorRegister() {
         }
     };
 
-    // const handleSignIn = async () => {
-    //     const res = await supabase.auth.signInWithPassword({
-    //         email,
-    //         password
-    //     })
-    //     setUser(res.data.user)
-    //     router.refresh();
-    //     setEmail('')
-    //     setPassword('')
-    // }
-
     const handleLogout = async () => {
         await supabase.auth.signOut();
         router.refresh();
@@ -169,6 +161,7 @@ export default function CounselorRegister() {
             setImagePreview(reader.result);
         };
         reader.readAsDataURL(file);
+        console.log(file);
     }
     };
 

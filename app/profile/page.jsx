@@ -26,6 +26,7 @@ export default function ProfilePage() {
     const [message, setMessage] = useState('');
     const [severity, setSeverity] = useState('success');
     const [openSnackbar, setOpenSnackbar] = useState(false);
+    const [profileImageUrl, setProfileImageUrl] = useState(null);
     const [formData, setFormData] = useState({
         name: '',
         username: '',
@@ -61,6 +62,7 @@ export default function ProfilePage() {
                     ...data,
                     birthday: data.birthday ? dayjs(data.birthday) : null
                 });
+                setProfileImageUrl(data.profile_image_url); // Set profile image URL
             }
         } catch (error) {
             console.error('Error fetching user data:', error);
@@ -126,6 +128,15 @@ export default function ProfilePage() {
                     <Typography variant="h4" gutterBottom sx={{ color: 'teal', mb: 4 }}>
                         Edit Profile
                     </Typography>
+                    {profileImageUrl && (
+                        <Box sx={{ mb: 4, textAlign: 'center' }}>
+                            <img
+                                src={profileImageUrl}
+                                alt="Profile"
+                                style={{ width: '150px', height: '150px', borderRadius: '50%' }}
+                            />
+                        </Box>
+                    )}
                     <Box component="form" onSubmit={handleSubmit}>
                         <Grid container spacing={3}>
                             <Grid item xs={12} sm={6}>

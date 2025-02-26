@@ -23,7 +23,7 @@ export default function SecretaryRegister() {
     const [short_biography, setShortBiography] = useState('')
     const [imagePreview, setImagePreview] = useState(null);
     const [error, setError] = useState(null); 
-
+    const [imageFile, setImageFile] = useState(null);
 
     const supabase = createClientComponentClient();
 
@@ -36,11 +36,6 @@ export default function SecretaryRegister() {
 
         getUser();
     }, [])
-
-    // const validateEmail = (email) => {
-    //     const regex = /^[a-zA-Z0-9._%+-]+@hnu\.edu\.ph$/;
-    //     return regex.test(email);
-    // };
 
     const handleSignUp = async () => {
         try {
@@ -58,6 +53,37 @@ export default function SecretaryRegister() {
                 console.error('Sign-Up Error:', signUpError);
                 setError(signUpError.message);
                 return;
+            }
+
+            const userId = signUpData.user?.id;
+
+            if (!signUpData.user) {
+                setError("Sign-up failed. Please try again.");
+                return;
+            }
+
+            let imageUrl = null;
+
+            // Upload Image if selected
+            if (imageFile) {
+                const { data, error: uploadError } = await supabase
+                    .storage
+                    .from('profile_pictures') // Ensure you have this storage bucket in Supabase
+                    .upload(`users/${userId}-${Date.now()}`, imageFile, {
+                        cacheControl: '3600',
+                        upsert: false,
+                    });
+
+                if (uploadError) {
+                    console.error('Image Upload Error:', uploadError);
+                    console.error('Upload Error Details:', uploadError.details);
+                    console.error('Upload Error Message:', uploadError.message);
+                    console.error('Upload Error Hint:', uploadError.hint);
+                    setError('Failed to upload image.');
+                    return;
+                }
+
+                imageUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/profile_pictures/${data.path}`;
             }
 
             console.log('Sign-Up Data:', signUpData);
@@ -79,6 +105,7 @@ export default function SecretaryRegister() {
                         gender,
                         department_assigned,
                         short_biography,
+                        profile_image_url: imageUrl,
                     },
                 ]);
 
@@ -103,7 +130,6 @@ export default function SecretaryRegister() {
         }
     };
 
-
     const handleSignIn = async () => {
         const res = await supabase.auth.signInWithPassword({
             email,
@@ -124,11 +150,12 @@ export default function SecretaryRegister() {
     const handleImageChange = (e) => {
         const file = e.target.files[0];
         if (file) {
+            setImageFile(file);
             const reader = new FileReader();
             reader.onload = () => {
                 setImagePreview(reader.result);
             };
-            reader.readAsDataURL(file); // Convert the file to a base64 string
+            reader.readAsDataURL(file);
         }
     };
 
