@@ -27,6 +27,7 @@ export default function ProfilePage() {
     const [severity, setSeverity] = useState('success');
     const [openSnackbar, setOpenSnackbar] = useState(false);
     const [profileImageUrl, setProfileImageUrl] = useState(null);
+    const [imageFile, setImageFile] = useState(null);
     const [formData, setFormData] = useState({
         name: '',
         username: '',
@@ -85,6 +86,18 @@ export default function ProfilePage() {
         }));
     };
 
+    const handleImageChange = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            setImageFile(file);
+            const reader = new FileReader();
+            reader.onload = () => {
+                setProfileImageUrl(reader.result);
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
     const showMessage = (msg, sev) => {
         setMessage(msg);
         setSeverity(sev);
@@ -95,11 +108,34 @@ export default function ProfilePage() {
         e.preventDefault();
         try {
             const { data: { user } } = await supabase.auth.getUser();
+            
+            let imageUrl = profileImageUrl;
+
+            // Upload Image if selected
+            if (imageFile) {
+                const { data, error: uploadError } = await supabase
+                    .storage
+                    .from('profile_pictures')
+                    .upload(`users/${user.id}-${Date.now()}`, imageFile, {
+                        cacheControl: '3600',
+                        upsert: false,
+                    });
+
+                if (uploadError) {
+                    console.error('Image Upload Error:', uploadError);
+                    showMessage('Failed to upload image.', 'error');
+                    return;
+                }
+
+                imageUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/profile_pictures/${data.path}`;
+            }
+
             const { error } = await supabase
                 .from('users')
                 .update({
                     ...formData,
-                    birthday: formData.birthday ? formData.birthday.format('YYYY-MM-DD') : null
+                    birthday: formData.birthday ? formData.birthday.format('YYYY-MM-DD') : null,
+                    profile_image_url: imageUrl
                 })
                 .eq('user_id', user.id);
 
@@ -258,6 +294,19 @@ export default function ProfilePage() {
                                     rows={4}
                                     value={formData.credentials || ''}
                                     onChange={handleChange}
+                                />
+                            </Grid>
+                            <Grid item xs={12}>
+                                <label htmlFor="imageInput" className="block mb-2 text-sm font-medium text-gray-700">
+                                    Upload New Profile Image
+                                </label>
+                                <input
+                                    type="file"
+                                    id="imageInput"
+                                    name="image"
+                                    accept="image/*"
+                                    className="mb-4 w-full p-3 rounded-md border border-gray-700 bg-gray-800 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+                                    onChange={handleImageChange}
                                 />
                             </Grid>
                             <Grid item xs={12}>

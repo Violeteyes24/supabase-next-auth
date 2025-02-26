@@ -24,6 +24,7 @@ export default function CounselorRegister() {
     const [credentials, setCredentials] = useState('')
     const [imagePreview, setImagePreview] = useState(null);
     const [imageFile, setImageFile] = useState();
+    const [proofImageFile, setProofImageFile] = useState(null);
     const [imageUrl, setImageUrl] = useState([])
     const [error, setError] = useState(null);    
 
@@ -77,9 +78,10 @@ export default function CounselorRegister() {
                 return;
             }
 
-            let imageUrl = null;
+            let profileImageUrl = null;
+            let proofImageUrl = null;
 
-            // Upload Image if selected
+            // Upload Profile Image if selected
             if (imageFile) {
                 const { data, error: uploadError } = await supabase
                     .storage
@@ -94,11 +96,33 @@ export default function CounselorRegister() {
                     console.error('Upload Error Details:', uploadError.details);
                     console.error('Upload Error Message:', uploadError.message);
                     console.error('Upload Error Hint:', uploadError.hint);
-                    setError('Failed to upload image.');
+                    setError('Failed to upload profile image.');
                     return;
                 }
 
-                imageUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/profile_pictures/${data.path}`;
+                profileImageUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/profile_pictures/${data.path}`;
+            }
+
+            // Upload Proof Image if selected
+            if (proofImageFile) {
+                const { data, error: uploadError } = await supabase
+                    .storage
+                    .from('proof_images')
+                    .upload(`users/${userId}-${Date.now()}-proof`, proofImageFile, {
+                        cacheControl: '3600',
+                        upsert: false,
+                    });
+
+                if (uploadError) {
+                    console.error('Proof Image Upload Error:', uploadError);
+                    console.error('Upload Error Details:', uploadError.details);
+                    console.error('Upload Error Message:', uploadError.message);
+                    console.error('Upload Error Hint:', uploadError.hint);
+                    setError('Failed to upload proof image.');
+                    return;
+                }
+
+                proofImageUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/proof_images/${data.path}`;
             }
 
             console.log('Sign-Up Data:', signUpData);
@@ -121,7 +145,8 @@ export default function CounselorRegister() {
                         department_assigned,
                         short_biography,
                         credentials,
-                        profile_image_url: imageUrl,
+                        profile_image_url: profileImageUrl,
+                        proof_image_url: proofImageUrl,
                     },
                 ]);
 
@@ -163,6 +188,18 @@ export default function CounselorRegister() {
         reader.readAsDataURL(file);
         console.log(file);
     }
+    };
+
+    const handleProofImageChange = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            setProofImageFile(file);
+            const reader = new FileReader();
+            reader.onload = () => {
+                setImagePreview(reader.result);
+            };
+            reader.readAsDataURL(file);
+        }
     };
 
     console.log({ loading, user })
@@ -314,6 +351,17 @@ return (
                 accept="image/*"
                 className="mb-4 w-full p-3 rounded-md border border-gray-700 bg-gray-800 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
                 onChange={handleImageChange}
+            />
+            <label htmlFor="proofImageInput" className="block mb-2 text-sm font-medium text-gray-700">
+                Upload Proof of Identity
+            </label>
+            <input
+                type="file"
+                id="proofImageInput"
+                name="proof_image"
+                accept="image/*"
+                className="mb-4 w-full p-3 rounded-md border border-gray-700 bg-gray-800 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+                onChange={handleProofImageChange}
             />
             <SignUpButton handleSignUp={handleSignUp} />
             <div className="flex items-center justify-center">
