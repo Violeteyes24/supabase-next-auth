@@ -13,12 +13,20 @@ import {
     MenuItem,
     Paper,
     Snackbar,
-    Alert
+    Alert,
+    Divider,
+    Avatar,
+    IconButton,
+    Stack,
+    Tooltip
 } from '@mui/material';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
 import dayjs from 'dayjs';
 import { useRouter } from 'next/navigation';
+import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
+import SaveIcon from '@mui/icons-material/Save';
+import EditIcon from '@mui/icons-material/Edit';
 
 export default function ProfilePage() {
     const router = useRouter();
@@ -42,6 +50,7 @@ export default function ProfilePage() {
         short_biography: '',
         credentials: ''
     });
+    const [loading, setLoading] = useState(false);
 
     useEffect(() => {
         fetchUserData();
@@ -49,6 +58,7 @@ export default function ProfilePage() {
 
     const fetchUserData = async () => {
         try {
+            setLoading(true);
             const { data: { user } } = await supabase.auth.getUser();
             if (user) {
                 const { data, error } = await supabase
@@ -63,11 +73,13 @@ export default function ProfilePage() {
                     ...data,
                     birthday: data.birthday ? dayjs(data.birthday) : null
                 });
-                setProfileImageUrl(data.profile_image_url); // Set profile image URL
+                setProfileImageUrl(data.profile_image_url);
             }
         } catch (error) {
             console.error('Error fetching user data:', error);
             showMessage('Error fetching profile data', 'error');
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -107,6 +119,7 @@ export default function ProfilePage() {
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
+            setLoading(true);
             const { data: { user } } = await supabase.auth.getUser();
             
             let imageUrl = profileImageUrl;
@@ -144,6 +157,8 @@ export default function ProfilePage() {
         } catch (error) {
             console.error('Error updating profile:', error);
             showMessage('Error updating profile', 'error');
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -157,23 +172,76 @@ export default function ProfilePage() {
     };
 
     return (
-        <div className="flex h-screen">
+        <div className="flex h-screen bg-gray-100">
             <Sidebar handleLogout={handleLogout} />
             <Container maxWidth="md" sx={{ py: 4 }}>
-                <Paper elevation={3} sx={{ p: 4 }}>
-                    <Typography variant="h4" gutterBottom sx={{ color: 'teal', mb: 4 }}>
-                        Edit Profile
-                    </Typography>
-                    {profileImageUrl && (
-                        <Box sx={{ mb: 4, textAlign: 'center' }}>
-                            <img
-                                src={profileImageUrl}
-                                alt="Profile"
-                                style={{ width: '150px', height: '150px', borderRadius: '50%' }}
-                            />
-                        </Box>
-                    )}
+                <Paper 
+                    elevation={3} 
+                    sx={{ 
+                        p: 4, 
+                        borderRadius: 2,
+                        boxShadow: '0 4px 20px rgba(0,0,0,0.08)'
+                    }}
+                >
+                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 4 }}>
+                        <Typography 
+                            variant="h4" 
+                            sx={{ 
+                                color: 'teal', 
+                                fontWeight: 600,
+                                flexGrow: 1
+                            }}
+                        >
+                            Edit Profile
+                        </Typography>
+                    </Box>
+                    
+                    <Divider sx={{ mb: 4 }} />
+                    
+                    <Box sx={{ mb: 5, textAlign: 'center', position: 'relative' }}>
+                        <Avatar
+                            src={profileImageUrl}
+                            alt="Profile"
+                            sx={{ 
+                                width: 150, 
+                                height: 150, 
+                                margin: '0 auto',
+                                border: '4px solid #e0f2f1',
+                                boxShadow: '0 4px 10px rgba(0,0,0,0.1)'
+                            }}
+                        />
+                        <input
+                            accept="image/*"
+                            id="icon-button-file"
+                            type="file"
+                            style={{ display: 'none' }}
+                            onChange={handleImageChange}
+                        />
+                        <label htmlFor="icon-button-file">
+                            <IconButton 
+                                component="span"
+                                sx={{ 
+                                    position: 'absolute',
+                                    bottom: 0,
+                                    right: '50%',
+                                    transform: 'translateX(50px)',
+                                    backgroundColor: 'teal',
+                                    color: 'white',
+                                    '&:hover': { backgroundColor: 'darkcyan' }
+                                }}
+                            >
+                                <PhotoCameraIcon />
+                            </IconButton>
+                        </label>
+                    </Box>
+                    
                     <Box component="form" onSubmit={handleSubmit}>
+                        <Typography 
+                            variant="h6" 
+                            sx={{ mb: 2, color: 'teal', fontWeight: 500 }}
+                        >
+                            Personal Information
+                        </Typography>
                         <Grid container spacing={3}>
                             <Grid item xs={12} sm={6}>
                                 <TextField
@@ -182,6 +250,9 @@ export default function ProfilePage() {
                                     name="name"
                                     value={formData.name}
                                     onChange={handleChange}
+                                    InputProps={{
+                                        sx: { borderRadius: 2 }
+                                    }}
                                 />
                             </Grid>
                             <Grid item xs={12} sm={6}>
@@ -191,6 +262,9 @@ export default function ProfilePage() {
                                     name="username"
                                     value={formData.username || ''}
                                     onChange={handleChange}
+                                    InputProps={{
+                                        sx: { borderRadius: 2 }
+                                    }}
                                 />
                             </Grid>
                             <Grid item xs={12}>
@@ -202,6 +276,9 @@ export default function ProfilePage() {
                                     rows={2}
                                     value={formData.address || ''}
                                     onChange={handleChange}
+                                    InputProps={{
+                                        sx: { borderRadius: 2 }
+                                    }}
                                 />
                             </Grid>
                             <Grid item xs={12} sm={6}>
@@ -211,6 +288,9 @@ export default function ProfilePage() {
                                     name="contact_number"
                                     value={formData.contact_number || ''}
                                     onChange={handleChange}
+                                    InputProps={{
+                                        sx: { borderRadius: 2 }
+                                    }}
                                 />
                             </Grid>
                             <Grid item xs={12} sm={6}>
@@ -219,7 +299,14 @@ export default function ProfilePage() {
                                         label="Birthday"
                                         value={formData.birthday}
                                         onChange={handleDateChange}
-                                        renderInput={(params) => <TextField {...params} fullWidth />}
+                                        sx={{ width: '100%' }}
+                                        slotProps={{
+                                            textField: {
+                                                InputProps: {
+                                                    sx: { borderRadius: 2 }
+                                                }
+                                            }
+                                        }}
                                     />
                                 </LocalizationProvider>
                             </Grid>
@@ -231,12 +318,26 @@ export default function ProfilePage() {
                                     name="gender"
                                     value={formData.gender || ''}
                                     onChange={handleChange}
+                                    InputProps={{
+                                        sx: { borderRadius: 2 }
+                                    }}
                                 >
                                     <MenuItem value="male">Male</MenuItem>
                                     <MenuItem value="female">Female</MenuItem>
                                     <MenuItem value="other">Other</MenuItem>
                                 </TextField>
                             </Grid>
+                        </Grid>
+                        
+                        <Divider sx={{ my: 4 }} />
+                        
+                        <Typography 
+                            variant="h6" 
+                            sx={{ mb: 2, color: 'teal', fontWeight: 500 }}
+                        >
+                            Academic Information
+                        </Typography>
+                        <Grid container spacing={3}>
                             <Grid item xs={12} sm={6}>
                                 <TextField
                                     fullWidth
@@ -244,6 +345,9 @@ export default function ProfilePage() {
                                     name="department"
                                     value={formData.department || ''}
                                     onChange={handleChange}
+                                    InputProps={{
+                                        sx: { borderRadius: 2 }
+                                    }}
                                 />
                             </Grid>
                             <Grid item xs={12} sm={6}>
@@ -253,6 +357,9 @@ export default function ProfilePage() {
                                     name="program"
                                     value={formData.program || ''}
                                     onChange={handleChange}
+                                    InputProps={{
+                                        sx: { borderRadius: 2 }
+                                    }}
                                 />
                             </Grid>
                             <Grid item xs={12} sm={6}>
@@ -263,6 +370,9 @@ export default function ProfilePage() {
                                     name="program_year_level"
                                     value={formData.program_year_level || ''}
                                     onChange={handleChange}
+                                    InputProps={{
+                                        sx: { borderRadius: 2 }
+                                    }}
                                 />
                             </Grid>
                             <Grid item xs={12} sm={6}>
@@ -272,8 +382,22 @@ export default function ProfilePage() {
                                     name="school_year"
                                     value={formData.school_year || ''}
                                     onChange={handleChange}
+                                    InputProps={{
+                                        sx: { borderRadius: 2 }
+                                    }}
                                 />
                             </Grid>
+                        </Grid>
+                        
+                        <Divider sx={{ my: 4 }} />
+                        
+                        <Typography 
+                            variant="h6" 
+                            sx={{ mb: 2, color: 'teal', fontWeight: 500 }}
+                        >
+                            Professional Information
+                        </Typography>
+                        <Grid container spacing={3}>
                             <Grid item xs={12}>
                                 <TextField
                                     fullWidth
@@ -283,6 +407,9 @@ export default function ProfilePage() {
                                     rows={4}
                                     value={formData.short_biography || ''}
                                     onChange={handleChange}
+                                    InputProps={{
+                                        sx: { borderRadius: 2 }
+                                    }}
                                 />
                             </Grid>
                             <Grid item xs={12}>
@@ -294,32 +421,28 @@ export default function ProfilePage() {
                                     rows={4}
                                     value={formData.credentials || ''}
                                     onChange={handleChange}
-                                />
-                            </Grid>
-                            <Grid item xs={12}>
-                                <label htmlFor="imageInput" className="block mb-2 text-sm font-medium text-gray-700">
-                                    Upload New Profile Image
-                                </label>
-                                <input
-                                    type="file"
-                                    id="imageInput"
-                                    name="image"
-                                    accept="image/*"
-                                    className="mb-4 w-full p-3 rounded-md border border-gray-700 bg-gray-800 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
-                                    onChange={handleImageChange}
+                                    InputProps={{
+                                        sx: { borderRadius: 2 }
+                                    }}
                                 />
                             </Grid>
                             <Grid item xs={12}>
                                 <Button
                                     type="submit"
                                     variant="contained"
+                                    disabled={loading}
+                                    startIcon={<SaveIcon />}
                                     sx={{
                                         mt: 2,
                                         bgcolor: 'teal',
-                                        '&:hover': { bgcolor: 'darkcyan' }
+                                        '&:hover': { bgcolor: 'darkcyan' },
+                                        borderRadius: 2,
+                                        padding: '10px 24px',
+                                        textTransform: 'none',
+                                        fontWeight: 600
                                     }}
                                 >
-                                    Update Profile
+                                    {loading ? 'Updating...' : 'Update Profile'}
                                 </Button>
                             </Grid>
                         </Grid>
@@ -330,7 +453,11 @@ export default function ProfilePage() {
                     autoHideDuration={6000}
                     onClose={() => setOpenSnackbar(false)}
                 >
-                    <Alert severity={severity} sx={{ width: '100%' }}>
+                    <Alert 
+                        severity={severity} 
+                        variant="filled"
+                        sx={{ width: '100%' }}
+                    >
                         {message}
                     </Alert>
                 </Snackbar>

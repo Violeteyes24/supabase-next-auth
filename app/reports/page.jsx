@@ -28,144 +28,93 @@ export default function ReportsPage() {
         router.push('/login');
     };
 
+    // Custom card styles with gradient backgrounds
+    const cardStyles = [
+        { 
+            backgroundColor: 'linear-gradient(135deg, #a3e635 0%, #22c55e 100%)', 
+            color: '#1a2e05'
+        },
+        { 
+            backgroundColor: 'linear-gradient(135deg, #38bdf8 0%, #0ea5e9 100%)', 
+            color: '#0c3256'
+        },
+        { 
+            backgroundColor: 'linear-gradient(135deg, #a78bfa 0%, #8b5cf6 100%)', 
+            color: '#2e1065'
+        },
+        { 
+            backgroundColor: 'linear-gradient(135deg, #fb923c 0%, #f97316 100%)', 
+            color: '#431407'
+        },
+        { 
+            backgroundColor: 'linear-gradient(135deg, #f472b6 0%, #ec4899 100%)', 
+            color: '#500724'
+        },
+        { 
+            backgroundColor: 'linear-gradient(135deg, #fdba74 0%, #f59e0b 100%)', 
+            color: '#451a03'
+        }
+    ];
+
     return (
-        <main className="h-screen flex bg-gray-100">
+        <main className="min-h-screen flex bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900">
             <Sidebar handleLogout={handleLogout} />
-            <Container sx={{ marginTop: '32px', flex: 1 }}>
-                <h1 className="mb-8 text-4xl font-bold text-center text-gray-800 dark:text-black">
-                    Reports Dashboard
-                </h1>
-                <Grid container spacing={4}>
-                    {/* Row 1 */}
-                    <Grid item xs={12} sm={4}>
-                        <Paper 
-                            elevation={3} 
-                            sx={{ 
-                                padding: '24px', 
-                                borderRadius: '16px', 
-                                border: '1px solid #ccc', 
-                                backgroundColor: '#A7F3D0',
-                                transition: 'transform 0.3s',
-                                '&:hover': {
-                                    transform: 'scale(1.02)',
-                                    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.2)',
-                                }
-                            }}
-                        >
-                            <EmotionalStateChart />
-                            <div className="text-center mt-4">
-                                <h2 className="text-2xl font-semibold">Overall Mood State</h2>
-                            </div>
-                        </Paper>
+            <div className="flex-1 overflow-auto py-8 px-4">
+                <Container maxWidth="xl">
+                    <div className="mb-10">
+                        <h1 className="text-4xl font-extrabold text-gray-800 dark:text-white text-center">
+                            Reports Dashboard
+                        </h1>
+                        <p className="text-center text-gray-600 dark:text-gray-300 mt-2">
+                            Analytics and insights for your organization
+                        </p>
+                    </div>
+                
+                    <Grid container spacing={4}>
+                        {[
+                            { component: <EmotionalStateChart />, title: "Overall Mood State", description: "Emotional state distribution of users" },
+                            { component: <FrequencyChart />, title: "Frequent Topics", description: "Most discussed topics by frequency" },
+                            { component: <DemographicChart />, title: "Demographic Report", description: "User distribution by demographic factors" },
+                            { component: <FeedbackChart />, title: "Feedback Report", description: "User satisfaction metrics and trends" },
+                            { component: <AppointmentTypeChart />, title: "Appointment Types", description: "Distribution of appointment categories" },
+                            { component: <DepartmentAppointmentChart />, title: "Department Analysis", description: "Appointments by department" }
+                        ].map((item, index) => (
+                            <Grid item xs={12} md={6} lg={4} key={index}>
+                                <Paper 
+                                    elevation={0}
+                                    sx={{ 
+                                        padding: { xs: '16px', md: '24px' }, 
+                                        borderRadius: '24px',
+                                        height: '100%',
+                                        background: cardStyles[index].backgroundColor,
+                                        color: cardStyles[index].color,
+                                        boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05)',
+                                        transition: 'all 0.3s ease-in-out',
+                                        '&:hover': {
+                                            transform: 'translateY(-8px)',
+                                            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 10px 10px -5px rgba(0, 0, 0, 0.1)',
+                                        },
+                                        display: 'flex',
+                                        flexDirection: 'column'
+                                    }}
+                                >
+                                    <div className="flex-1">
+                                        {item.component}
+                                    </div>
+                                    <div className="mt-6">
+                                        <h2 className="text-2xl font-bold">{item.title}</h2>
+                                        <p className="mt-1 opacity-80">{item.description}</p>
+                                    </div>
+                                </Paper>
+                            </Grid>
+                        ))}
                     </Grid>
-                    <Grid item xs={12} sm={4}>
-                        <Paper 
-                            elevation={3} 
-                            sx={{ 
-                                padding: '24px', 
-                                borderRadius: '16px', 
-                                border: '1px solid #ccc', 
-                                backgroundColor: '#A7F3D0',
-                                transition: 'transform 0.3s',
-                                '&:hover': {
-                                    transform: 'scale(1.02)',
-                                    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.2)',
-                                }
-                            }}
-                        >
-                            <FrequencyChart />
-                            <div className="text-center mt-4">
-                                <h2 className="text-2xl font-semibold">Frequent Topics</h2>
-                            </div>
-                        </Paper>
-                    </Grid>
-                    <Grid item xs={12} sm={4}>
-                        <Paper 
-                            elevation={3} 
-                            sx={{ 
-                                padding: '24px', 
-                                borderRadius: '16px', 
-                                border: '1px solid #ccc', 
-                                backgroundColor: '#A7F3D0',
-                                transition: 'transform 0.3s',
-                                '&:hover': {
-                                    transform: 'scale(1.02)',
-                                    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.2)',
-                                }
-                            }}
-                        >
-                            <DemographicChart />
-                            <div className="text-center mt-4">
-                                <h2 className="text-2xl font-semibold">Demographic Report</h2>
-                            </div>
-                        </Paper>
-                    </Grid>
-                    {/* Row 2 */}
-                    <Grid item xs={12} sm={4}>
-                        <Paper 
-                            elevation={3} 
-                            sx={{ 
-                                padding: '24px', 
-                                borderRadius: '16px', 
-                                border: '1px solid #ccc', 
-                                backgroundColor: '#A7F3D0',
-                                transition: 'transform 0.3s',
-                                '&:hover': {
-                                    transform: 'scale(1.02)',
-                                    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.2)',
-                                }
-                            }}
-                        >
-                            <FeedbackChart />
-                            <div className="text-center mt-4">
-                                <h2 className="text-2xl font-semibold">Feedback Report</h2>
-                            </div>
-                        </Paper>
-                    </Grid>
-                    <Grid item xs={12} sm={4}>
-                        <Paper 
-                            elevation={3} 
-                            sx={{ 
-                                padding: '24px', 
-                                borderRadius: '16px', 
-                                border: '1px solid #ccc', 
-                                backgroundColor: '#A7F3D0',
-                                transition: 'transform 0.3s',
-                                '&:hover': {
-                                    transform: 'scale(1.02)',
-                                    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.2)',
-                                }
-                            }}
-                        >
-                            <AppointmentTypeChart />
-                            <div className="text-center mt-4">
-                                <h2 className="text-2xl font-semibold">Appointment Type Report</h2>
-                            </div>
-                        </Paper>
-                    </Grid>
-                    <Grid item xs={12} sm={4}>
-                        <Paper 
-                            elevation={3} 
-                            sx={{ 
-                                padding: '24px', 
-                                borderRadius: '16px', 
-                                border: '1px solid #ccc', 
-                                backgroundColor: '#A7F3D0',
-                                transition: 'transform 0.3s',
-                                '&:hover': {
-                                    transform: 'scale(1.02)',
-                                    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.2)',
-                                }
-                            }}
-                        >
-                            <DepartmentAppointmentChart />
-                            <div className="text-center mt-4">
-                                <h2 className="text-2xl font-semibold">Department Report</h2>
-                            </div>
-                        </Paper>
-                    </Grid>
-                </Grid>
-            </Container>
+                    
+                    <footer className="mt-16 text-center text-gray-500 text-sm">
+                        <p>© {new Date().getFullYear()} Your Organization • Dashboard v2.0</p>
+                    </footer>
+                </Container>
+            </div>
         </main>
     );
 }
