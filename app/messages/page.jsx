@@ -3,7 +3,9 @@ import { useRouter } from 'next/navigation';
 import React, { useState, useEffect } from "react";
 import Sidebar from "../components/dashboard components/sidebar";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
-import { FaPlus } from 'react-icons/fa';
+import { FaPlus, FaArrowLeft } from 'react-icons/fa';
+import { BiMessageDetail } from 'react-icons/bi';
+import { format } from 'date-fns';
 
 export default function MessagePage() {
     const router = useRouter();
@@ -19,6 +21,19 @@ export default function MessagePage() {
     const [showUserModal, setShowUserModal] = useState(false);
     const [selectedMessage, setSelectedMessage] = useState(null);
     const [newUser, setNewUser] = useState(null);
+    const [isMobile, setIsMobile] = useState(false);
+    const [showSidebar, setShowSidebar] = useState(true);
+
+    useEffect(() => {
+        const handleResize = () => {
+            setIsMobile(window.innerWidth < 768);
+            setShowSidebar(window.innerWidth >= 768);
+        };
+        
+        handleResize();
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
 
     useEffect(() => {
         const getSession = async () => {
@@ -27,14 +42,6 @@ export default function MessagePage() {
         };
         getSession();
     }, []);
-
-    useEffect(() => {
-        console.log("Messages state updated:", messages);
-    }, [messages]);
-
-    useEffect(() => {
-        console.log("Predefined options state updated:", predefinedOptions);
-    }, [predefinedOptions]);
 
     useEffect(() => {
         if (session) {
@@ -53,7 +60,6 @@ export default function MessagePage() {
                         filter: `conversation_id=eq.${selectedUser?.conversation_id}`
                     },
                     (payload) => {
-                        console.log('Message change received:', payload);
                         fetchMessages();
                         fetchConversations();
                     }
@@ -80,7 +86,7 @@ export default function MessagePage() {
                 supabase.removeChannel(predefinedMessageChannel);
             };
         }
-    }, [session, selectedUser]); // Add selectedUser to dependency array
+    }, [session, selectedUser]);
 
     const fetchMessages = async () => {
         if (!selectedUser?.conversation_id) return;
@@ -103,7 +109,6 @@ export default function MessagePage() {
     };
 
     const fetchPredefinedOptions = async (parentId = 13) => {
-        console.log("Fetching predefined options for parent ID:", parentId);
         let query = supabase.from("predefined_messages").select("*").eq("message_role", "counselor");
         if (parentId !== null) {
             query = query.eq("parent_id", parentId);
@@ -120,7 +125,6 @@ export default function MessagePage() {
     };
 
     const sendMessage = async (option) => {
-        console.log("Sending message:", option); // Changed from selectedMessage to option
         if (!option || !selectedUser) {
             console.error("No message or user selected");
             return;
@@ -214,7 +218,6 @@ export default function MessagePage() {
     };
 
     const handleOptionClick = async (option) => {
-        console.log("Selected message:", option);
         await sendMessage(option);
         
         // Check if there are predefined options for the selected message_content_id
@@ -240,10 +243,13 @@ export default function MessagePage() {
     };
 
     const handleUserSelect = async (conversation) => {
-        console.log("Selected Conversation:", conversation);
         setSelectedUser(conversation);
         setShowUserModal(false);
         fetchPredefinedOptions(currentParentId);
+        
+        if (isMobile) {
+            setShowSidebar(false);
+        }
         
         const { data, error } = await supabase
             .from("messages")
@@ -271,103 +277,233 @@ export default function MessagePage() {
         router.push('/login');
     };
 
+    const formatTime = (timestamp) => {
+        if (!timestamp) return '';
+        try {
+            return format(new Date(timestamp), 'h:mm a');
+        } catch (e) {
+            return '';
+        }
+    };
+
+    const toggleSidebar = () => {
+        setShowSidebar(!showSidebar);
+    };
+
     return (
-        <div className="h-screen flex">
-            <Sidebar handleLogout={handleLogout} />
+        <div className="h-screen flex flex-col md:flex-row bg-gray-50">
+            {/* Main Sidebar */}
+            <div className={`${isMobile ? (showSidebar ? 'block' : 'hidden') : 'block'} md:w-16 bg-gray-900 flex-shrink-0`}>
+                <Sidebar handleLogout={handleLogout} />
+            </div>
 
             {/* Message Sidebar */}
-            <div className="w-1/4 bg-gray-100 border-r overflow-y-auto">
-                <div className="p-4 font-bold text-gray-700 flex items-center justify-between">
-                    Messages
-                    <FaPlus className="cursor-pointer" onClick={handlePlusClick} />
-                </div>
-                {conversations.map((conversation, index) => (
-                    <div
-                        key={index}
-                        className="flex items-center px-4 py-2 hover:bg-gray-200 cursor-pointer"
-                        onClick={() => handleUserSelect(conversation)}
+            <div className={`${isMobile ? (showSidebar ? 'block' : 'hidden') : 'block'} w-full md:w-1/4 lg:w-1/5 bg-white border-r border-gray-200 overflow-y-auto`}>
+                <div className="p-4 bg-gray-800 text-white font-semibold flex items-center justify-between sticky top-0 z-10">
+                    <h2 className="text-lg">Messages</h2>
+                    <button 
+                        onClick={handlePlusClick}
+                        className="w-8 h-8 flex items-center justify-center bg-emerald-600 rounded-full hover:bg-emerald-700 transition-colors"
                     >
-                        <div className="w-12 h-12 bg-gray-300 rounded-full flex-shrink-0"></div>
-                        <div className="ml-4">
-                            <div className="font-bold text-gray-800">
-                                {conversation.recipient?.name || "Unknown User"}
+                        <FaPlus className="text-sm" />
+                    </button>
+                </div>
+                
+                {loading ? (
+                    <div className="p-4 text-center">
+                        <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-gray-300 border-t-emerald-600"></div>
+                    </div>
+                ) : conversations.length === 0 ? (
+                    <div className="p-6 text-center text-gray-500">
+                        <BiMessageDetail className="w-12 h-12 mx-auto mb-2 text-gray-400" />
+                        <p>No conversations yet</p>
+                        <button 
+                            onClick={handlePlusClick}
+                            className="mt-2 text-emerald-600 hover:text-emerald-800"
+                        >
+                            Start a new conversation
+                        </button>
+                    </div>
+                ) : (
+                    conversations.map((conversation, index) => (
+                        <div
+                            key={index}
+                            className={`flex items-center px-4 py-3 hover:bg-gray-100 cursor-pointer transition-colors border-b border-gray-100 ${
+                                selectedUser?.conversation_id === conversation.conversation_id ? 'bg-gray-100' : ''
+                            }`}
+                            onClick={() => handleUserSelect(conversation)}
+                        >
+                            <div className="w-10 h-10 bg-emerald-600 text-white rounded-full flex-shrink-0 flex items-center justify-center font-semibold">
+                                {conversation.recipient?.name?.charAt(0).toUpperCase() || "?"}
                             </div>
-                            <div className="text-sm text-gray-600">
-                                {conversation.message_content}
+                            <div className="ml-3 flex-1 min-w-0">
+                                <div className="flex justify-between items-baseline">
+                                    <div className="font-medium text-gray-800 truncate">
+                                        {conversation.recipient?.name || "Unknown User"}
+                                    </div>
+                                    <div className="text-xs text-gray-500">
+                                        {formatTime(conversation.sent_at)}
+                                    </div>
+                                </div>
+                                <div className="text-sm text-gray-600 truncate">
+                                    {conversation.message_content}
+                                </div>
                             </div>
                         </div>
-                    </div>
-                ))}
+                    ))
+                )}
             </div>
 
             {/* Main Chat Area */}
-            <div className="flex-1 flex flex-col bg-gray-200">
-                <div className="bg-gray-900 text-white text-xl py-4 px-6 font-bold shadow-md">
-                    {selectedUser?.recipient?.name || "Select a conversation"}
+            <div className={`${isMobile && showSidebar ? 'hidden' : 'flex'} flex-1 flex flex-col bg-gray-100 relative`}>
+                {isMobile && selectedUser && (
+                    <button 
+                        onClick={toggleSidebar}
+                        className="absolute top-4 left-4 z-20 bg-gray-800 text-white p-2 rounded-full"
+                    >
+                        <FaArrowLeft />
+                    </button>
+                )}
+                
+                <div className="bg-gray-800 text-white py-4 px-6 shadow-md flex items-center">
+                    {selectedUser?.recipient?.name ? (
+                        <>
+                            <div className="w-8 h-8 bg-emerald-600 text-white rounded-full mr-3 flex items-center justify-center font-semibold">
+                                {selectedUser.recipient.name.charAt(0).toUpperCase()}
+                            </div>
+                            <span className="font-semibold">{selectedUser.recipient.name}</span>
+                        </>
+                    ) : (
+                        <span className="font-semibold">Select a conversation</span>
+                    )}
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                    {messages.map((msg, index) => (
-                        <div
-                            key={index}
-                            className={`flex ${msg.sender_id === session?.user.id ? "justify-end" : "justify-start"}`}
-                        >
-                            <div
-                                className={`p-4 rounded-lg shadow-md ${
-                                    msg.sender_id === session?.user.id
-                                        ? "bg-blue-600 text-white"
-                                        : "bg-gray-200 text-black"
-                                }`}
+                {!selectedUser ? (
+                    <div className="flex-1 flex items-center justify-center">
+                        <div className="text-center p-6">
+                            <BiMessageDetail className="w-16 h-16 mx-auto mb-4 text-gray-400" />
+                            <h3 className="text-xl font-semibold text-gray-700 mb-2">No conversation selected</h3>
+                            <p className="text-gray-500 mb-4">Choose a conversation from the sidebar or start a new one</p>
+                            <button
+                                onClick={handlePlusClick}
+                                className="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition-colors flex items-center mx-auto"
                             >
-                                <div className="text-sm opacity-75 mb-1">
-                                    {msg.sender?.name || "Unknown"}
+                                <FaPlus className="mr-2" /> New conversation
+                            </button>
+                        </div>
+                    </div>
+                ) : (
+                    <>
+                        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                            {messages.length === 0 ? (
+                                <div className="text-center text-gray-500 my-10">
+                                    <p>No messages yet</p>
+                                    <p className="text-sm">Choose one of the options below to start the conversation</p>
                                 </div>
-                                {msg.message_content}
+                            ) : (
+                                messages.map((msg, index) => {
+                                    const isCurrentUser = msg.sender_id === session?.user.id;
+                                    return (
+                                        <div
+                                            key={index}
+                                            className={`flex ${isCurrentUser ? "justify-end" : "justify-start"}`}
+                                        >
+                                            {!isCurrentUser && (
+                                                <div className="w-8 h-8 bg-gray-300 rounded-full flex-shrink-0 mr-2 flex items-center justify-center text-sm font-medium">
+                                                    {msg.sender?.name?.charAt(0).toUpperCase() || "?"}
+                                                </div>
+                                            )}
+                                            <div className="max-w-[75%]">
+                                                <div
+                                                    className={`p-3 rounded-lg shadow-sm ${
+                                                        isCurrentUser
+                                                            ? "bg-emerald-600 text-white rounded-br-none"
+                                                            : "bg-white text-gray-800 rounded-bl-none"
+                                                    }`}
+                                                >
+                                                    <div className="text-sm opacity-90">
+                                                        {msg.message_content}
+                                                    </div>
+                                                </div>
+                                                <div className={`text-xs mt-1 text-gray-500 ${isCurrentUser ? 'text-right' : 'text-left'}`}>
+                                                    {formatTime(msg.sent_at)}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })
+                            )}
+                        </div>
+
+                        <div className="bg-white p-4 border-t border-gray-200">
+                            <div className="flex flex-wrap gap-2 justify-center">
+                                {predefinedOptions.length === 0 ? (
+                                    <div className="text-gray-500 text-center py-2">
+                                        Loading response options...
+                                    </div>
+                                ) : (
+                                    predefinedOptions.map((option, index) => (
+                                        <button
+                                            key={index}
+                                            className="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition-colors shadow-sm"
+                                            onClick={() => handleOptionClick(option)}
+                                        >
+                                            {option.message_content}
+                                        </button>
+                                    ))
+                                )}
                             </div>
                         </div>
-                    ))}
-                </div>
-
-                <div className="bg-gray-900 p-4">
-                    <div className="flex space-x-4 justify-center">
-                        {predefinedOptions.map((option, index) => (
-                            <button
-                                key={index}
-                                className="bg-emerald-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-                                onClick={() => handleOptionClick(option)}
-                            >
-                                {option.message_content}
-                            </button>
-                        ))}
-                    </div>
-                </div>
+                    </>
+                )}
             </div>
 
             {/* User Selection Modal */}
             {showUserModal && (
-                <div className="fixed inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center">
-                    <div className="bg-gray-700 p-4 rounded-lg shadow-lg">
-                        <h2 className="text-xl font-bold mb-4 text-white">Select User</h2>
-                        <ul>
-                            {users.map((user) => (
-                                <li
-                                    key={user.user_id}
-                                    className="cursor-pointer hover:bg-gray-600 p-2 rounded text-white"
-                                    onClick={() => {
-                                        handleNewMessage();
-                                        setNewUser(user);
-                                    }}
-                                >
-                                    {user.name}
-                                </li>
-                            ))}
-                        </ul>
-                        <button
-                            className="mt-4 bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
-                            onClick={() => setShowUserModal(false)}
-                        >
-                            Cancel
-                        </button>
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-lg shadow-xl max-w-md w-full overflow-hidden">
+                        <div className="bg-gray-800 text-white px-4 py-3 flex justify-between items-center">
+                            <h2 className="text-lg font-semibold">Select User</h2>
+                            <button 
+                                onClick={() => setShowUserModal(false)}
+                                className="text-gray-300 hover:text-white"
+                            >
+                                ✕
+                            </button>
+                        </div>
+                        <div className="max-h-80 overflow-y-auto p-2">
+                            {users.length === 0 ? (
+                                <div className="text-center p-4 text-gray-500">
+                                    No users available
+                                </div>
+                            ) : (
+                                <ul className="divide-y divide-gray-100">
+                                    {users.map((user) => (
+                                        <li
+                                            key={user.user_id}
+                                            className="px-4 py-3 hover:bg-gray-50 cursor-pointer rounded transition-colors flex items-center"
+                                            onClick={() => {
+                                                handleNewMessage();
+                                                setNewUser(user);
+                                            }}
+                                        >
+                                            <div className="w-8 h-8 bg-emerald-600 text-white rounded-full flex items-center justify-center mr-3 font-medium">
+                                                {user.name.charAt(0).toUpperCase()}
+                                            </div>
+                                            <span className="text-gray-800">{user.name}</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+                        </div>
+                        <div className="bg-gray-50 px-4 py-3 flex justify-end">
+                            <button
+                                className="bg-gray-300 text-gray-800 px-4 py-2 rounded hover:bg-gray-400 transition-colors"
+                                onClick={() => setShowUserModal(false)}
+                            >
+                                Cancel
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

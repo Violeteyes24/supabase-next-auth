@@ -14,6 +14,7 @@ export default function ApproveDenyPage() {
     const [selectedUser, setSelectedUser] = useState(null);
     const [proofImage, setProofImage] = useState(null);
     const [openViewModal, setOpenViewModal] = useState(false);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         fetchRegistrants();
@@ -30,9 +31,10 @@ export default function ApproveDenyPage() {
     }, []);
 
     const fetchRegistrants = async () => {
+        setLoading(true);
         const { data, error } = await supabase
             .from("users")
-            .select("user_id, name, credentials, department_assigned, short_biography, user_type, approval_status") // Adjust the columns to match your table schema
+            .select("user_id, name, credentials, department_assigned, short_biography, user_type, approval_status")
             .in("user_type", ["counselor", "secretary"])
             .not("is_director", "eq", true);
 
@@ -42,46 +44,38 @@ export default function ApproveDenyPage() {
         } else {
             setRegistrants(data || []);
         }
+        setLoading(false);
     };
 
     const handleApprove = async (id) => {
-        console.log(`Approved registrant with ID: ${id}`);
-
         const { data, error } = await supabase
             .from('users')
             .update({ approval_status: 'approved' })
             .eq('user_id', id)
-            .select(); // Ensure updated rows are returned
+            .select();
 
         if (error) {
             console.error("Error approving registrant:", error.message, error.details, error.hint);
         } else {
             console.log("Registrant approved:", data);
-            // No need to call fetchRegistrants() here as real-time updates will handle it
         }
-
     };
 
     const handleDeny = async (id) => {
-        console.log(`Denied registrant with ID: ${id}`);
-
         const { data, error } = await supabase
             .from('users')
             .update({ approval_status: 'denied' })
-            .eq('user_id', id) // Update the approval status for the selected user
-            .select(); // Ensure updated rows are returned
+            .eq('user_id', id)
+            .select();
 
         if (error) {
             console.error("Error denying registrant:", error.message, error.details, error.hint);
         } else {
             console.log("Registrant denied:", data);
-            // No need to call fetchRegistrants() here as real-time updates will handle it
         }
     };
 
     const handleView = async (id) => {
-        console.log(`Viewing registrant with ID: ${id}`);
-
         const { data, error } = await supabase
             .from('users')
             .select('proof_image_url')
@@ -106,96 +100,201 @@ export default function ApproveDenyPage() {
         router.push('/login');
     };
 
+    // Function to get status badge styling
+    const getStatusBadgeClass = (status) => {
+        switch(status) {
+            case 'approved':
+                return 'bg-green-100 text-green-800 border-green-200';
+            case 'denied':
+                return 'bg-red-100 text-red-800 border-red-200';
+            case 'pending':
+                return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+            default:
+                return 'bg-gray-100 text-gray-800 border-gray-200';
+        }
+    };
+
     return (
-        <div className="flex h-screen">
+        <div className="flex h-screen bg-gray-50">
             <Sidebar handleLogout={handleLogout} />
 
             {/* Main Content */}
-            <div className="flex-1 flex flex-col text-black ml-20 p-6">
-                <h1 className="text-3xl font-bold mt-4 mb-6">Approve or Deny Registrants</h1>
+            <div className="flex-1 flex flex-col text-gray-800 ml-20 p-8 overflow-hidden">
+                <div className="flex justify-between items-center mb-8">
+                    <h1 className="text-3xl font-bold text-emerald-700">Registrant Approval</h1>
+                    <div className="bg-white p-2 rounded-lg shadow-sm">
+                        <span className="text-sm text-gray-500">Total Registrants: {registrants.length}</span>
+                    </div>
+                </div>
 
-                {/* Table */}
-                <div className="overflow-x-auto">
-                    <table className="min-w-full bg-emerald-200 rounded-lg">
-                        <thead>
-                            <tr>
-                                <th className="px-4 py-2 text-left text-black">Picture</th>
-                                <th className="px-4 py-2 text-left text-black">Name</th>
-                                <th className="px-4 py-2 text-left text-black">User Type</th>
-                                <th className="px-4 py-2 text-left text-black">Credentials</th>
-                                <th className="px-4 py-2 text-left text-black">Biography</th>
-                                <th className="px-4 py-2 text-left text-black">Department</th>
-                                <th className="px-4 py-2 text-left text-black">Approval Status</th>
-                                <th className="px-4 py-2 text-center text-black">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {registrants.map((registrant) => (
-                                <tr key={registrant.user_id} className="border-b border-gray-700">
-                                    <td className="px-4 py-2">
-                                        <img
-                                            src="https://static.vecteezy.com/system/resources/previews/021/548/095/original/default-profile-picture-avatar-user-avatar-icon-person-icon-head-icon-profile-picture-icons-default-anonymous-user-male-and-female-businessman-photo-placeholder-social-network-avatar-portrait-free-vector.jpg"
-                                            alt="Profile"
-                                            className="w-12 h-12 rounded-full"
-                                        />
-                                    </td>
-                                    <td className="px-4 py-2">{registrant.name}</td>
-                                    <td className="px-4 py-2">{registrant.user_type}</td>
-                                    <td className="px-4 py-2">{registrant.credentials}</td>
-                                    <td className="px-4 py-2">{registrant.short_biography}</td>
-                                    <td className="px-4 py-2">{registrant.department_assigned}</td>
-                                    <td className="px-4 py-2">{registrant.approval_status}</td>
-                                    <td className="px-4 py-2 flex justify-center space-x-4">
-                                        <button
-                                            className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
-                                            onClick={() => handleApprove(registrant.user_id)}
-                                        >
-                                            Approve
-                                        </button>
-                                        <button
-                                            className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600"
-                                            onClick={() => handleDeny(registrant.user_id)}
-                                        >
-                                            Deny
-                                        </button>
-                                        <button
-                                            className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
-                                            onClick={() => handleView(registrant.user_id)}
-                                        >
-                                            View
-                                        </button>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                {/* Card Container */}
+                <div className="bg-white rounded-xl shadow-md p-6 flex-1 overflow-hidden flex flex-col">
+                    <div className="mb-4">
+                        <h2 className="text-xl font-semibold text-gray-700 mb-2">Pending Registrants</h2>
+                        <p className="text-gray-500 text-sm">Approve or deny account requests from counselors and secretaries</p>
+                    </div>
+
+                    {/* Table Container with Shadow */}
+                    <div className="overflow-hidden rounded-lg border border-gray-200 flex-1 flex flex-col">
+                        {/* Table Header */}
+                        <div className="overflow-x-auto flex-1">
+                            <table className="min-w-full divide-y divide-gray-200">
+                                <thead className="bg-gray-50">
+                                    <tr>
+                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Picture</th>
+                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User Type</th>
+                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Credentials</th>
+                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Biography</th>
+                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Department</th>
+                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                        <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="bg-white divide-y divide-gray-200">
+                                    {loading ? (
+                                        <tr>
+                                            <td colSpan="8" className="px-6 py-4 text-center text-sm text-gray-500">
+                                                Loading registrants...
+                                            </td>
+                                        </tr>
+                                    ) : registrants.length === 0 ? (
+                                        <tr>
+                                            <td colSpan="8" className="px-6 py-4 text-center text-sm text-gray-500">
+                                                No registrants found
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        registrants.map((registrant) => (
+                                            <tr key={registrant.user_id} className="hover:bg-gray-50 transition-colors">
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    <img
+                                                        src="https://static.vecteezy.com/system/resources/previews/021/548/095/original/default-profile-picture-avatar-user-avatar-icon-person-icon-head-icon-profile-picture-icons-default-anonymous-user-male-and-female-businessman-photo-placeholder-social-network-avatar-portrait-free-vector.jpg"
+                                                        alt="Profile"
+                                                        className="w-10 h-10 rounded-full object-cover border border-gray-200"
+                                                    />
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{registrant.name}</td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 capitalize">{registrant.user_type}</td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{registrant.credentials}</td>
+                                                <td className="px-6 py-4 text-sm text-gray-500 max-w-xs truncate">{registrant.short_biography}</td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{registrant.department_assigned}</td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusBadgeClass(registrant.approval_status)}`}>
+                                                        {registrant.approval_status || 'pending'}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">
+                                                    <div className="flex justify-center space-x-2">
+                                                        <button
+                                                            className="bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1.5 rounded text-xs font-medium transition-colors duration-150 ease-in-out"
+                                                            onClick={() => handleApprove(registrant.user_id)}
+                                                            disabled={registrant.approval_status === 'approved'}
+                                                        >
+                                                            Approve
+                                                        </button>
+                                                        <button
+                                                            className="bg-red-500 hover:bg-red-600 text-white px-3 py-1.5 rounded text-xs font-medium transition-colors duration-150 ease-in-out"
+                                                            onClick={() => handleDeny(registrant.user_id)}
+                                                            disabled={registrant.approval_status === 'denied'}
+                                                        >
+                                                            Deny
+                                                        </button>
+                                                        <button
+                                                            className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1.5 rounded text-xs font-medium transition-colors duration-150 ease-in-out"
+                                                            onClick={() => handleView(registrant.user_id)}
+                                                        >
+                                                            View
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            {/* View Modal */}
-            <Modal open={openViewModal} onClose={() => setOpenViewModal(false)}>
+            {/* Enhanced View Modal */}
+            <Modal 
+                open={openViewModal} 
+                onClose={() => setOpenViewModal(false)}
+                aria-labelledby="proof-image-modal"
+            >
                 <Box
                     sx={{
                         position: 'absolute',
                         top: '50%',
                         left: '50%',
                         transform: 'translate(-50%, -50%)',
-                        bgcolor: 'background.paper',
+                        bgcolor: 'white',
+                        borderRadius: '8px',
                         boxShadow: 24,
                         p: 4,
-                        width: 400,
+                        width: 500,
+                        maxWidth: '90vw',
+                        maxHeight: '90vh',
+                        overflow: 'auto'
                     }}
                 >
-                    <h2 className="mb-4 text-lg font-bold">Proof Image</h2>
-                    {proofImage ? (
-                        <img src={proofImage} alt="Proof" className="w-full h-auto" />
-                    ) : (
-                        <p>No proof image available.</p>
-                    )}
-                    <div className="mt-4 flex justify-end">
-                        <Button variant="contained" onClick={() => setOpenViewModal(false)}>
+                    <h2 className="text-xl font-bold text-gray-800 mb-4">Verification Document</h2>
+                    <div className="border border-gray-200 rounded-lg overflow-hidden">
+                        {proofImage ? (
+                            <img src={proofImage} alt="Proof" className="w-full h-auto" />
+                        ) : (
+                            <div className="p-8 text-center text-gray-500 bg-gray-50">
+                                <p>No verification document available.</p>
+                            </div>
+                        )}
+                    </div>
+                    <div className="mt-6 flex justify-end space-x-2">
+                        <Button 
+                            variant="outlined" 
+                            onClick={() => setOpenViewModal(false)}
+                            sx={{
+                                borderColor: '#d1d5db',
+                                color: '#4b5563'
+                            }}
+                        >
                             Close
                         </Button>
+                        {selectedUser && proofImage && (
+                            <>
+                                <Button 
+                                    variant="contained" 
+                                    onClick={() => {
+                                        handleApprove(selectedUser);
+                                        setOpenViewModal(false);
+                                    }}
+                                    sx={{
+                                        bgcolor: '#10b981',
+                                        '&:hover': {
+                                            bgcolor: '#059669'
+                                        }
+                                    }}
+                                >
+                                    Approve
+                                </Button>
+                                <Button 
+                                    variant="contained" 
+                                    onClick={() => {
+                                        handleDeny(selectedUser);
+                                        setOpenViewModal(false);
+                                    }}
+                                    sx={{
+                                        bgcolor: '#ef4444',
+                                        '&:hover': {
+                                            bgcolor: '#dc2626'
+                                        }
+                                    }}
+                                >
+                                    Deny
+                                </Button>
+                            </>
+                        )}
                     </div>
                 </Box>
             </Modal>
