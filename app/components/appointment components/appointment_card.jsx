@@ -36,6 +36,7 @@ export default function AppointmentCard() {
         }
 
         const userId = session.user.id;
+        const currentDate = dayjs().format('YYYY-MM-DD'); // Get the current date in the format 'YYYY-MM-DD'
 
         console.log('Fetching appointments for user ID:', userId); // Add this line to log the user ID
 
@@ -60,7 +61,8 @@ export default function AppointmentCard() {
                 )
             `)
             .eq('status', 'pending')
-            .eq('counselor_id', userId);
+            .eq('counselor_id', userId)
+            .gte('availability_schedules.date', currentDate); // Filter appointments by date
 
         if (error) {
             console.error('Error fetching appointments:', error.message);
@@ -161,31 +163,33 @@ export default function AppointmentCard() {
                                 </tr>
                             </thead>
                             <tbody>
-                                {appointments.map((appointment, index) => (
-                                    <tr key={index} className="hover:bg-emerald-400 transition duration-200">
-                                        <td className="px-4 py-3 border-b text-gray-100 text-sm">
-                                            <img
-                                                src="https://static.vecteezy.com/system/resources/previews/021/548/095/original/default-profile-picture-avatar-user-avatar-icon-person-icon-head-icon-profile-picture-icons-default-anonymous-user-male-and-female-businessman-photo-placeholder-social-network-avatar-portrait-free-vector.jpg"
-                                                alt="Profile Picture"
-                                                className="w-12 h-12 rounded-full border-2 border-emerald-400"
-                                            />
-                                        </td>
-                                        <td className="px-4 py-3 border-b text-black text-sm">
-                                            {appointment.users ? appointment.users.name : 'Unknown'}
-                                        </td>
-                                        <td className="px-4 py-3 border-b text-black text-sm">{appointment.reason}</td>
-                                        <td className="px-4 py-3 border-b text-black text-sm">
-                                            {appointment.availability_schedules ? appointment.availability_schedules.date : 'Unknown'}
-                                        </td>
-                                        <td className="px-4 py-3 border-b text-black text-sm">
-                                            {appointment.availability_schedules ? `${appointment.availability_schedules.start_time} - ${appointment.availability_schedules.end_time}` : 'Unknown'}
-                                        </td>
-                                        <td className="px-4 py-3 border-b text-black text-sm">
-                                            <Button variant="outlined" onClick={() => handleReschedule(appointment)}>Reschedule</Button>
-                                            <Button variant="outlined" color="error" onClick={() => handleCancel(appointment)}>Cancel</Button>
-                                        </td>
-                                    </tr>
-                                ))}
+                                {appointments
+                                    .filter(appointment => appointment.users && appointment.availability_schedules)
+                                    .map((appointment, index) => (
+                                        <tr key={index} className="hover:bg-emerald-400 transition duration-200">
+                                            <td className="px-4 py-3 border-b text-gray-100 text-sm">
+                                                <img
+                                                    src="https://static.vecteezy.com/system/resources/previews/021/548/095/original/default-profile-picture-avatar-user-avatar-icon-person-icon-head-icon-profile-picture-icons-default-anonymous-user-male-and-female-businessman-photo-placeholder-social-network-avatar-portrait-free-vector.jpg"
+                                                    alt="Profile Picture"
+                                                    className="w-12 h-12 rounded-full border-2 border-emerald-400"
+                                                />
+                                            </td>
+                                            <td className="px-4 py-3 border-b text-black text-sm">
+                                                {appointment.users.name}
+                                            </td>
+                                            <td className="px-4 py-3 border-b text-black text-sm">{appointment.reason || ''}</td>
+                                            <td className="px-4 py-3 border-b text-black text-sm">
+                                                {appointment.availability_schedules.date}
+                                            </td>
+                                            <td className="px-4 py-3 border-b text-black text-sm">
+                                                {`${appointment.availability_schedules.start_time} - ${appointment.availability_schedules.end_time}`}
+                                            </td>
+                                            <td className="px-4 py-3 border-b text-black text-sm">
+                                                <Button variant="outlined" onClick={() => handleReschedule(appointment)}>Reschedule</Button>
+                                                <Button variant="outlined" color="error" onClick={() => handleCancel(appointment)}>Cancel</Button>
+                                            </td>
+                                        </tr>
+                                    ))}
                             </tbody>
                         </table>
                     </div>
