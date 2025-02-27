@@ -60,7 +60,7 @@ export default function AppointmentCard() {
                 )
             `)
             .eq('status', 'pending')
-            .eq('user_id', userId);
+            .eq('counselor_id', userId);
 
         if (error) {
             console.error('Error fetching appointments:', error.message);
