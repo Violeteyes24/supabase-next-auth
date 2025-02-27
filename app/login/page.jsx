@@ -130,14 +130,20 @@ export default function Auth() {
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold text-gray-800 flex items-center justify-center">
             <span className="text-black">Mental</span>
-            <span className="bg-green-500 text-white px-3 py-1 rounded-md ml-1">Help</span>
+            <span className="bg-green-500 text-white px-3 py-1 rounded-md ml-1">
+              Help
+            </span>
           </h1>
-          <p className="text-gray-600 mt-2 font-medium">Your mental health companion</p>
+          <p className="text-gray-600 mt-2 font-medium">
+            Your mental health companion
+          </p>
         </div>
 
         <div className="space-y-5">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Email
+            </label>
             <input
               type="email"
               className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-400 focus:border-green-400 transition duration-200"
@@ -146,9 +152,11 @@ export default function Auth() {
               placeholder="email@address.com"
             />
           </div>
-          
+
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Password
+            </label>
             <input
               type="password"
               className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-400 focus:border-green-400 transition duration-200"
@@ -185,16 +193,23 @@ export default function Auth() {
           >
             Sign in with OTP
           </button>
-          
+
           <div className="mt-6 text-center">
             <p className="text-gray-600 text-sm">
               Don't have an account?{" "}
               <button
-                onClick={signUpWithEmail}
+                onClick={() => router.push("/register/counselor")}
                 disabled={loading}
                 className="text-green-600 hover:text-green-800 font-medium"
               >
-                Sign up
+                Sign up as a counselor
+              </button>
+              <button
+                onClick={() => router.push("/register/secretary")}
+                disabled={loading}
+                className="text-green-600 hover:text-green-800 font-medium"
+              >
+                or as a secretary
               </button>
             </p>
           </div>
@@ -204,9 +219,13 @@ export default function Auth() {
       {isOtpModalVisible && (
         <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
           <div className="bg-white p-6 rounded-xl shadow-xl w-full max-w-md">
-            <h2 className="text-xl font-semibold text-gray-800 mb-4">Enter 6-Digit OTP Code</h2>
-            <p className="text-gray-600 mb-4">We've sent a verification code to your email address.</p>
-            
+            <h2 className="text-xl font-semibold text-gray-800 mb-4">
+              Enter 6-Digit OTP Code
+            </h2>
+            <p className="text-gray-600 mb-4">
+              We've sent a verification code to your email address.
+            </p>
+
             <input
               type="text"
               className="w-full p-3 text-center text-xl tracking-widest border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-400 focus:border-green-400"
@@ -215,18 +234,20 @@ export default function Auth() {
               placeholder="• • • • • •"
               maxLength={6}
             />
-            
+
             <div className="flex flex-col sm:flex-row justify-between gap-3 mt-6">
               <button
                 onClick={verifyOtp}
                 disabled={loading || otp.length !== 6}
                 className={`${
-                  otp.length === 6 ? "bg-green-500 hover:bg-green-600" : "bg-gray-300 cursor-not-allowed"
+                  otp.length === 6
+                    ? "bg-green-500 hover:bg-green-600"
+                    : "bg-gray-300 cursor-not-allowed"
                 } text-white font-medium py-3 px-4 rounded-lg transition duration-200 sm:flex-1`}
               >
                 Verify OTP
               </button>
-              
+
               <button
                 onClick={() => setOtpModalVisible(false)}
                 className="bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium py-3 px-4 rounded-lg transition duration-200 sm:flex-1"
