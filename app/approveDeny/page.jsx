@@ -33,7 +33,8 @@ export default function ApproveDenyPage() {
         const { data, error } = await supabase
             .from("users")
             .select("user_id, name, credentials, department_assigned, short_biography, user_type, approval_status") // Adjust the columns to match your table schema
-            .in("user_type", ["counselor", "secretary"]);
+            .in("user_type", ["counselor", "secretary"])
+            .not("is_director", "eq", true);
 
         console.log("Fetched registrants:", data);
         if (error) {
