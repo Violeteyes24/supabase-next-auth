@@ -5,11 +5,15 @@ import React, { useState, useEffect } from 'react';
 import Sidebar from "../components/dashboard components/sidebar";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { useRouter } from 'next/navigation';
+import { Modal, Box, Button } from '@mui/material';
 
 export default function ApproveDenyPage() {
     const router = useRouter();
     const supabase = createClientComponentClient();
     const [registrants, setRegistrants] = useState([]);
+    const [selectedUser, setSelectedUser] = useState(null);
+    const [proofImage, setProofImage] = useState(null);
+    const [openViewModal, setOpenViewModal] = useState(false);
 
     useEffect(() => {
         fetchRegistrants();
@@ -74,6 +78,24 @@ export default function ApproveDenyPage() {
         }
     };
 
+    const handleView = async (id) => {
+        console.log(`Viewing registrant with ID: ${id}`);
+
+        const { data, error } = await supabase
+            .from('users')
+            .select('proof_image_url')
+            .eq('user_id', id)
+            .single();
+
+        if (error) {
+            console.error("Error fetching proof image:", error.message, error.details, error.hint);
+        } else {
+            setSelectedUser(id);
+            setProofImage(data.proof_image_url);
+            setOpenViewModal(true);
+        }
+    };
+
     const handleLogout = async () => {
         const { error } = await supabase.auth.signOut();
         if (error) {
@@ -135,6 +157,12 @@ export default function ApproveDenyPage() {
                                         >
                                             Deny
                                         </button>
+                                        <button
+                                            className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+                                            onClick={() => handleView(registrant.user_id)}
+                                        >
+                                            View
+                                        </button>
                                     </td>
                                 </tr>
                             ))}
@@ -142,6 +170,34 @@ export default function ApproveDenyPage() {
                     </table>
                 </div>
             </div>
+
+            {/* View Modal */}
+            <Modal open={openViewModal} onClose={() => setOpenViewModal(false)}>
+                <Box
+                    sx={{
+                        position: 'absolute',
+                        top: '50%',
+                        left: '50%',
+                        transform: 'translate(-50%, -50%)',
+                        bgcolor: 'background.paper',
+                        boxShadow: 24,
+                        p: 4,
+                        width: 400,
+                    }}
+                >
+                    <h2 className="mb-4 text-lg font-bold">Proof Image</h2>
+                    {proofImage ? (
+                        <img src={proofImage} alt="Proof" className="w-full h-auto" />
+                    ) : (
+                        <p>No proof image available.</p>
+                    )}
+                    <div className="mt-4 flex justify-end">
+                        <Button variant="contained" onClick={() => setOpenViewModal(false)}>
+                            Close
+                        </Button>
+                    </div>
+                </Box>
+            </Modal>
         </div>
     );
 }

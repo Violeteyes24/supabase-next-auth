@@ -22,6 +22,7 @@ import dayjs from 'dayjs';
 
 export default function GroupAppointmentsManager() {
   const supabase = createClientComponentClient();
+  
   const [individualAppointments, setIndividualAppointments] = useState([]);
   const [users, setUsers] = useState([]);
   const [selectedUsers, setSelectedUsers] = useState([]);
@@ -46,13 +47,20 @@ export default function GroupAppointmentsManager() {
   }, []);
 
   const fetchIndividualAppointments = async () => {
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError) {
+      console.error('Error getting session:', sessionError);
+      return;
+    }
+
     const { data, error } = await supabase
       .from('appointments')
       .select('*')
+      .eq('counselor_id', session?.user?.id)
       .eq('appointment_type', 'individual')
       .eq('status', 'pending');
 
-      console.log(data);
+    console.log('Fetching individual appointments:', data); // Add this line to log the fetched appointments
 
     if (error) {
       console.error('Error fetching appointments:', error);

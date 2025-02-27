@@ -29,6 +29,16 @@ export default function AppointmentCard() {
     }, []);
 
     const fetchAppointments = async () => {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+            console.error("No session found");
+            return;
+        }
+
+        const userId = session.user.id;
+
+        console.log('Fetching appointments for user ID:', userId); // Add this line to log the user ID
+
         const { data, error } = await supabase
             .from('appointments')
             .select(`
@@ -49,12 +59,15 @@ export default function AppointmentCard() {
                     name
                 )
             `)
-            .eq('status', 'pending');
+            .eq('status', 'pending')
+            .eq('user_id', userId);
 
         if (error) {
             console.error('Error fetching appointments:', error.message);
             return;
         }
+
+        console.log('Fetched appointments:', data); // Add this line to log the fetched appointments
         setAppointments(data);
     };
 

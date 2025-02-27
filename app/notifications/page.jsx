@@ -28,6 +28,14 @@ export default function NotificationsPage() {
 
     useEffect(() => {
         const fetchNotifications = async () => {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) {
+                console.error("No session found");
+                return;
+            }
+
+            const userId = session.user.id;
+
             const { data: sentNotifications, error: sentError } = await supabase
                 .from("notifications")
                 .select(`
@@ -40,6 +48,7 @@ export default function NotificationsPage() {
                     users (name)
                 `)
                 .eq("status", "sent")
+                .eq("user_id", userId)
                 .order("sent_at", { ascending: false });
 
             const { data: draftNotifications, error: draftError } = await supabase
@@ -53,7 +62,8 @@ export default function NotificationsPage() {
                     target_group, 
                     users (name)
                 `)
-                .eq("status", "draft");
+                .eq("status", "draft")
+                .eq("user_id", userId);
 
             if (sentError || draftError) {
                 console.error("Error fetching notifications:", sentError || draftError);
