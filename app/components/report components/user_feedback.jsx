@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
 const FeedbackChart = () => {
@@ -40,8 +40,8 @@ const FeedbackChart = () => {
     }, []);
 
     return (
-        <div style={{ width: '100%', height: 300 }}>
-            <BarChart width={400} height={300} data={feedbackData}>
+        <ResponsiveContainer width="100%" height={400}>
+            <BarChart data={feedbackData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="rating" />
                 <YAxis />
@@ -49,7 +49,7 @@ const FeedbackChart = () => {
                 <Legend />
                 <Bar dataKey="count" fill="#82ca9d" />
             </BarChart>
-        </div>
+        </ResponsiveContainer>
     );
 };
 

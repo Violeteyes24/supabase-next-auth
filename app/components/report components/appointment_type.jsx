@@ -1,45 +1,57 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
 const AppointmentTypeChart = () => {
-    const [data, setData] = useState({ labels: [], datasets: [] });
+    const [data, setData] = useState([]);
     const supabase = createClientComponentClient();
 
     useEffect(() => {
         const fetchData = async () => {
             const { data: appointments, error } = await supabase
-                .from('appointments')
-                .select('appointment_type, count(appointment_id)')
-                .group('appointment_type');
+                .rpc('get_appointment_types');
 
             if (error) {
                 console.error('Error fetching appointment types:', error);
                 return;
             }
 
-            const labels = appointments.map(app => app.appointment_type);
-            const counts = appointments.map(app => app.count);
+            const chartData = appointments.map(app => ({
+                name: app.appointment_type,
+                value: app.count
+            }));
 
-            setData({
-                labels,
-                datasets: [{
-                    data: counts,
-                    backgroundColor: ['#FF6384', '#36A2EB'],
-                    hoverBackgroundColor: ['#FF6384', '#36A2EB']
-                }]
-            });
+            setData(chartData);
         };
 
         fetchData();
     }, [supabase]);
 
+    const COLORS = ['#FF6384', '#36A2EB'];
+
     return (
-        <div>
-            <Pie data={data} />
-        </div>
+        <ResponsiveContainer width="100%" height={400}>
+            <PieChart>
+                <Pie
+                    data={data}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={150}
+                    fill="#8884d8"
+                    label
+                >
+                    {data.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                </Pie>
+                <Tooltip />
+                <Legend />
+            </PieChart>
+        </ResponsiveContainer>
     );
 };
 
