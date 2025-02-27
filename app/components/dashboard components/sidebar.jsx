@@ -58,7 +58,9 @@ const Sidebar = ({ handleLogout }) => {
         { text: 'Reports', icon: <AssessmentIcon />, action: () => (window.location.href = '/reports') },
         { text: 'Appointments', icon: <EventIcon />, action: () => (window.location.href = '/appointment') },
         { text: 'Messages', icon: <ChatIcon />, action: () => (window.location.href = '/messages') },
-        { text: 'Notifications', icon: <NotificationsIcon />, action: () => (window.location.href = '/notifications') },
+        ...(user?.is_director
+            ? [{ text: 'Notifications', icon: <NotificationsIcon />, action: () => (window.location.href = '/notifications') }]
+            : [{ text: 'View Notifications', icon: <NotificationsIcon />, action: () => (window.location.href = '/view-notifications') }]),
         ...(user?.user_type === 'counselor' && user?.is_director
             ? [{ text: 'Approve and Deny', icon: <CheckCircleIcon />, action: () => (window.location.href = '/approveDeny') }]
             : []),
