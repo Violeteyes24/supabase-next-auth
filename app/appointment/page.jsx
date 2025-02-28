@@ -35,9 +35,11 @@ export default function AppointmentPage() {
     const [openDatePicker, setOpenDatePicker] = useState(false);
     const [showSuccessToast, setShowSuccessToast] = useState(false);
     const [toastMessage, setToastMessage] = useState('');
+    const [currentMonthDays, setCurrentMonthDays] = useState([]);
 
     useEffect(() => {
         fetchAvailabilitySchedules();
+        updateDaysNavigation(selectedDate);
 
         const scheduleChannel = supabase.channel('schedule-changes')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'availability_schedules' }, () => {
@@ -49,6 +51,32 @@ export default function AppointmentPage() {
             supabase.removeChannel(scheduleChannel);
         };
     }, [selectedDate]);
+
+    // Update days navigation based on selected date
+    const updateDaysNavigation = (date) => {
+        // Get the first date of the selected month
+        const firstDayOfMonth = date.startOf('month');
+        // Calculate days to include in the navigation (6 days)
+        const days = [];
+        
+        // If we're showing the current month, start with today
+        if (date.month() === dayjs().month() && date.year() === dayjs().year()) {
+            const today = dayjs();
+            days.push(today);
+            
+            // Add 5 more days after today
+            for (let i = 1; i <= 5; i++) {
+                days.push(today.add(i, 'day'));
+            }
+        } else {
+            // For other months, show the first 6 days of the month
+            for (let i = 0; i < 6; i++) {
+                days.push(firstDayOfMonth.add(i, 'day'));
+            }
+        }
+        
+        setCurrentMonthDays(days);
+    };
 
     // Show success toast message
     const displaySuccessToast = (message) => {
@@ -249,10 +277,15 @@ export default function AppointmentPage() {
         }
     };
 
-    const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-
     const formatTime = (time) => {
         return dayjs(time, 'HH:mm').format('hh:mm A');
+    };
+
+    // Handle date change from date picker
+    const handleDateChange = (newDate) => {
+        setSelectedDate(newDate);
+        updateDaysNavigation(newDate);
+        setOpenDatePicker(false);
     };
 
     // Modal styles
@@ -298,9 +331,8 @@ export default function AppointmentPage() {
 
                         {/* Days Navigation */}
                         <div className="flex space-x-2 mb-6 overflow-x-auto pb-2">
-                            {days.map((day, index) => {
-                                const dayDate = dayjs().day(index + 1);
-                                const isSelected = selectedDate.format('YYYY-MM-DD') === dayDate.format('YYYY-MM-DD');
+                            {currentMonthDays.map((day, index) => {
+                                const isSelected = selectedDate.format('YYYY-MM-DD') === day.format('YYYY-MM-DD');
                                 return (
                                     <button
                                         key={index}
@@ -309,11 +341,11 @@ export default function AppointmentPage() {
                                                 ? 'bg-emerald-500 text-white shadow-md'
                                                 : 'bg-gray-100 text-gray-700 hover:bg-emerald-100'
                                         }`}
-                                        onClick={() => setSelectedDate(dayDate)}
+                                        onClick={() => setSelectedDate(day)}
                                     >
                                         <div className="text-center">
-                                            <div className="text-sm">{day.substring(0, 3)}</div>
-                                            <div className="text-lg font-bold">{dayDate.format('DD')}</div>
+                                            <div className="text-sm">{day.format('ddd')}</div>
+                                            <div className="text-lg font-bold">{day.format('DD')}</div>
                                         </div>
                                     </button>
                                 );
@@ -384,12 +416,12 @@ export default function AppointmentPage() {
                     {/* Appointment Card */}
                     <div className="px-6 pb-20">
                         <div className="bg-white p-6 rounded-lg shadow-md mb-6">
-                            <h2 className="text-xl font-semibold text-gray-800 mb-4">Your Appointments</h2>
+                            {/* <h2 className="text-xl font-semibold text-gray-800 mb-4">Your Appointments</h2> */}
                             <AppointmentCard />
                         </div>
                         
                         <div className="bg-white p-6 rounded-lg shadow-md">
-                            <h2 className="text-xl font-semibold text-gray-800 mb-4">Group Appointments</h2>
+                            {/* <h2 className="text-xl font-semibold text-gray-800 mb-4">Group Appointments</h2> */}
                             <GroupAppointmentsManager />
                         </div>
                     </div>
@@ -475,10 +507,7 @@ export default function AppointmentPage() {
                             <h2 className="mb-6 text-xl font-bold text-gray-800">Select Date</h2>
                             <DatePicker
                                 value={selectedDate}
-                                onChange={(newValue) => {
-                                    setSelectedDate(newValue);
-                                    setOpenDatePicker(false);
-                                }}
+                                onChange={handleDateChange}
                                 sx={{ width: '100%' }}
                             />
                             <div className="mt-6 flex justify-end">

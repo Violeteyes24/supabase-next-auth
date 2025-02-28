@@ -29,6 +29,14 @@ export default function CounselorRegister() {
     const [error, setError] = useState(null);
     const [step, setStep] = useState(1);
     const totalSteps = 3;
+    
+    // Field validation states
+    const [emailError, setEmailError] = useState('');
+    const [usernameError, setUsernameError] = useState('');
+    const [nameError, setNameError] = useState('');
+    const [contactNumberError, setContactNumberError] = useState('');
+    const [birthdayError, setBirthdayError] = useState('');
+    const [credentialsError, setCredentialsError] = useState('');
 
     const supabase = createClientComponentClient();
 
@@ -42,9 +50,147 @@ export default function CounselorRegister() {
         getUser();
     }, [])
 
+    // Validate email format
+    const validateEmail = (email) => {
+        setEmailError('');
+        if (!email) {
+            setEmailError('Email is required');
+            return false;
+        }
+        
+        if (!email.includes('@hnu.edu.ph')) {
+            setEmailError('Email must be a valid HNU email (must contain @hnu.edu.ph)');
+            return false;
+        }
+        
+        return true;
+    };
+
+    // Validate username
+    const validateUsername = (username) => {
+        setUsernameError('');
+        if (!username) {
+            setUsernameError('Username is required');
+            return false;
+        }
+        
+        if (username.length < 3) {
+            setUsernameError('Username must be at least 3 characters');
+            return false;
+        }
+        
+        return true;
+    };
+
+    // Validate name
+    const validateName = (name) => {
+        setNameError('');
+        if (!name) {
+            setNameError('Full name is required');
+            return false;
+        }
+        return true;
+    };
+
+    // Validate contact number
+    const validateContactNumber = (number) => {
+        setContactNumberError('');
+        if (!number) {
+            setContactNumberError('Contact number is required');
+            return false;
+        }
+        
+        // Simple phone number validation - adjust for your specific requirements
+        const phoneRegex = /^\d{10,11}$/;
+        if (!phoneRegex.test(number.replace(/[^0-9]/g, ''))) {
+            setContactNumberError('Please enter a valid phone number (10-11 digits)');
+            return false;
+        }
+        
+        return true;
+    };
+
+    // Validate birthday
+    const validateBirthday = (birthday) => {
+        setBirthdayError('');
+        if (!birthday) {
+            setBirthdayError('Date of birth is required');
+            return false;
+        }
+        
+        // Check if the user is at least 18 years old
+        const birthDate = new Date(birthday);
+        const today = new Date();
+        let age = today.getFullYear() - birthDate.getFullYear();
+        const monthDiff = today.getMonth() - birthDate.getMonth();
+        
+        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+            age--;
+        }
+        
+        if (age < 18) {
+            setBirthdayError('You must be at least 18 years old to register as a counselor');
+            return false;
+        }
+        
+        return true;
+    };
+
+    // Validate credentials
+    const validateCredentials = (credentials) => {
+        setCredentialsError('');
+        if (!credentials) {
+            setCredentialsError('Professional credentials are required');
+            return false;
+        }
+        return true;
+    };
+
+    // Validate current step
+    const validateCurrentStep = () => {
+        switch (step) {
+            case 1:
+                const isEmailValid = validateEmail(email);
+                const isUsernameValid = validateUsername(username);
+                return isEmailValid && isUsernameValid;
+                
+            case 2:
+                const isNameValid = validateName(name);
+                const isContactValid = validateContactNumber(contact_number);
+                const isBirthdayValid = validateBirthday(birthday);
+                return isNameValid && isContactValid && isBirthdayValid;
+                
+            case 3:
+                const areCredentialsValid = validateCredentials(credentials);
+                return areCredentialsValid;
+                
+            default:
+                return true;
+        }
+    };
+
     const handleSignUp = async () => {
         try {
             setError(''); // Clear any previous errors
+            
+            // Validate all fields before submission
+            const isEmailValid = validateEmail(email);
+            const isUsernameValid = validateUsername(username);
+            const isNameValid = validateName(name);
+            const isContactValid = validateContactNumber(contact_number);
+            const isBirthdayValid = validateBirthday(birthday);
+            const areCredentialsValid = validateCredentials(credentials);
+            
+            if (!isEmailValid || !isUsernameValid || !isNameValid || 
+                !isContactValid || !isBirthdayValid || !areCredentialsValid) {
+                setError('Please fix the validation errors before submitting');
+                return;
+            }
+            
+            if (!proofImageFile) {
+                setError('Proof of identity is required');
+                return;
+            }
 
             // Sign up the user
             const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
@@ -182,7 +328,7 @@ export default function CounselorRegister() {
     };
 
     const nextStep = () => {
-        if (step < totalSteps) {
+        if (validateCurrentStep() && step < totalSteps) {
             setStep(step + 1);
         }
     };
@@ -268,10 +414,14 @@ export default function CounselorRegister() {
                     <input
                         type="email"
                         value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        placeholder="Enter your email address"
-                        className="w-full p-3 rounded-md border border-gray-700 bg-gray-800 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                        onChange={(e) => {
+                            setEmail(e.target.value);
+                            if (emailError) validateEmail(e.target.value);
+                        }}
+                        placeholder="Enter your HNU email address"
+                        className={`w-full p-3 rounded-md border ${emailError ? 'border-red-500' : 'border-gray-700'} bg-gray-800 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent`}
                     />
+                    {emailError && <p className="mt-1 text-sm text-red-500">{emailError}</p>}
                 </div>
                 <div className="mb-4">
                     <label className="block text-gray-300 text-sm font-medium mb-2">Password</label>
@@ -288,10 +438,14 @@ export default function CounselorRegister() {
                     <input
                         type="text"
                         value={username}
-                        onChange={(e) => setUserName(e.target.value)}
+                        onChange={(e) => {
+                            setUserName(e.target.value);
+                            if (usernameError) validateUsername(e.target.value);
+                        }}
                         placeholder="Choose a username"
-                        className="w-full p-3 rounded-md border border-gray-700 bg-gray-800 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                        className={`w-full p-3 rounded-md border ${usernameError ? 'border-red-500' : 'border-gray-700'} bg-gray-800 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent`}
                     />
+                    {usernameError && <p className="mt-1 text-sm text-red-500">{usernameError}</p>}
                 </div>
             </>
         );
@@ -306,10 +460,14 @@ export default function CounselorRegister() {
                     <input
                         type="text"
                         value={name}
-                        onChange={(e) => setName(e.target.value)}
+                        onChange={(e) => {
+                            setName(e.target.value);
+                            if (nameError) validateName(e.target.value);
+                        }}
                         placeholder="Enter your full name"
-                        className="w-full p-3 rounded-md border border-gray-700 bg-gray-800 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                        className={`w-full p-3 rounded-md border ${nameError ? 'border-red-500' : 'border-gray-700'} bg-gray-800 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent`}
                     />
+                    {nameError && <p className="mt-1 text-sm text-red-500">{nameError}</p>}
                 </div>
                 <div className="mb-4">
                     <label className="block text-gray-300 text-sm font-medium mb-2">Address</label>
@@ -326,10 +484,14 @@ export default function CounselorRegister() {
                     <input
                         type="text"
                         value={contact_number}
-                        onChange={(e) => setContactNumber(e.target.value)}
+                        onChange={(e) => {
+                            setContactNumber(e.target.value);
+                            if (contactNumberError) validateContactNumber(e.target.value);
+                        }}
                         placeholder="Your phone number"
-                        className="w-full p-3 rounded-md border border-gray-700 bg-gray-800 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                        className={`w-full p-3 rounded-md border ${contactNumberError ? 'border-red-500' : 'border-gray-700'} bg-gray-800 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent`}
                     />
+                    {contactNumberError && <p className="mt-1 text-sm text-red-500">{contactNumberError}</p>}
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                     <div className="mb-4">
@@ -337,9 +499,13 @@ export default function CounselorRegister() {
                         <input
                             type="date"
                             value={birthday}
-                            onChange={(e) => setBirthday(e.target.value)}
-                            className="w-full p-3 rounded-md border border-gray-700 bg-gray-800 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                            onChange={(e) => {
+                                setBirthday(e.target.value);
+                                if (birthdayError) validateBirthday(e.target.value);
+                            }}
+                            className={`w-full p-3 rounded-md border ${birthdayError ? 'border-red-500' : 'border-gray-700'} bg-gray-800 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent`}
                         />
+                        {birthdayError && <p className="mt-1 text-sm text-red-500">{birthdayError}</p>}
                     </div>
                     <div className="mb-4">
                         <label className="block text-gray-300 text-sm font-medium mb-2">Gender</label>
@@ -382,10 +548,14 @@ export default function CounselorRegister() {
                     <input
                         type="text"
                         value={credentials}
-                        onChange={(e) => setCredentials(e.target.value)}
+                        onChange={(e) => {
+                            setCredentials(e.target.value);
+                            if (credentialsError) validateCredentials(e.target.value);
+                        }}
                         placeholder="Your qualifications and certifications"
-                        className="w-full p-3 rounded-md border border-gray-700 bg-gray-800 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                        className={`w-full p-3 rounded-md border ${credentialsError ? 'border-red-500' : 'border-gray-700'} bg-gray-800 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent`}
                     />
+                    {credentialsError && <p className="mt-1 text-sm text-red-500">{credentialsError}</p>}
                 </div>
                 <div className="mb-4">
                     <label className="block text-gray-300 text-sm font-medium mb-2">Short Biography</label>
