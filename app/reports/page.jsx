@@ -1,7 +1,10 @@
 'use client';
 
 import React from 'react';
-import { Container, Grid, Paper } from '@mui/material';
+import { Container, Grid, Paper, IconButton, Tooltip, Button } from '@mui/material';
+import DownloadIcon from '@mui/icons-material/Download';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 import Sidebar from '../components/dashboard components/sidebar';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
@@ -26,6 +29,85 @@ export default function ReportsPage() {
             return;
         }
         router.push('/login');
+    };
+
+    const handleDownloadPDF = async (elementId, title) => {
+        const element = document.getElementById(elementId);
+        if (!element) return;
+
+        try {
+            const canvas = await html2canvas(element);
+            const imgData = canvas.toDataURL('image/png');
+            
+            const pdf = new jsPDF({
+                orientation: 'landscape',
+                unit: 'px',
+                format: [canvas.width, canvas.height]
+            });
+            
+            pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+            pdf.save(`${title.toLowerCase().replace(/\s+/g, '_')}_report.pdf`);
+        } catch (error) {
+            console.error('Error generating PDF:', error);
+        }
+    };
+
+    const handleDownloadAllPDF = async () => {
+        try {
+            const charts = document.querySelectorAll('[id^="chart-"]');
+            const chartsArray = Array.from(charts);
+            
+            // Create a temporary container with smaller dimensions
+            const container = document.createElement('div');
+            container.style.width = '1200px'; // Reduced from 2480px
+            container.style.position = 'absolute';
+            container.style.left = '-9999px';
+            container.style.top = '-9999px';
+            container.style.display = 'grid';
+            container.style.gridTemplateColumns = 'repeat(2, 1fr)';
+            container.style.gap = '10px'; // Reduced gap
+            container.style.padding = '20px'; // Reduced padding
+            document.body.appendChild(container);
+
+            // Create smaller clones of the charts
+            const clonedCharts = await Promise.all(chartsArray.map(async (chart, index) => {
+                const clone = chart.cloneNode(true);
+                clone.style.width = '550px'; // Reduced from 1150px
+                clone.style.height = '400px'; // Adjusted height
+                clone.style.background = cardStyles[index].backgroundColor;
+                clone.style.padding = '10px'; // Reduced padding
+                clone.style.borderRadius = '8px';
+                container.appendChild(clone);
+                return clone;
+            }));
+
+            await new Promise(resolve => setTimeout(resolve, 1000));
+
+            // Create PDF with smaller dimensions
+            const pdf = new jsPDF({
+                orientation: 'landscape',
+                unit: 'px',
+                format: [842, 595] // Standard A4 landscape size
+            });
+
+            // Capture with better scaling
+            const canvas = await html2canvas(container, {
+                scale: 2, // Increased scale for better quality
+                useCORS: true,
+                logging: false,
+                allowTaint: true,
+                backgroundColor: '#ffffff'
+            });
+
+            // Add to PDF with proper scaling
+            const imgData = canvas.toDataURL('image/jpeg', 0.95);
+            pdf.addImage(imgData, 'JPEG', 0, 0, 842, 595); // Fit to A4 landscape
+
+            document.body.removeChild(container);
+            pdf.save('all_reports_single_page.pdf');
+        } catch (error) {
+            console.error('Error generating PDF:', error);
+        }
     };
 
     // Custom card styles with gradient backgrounds
@@ -68,6 +150,24 @@ export default function ReportsPage() {
                         <p className="text-center text-gray-600 dark:text-gray-300 mt-2">
                             Analytics and insights for your organization
                         </p>
+                        <div className="flex justify-center mt-4">
+                            <Button
+                                variant="contained"
+                                startIcon={<DownloadIcon />}
+                                onClick={handleDownloadAllPDF}
+                                sx={{
+                                    background: 'linear-gradient(135deg, #38bdf8 0%, #0ea5e9 100%)',
+                                    '&:hover': {
+                                        background: 'linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)',
+                                    },
+                                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                                    textTransform: 'none',
+                                    fontWeight: 'bold',
+                                }}
+                            >
+                                Download All Reports
+                            </Button>
+                        </div>
                     </div>
                 
                     <Grid container spacing={4}>
@@ -83,6 +183,7 @@ export default function ReportsPage() {
                                 <Paper 
                                     elevation={0}
                                     sx={{ 
+                                        position: 'relative',
                                         padding: { xs: '16px', md: '24px' }, 
                                         borderRadius: '24px',
                                         height: '100%',
@@ -98,7 +199,24 @@ export default function ReportsPage() {
                                         flexDirection: 'column'
                                     }}
                                 >
-                                    <div className="flex-1">
+                                    <Tooltip title="Download as PDF">
+                                        <IconButton
+                                            sx={{
+                                                position: 'absolute',
+                                                top: 8,
+                                                right: 8,
+                                                backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                                                '&:hover': {
+                                                    backgroundColor: 'rgba(255, 255, 255, 1)',
+                                                },
+                                                zIndex: 1,
+                                            }}
+                                            onClick={() => handleDownloadPDF(`chart-${index}`, item.title)}
+                                        >
+                                            <DownloadIcon />
+                                        </IconButton>
+                                    </Tooltip>
+                                    <div id={`chart-${index}`} className="flex-1">
                                         {item.component}
                                     </div>
                                     <div className="mt-6">
