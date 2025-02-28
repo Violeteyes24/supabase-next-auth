@@ -27,6 +27,8 @@ import {
   Snackbar
 } from '@mui/material';
 import dayjs from 'dayjs';
+import { DatePicker, TimePicker, LocalizationProvider } from '@mui/x-date-pickers';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 
 export default function GroupAppointmentsManager() {
   const supabase = createClientComponentClient();
@@ -50,6 +52,9 @@ export default function GroupAppointmentsManager() {
   const [searchTerm, setSearchTerm] = useState('');
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
   const [session, setSession] = useState(null);
+  const [rescheduleDate, setRescheduleDate] = useState(dayjs());
+  const [rescheduleStartTime, setRescheduleStartTime] = useState(dayjs());
+  const [rescheduleEndTime, setRescheduleEndTime] = useState(dayjs());
   
         useEffect(() => {
           const getSession = async () => {
@@ -205,6 +210,9 @@ export default function GroupAppointmentsManager() {
 
   const handleRescheduleGroup = (appointment) => {
     setSelectedGroupAppointment(appointment);
+    setRescheduleDate(dayjs());
+    setRescheduleStartTime(dayjs());
+    setRescheduleEndTime(dayjs());
     setOpenRescheduleModal(true);
   };
 
@@ -217,7 +225,12 @@ export default function GroupAppointmentsManager() {
     try {
       const { error } = await supabase
         .from('appointments')
-        .update({ status: 'rescheduled' })
+        .update({ 
+          status: 'rescheduled',
+          date: rescheduleDate.format('YYYY-MM-DD'), // fail reschedule
+          start_time: rescheduleStartTime.format('HH:mm'),
+          end_time: rescheduleEndTime.format('HH:mm')
+        })
         .eq('appointment_id', selectedGroupAppointment.appointment_id);
 
       if (error) throw error;
@@ -675,10 +688,35 @@ export default function GroupAppointmentsManager() {
               </Typography>
             </Box>
           )}
-          
-          <Typography variant="body1" sx={{ mt: 2 }}>
-            Are you sure you want to reschedule this group session? You will need to notify all participants of the new schedule.
-          </Typography>
+
+          <LocalizationProvider dateAdapter={AdapterDayjs}>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                <DatePicker
+                  value={rescheduleDate}
+                  onChange={(newValue) => setRescheduleDate(newValue)}
+                  sx={{ width: '100%' }}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Start Time</label>
+                <TimePicker
+                  value={rescheduleStartTime}
+                  onChange={(newValue) => setRescheduleStartTime(newValue)}
+                  sx={{ width: '100%' }}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">End Time</label>
+                <TimePicker
+                  value={rescheduleEndTime}
+                  onChange={(newValue) => setRescheduleEndTime(newValue)}
+                  sx={{ width: '100%' }}
+                />
+              </div>
+            </div>
+          </LocalizationProvider>
           
           <Box sx={{ mt: 3, display: 'flex', justifyContent: 'space-between' }}>
             <Button 
