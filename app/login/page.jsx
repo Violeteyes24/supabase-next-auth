@@ -146,7 +146,7 @@ export default function Auth() {
             </label>
             <input
               type="email"
-              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-400 focus:border-green-400 transition duration-200"
+              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-400 focus:border-green-400 transition duration-200 text-black"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="email@address.com"
@@ -159,7 +159,7 @@ export default function Auth() {
             </label>
             <input
               type="password"
-              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-400 focus:border-green-400 transition duration-200"
+              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-400 focus:border-green-400 transition duration-200 text-black"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Password"
@@ -228,7 +228,7 @@ export default function Auth() {
 
             <input
               type="text"
-              className="w-full p-3 text-center text-xl tracking-widest border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-400 focus:border-green-400"
+              className="w-full p-3 text-black text-center text-xl tracking-widest border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-400 focus:border-green-400"
               value={otp}
               onChange={(e) => setOtp(e.target.value.replace(/[^0-9]/g, ""))}
               placeholder="• • • • • •"

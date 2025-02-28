@@ -361,7 +361,7 @@ export default function NotificationsPage() {
                 </div>
 
                 <button
-                    className="fixed bottom-6 left-64 bg-emerald-600 hover:bg-emerald-700 text-white p-3 rounded-full shadow-lg transition-colors duration-200 flex items-center justify-center"
+                    className="fixed bottom-6 right-90 bg-emerald-600 hover:bg-emerald-700 text-white p-3 rounded-full shadow-lg transition-colors duration-200 flex items-center justify-center"
                     onClick={handleCreateNewNotification}
                     title="Create new notification"
                 >
@@ -375,6 +375,8 @@ export default function NotificationsPage() {
                     <h1 className="text-xl font-bold">
                         {selectedNotification ? "View Notification" : "Compose Notification"}
                     </h1>
+
+                    
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-6 space-y-4">

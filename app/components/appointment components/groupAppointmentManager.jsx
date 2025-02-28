@@ -49,6 +49,17 @@ export default function GroupAppointmentsManager() {
   const [openCancelModal, setOpenCancelModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+  const [session, setSession] = useState(null);
+  
+        useEffect(() => {
+          const getSession = async () => {
+            const {
+              data: { session },
+            } = await supabase.auth.getSession();
+            setSession(session);
+          };
+          getSession();
+        }, []);
 
   useEffect(() => {
     fetchIndividualAppointments();
@@ -66,7 +77,7 @@ export default function GroupAppointmentsManager() {
     const { data, error } = await supabase
       .from('appointments')
       .select('*')
-      .eq('counselor_id', session?.user?.id)
+      .eq('counselor_id', userId)
       .eq('appointment_type', 'individual')
       .eq('status', 'pending');
 
@@ -90,6 +101,14 @@ export default function GroupAppointmentsManager() {
   };
 
   const fetchGroupAppointments = async () => {
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    
+    if (sessionError || !session) {
+      console.error('Error getting session:', sessionError);
+      return;
+    }
+  
+    const userId = session.user.id;
     const { data, error } = await supabase
       .from('appointments')
       .select(`
@@ -101,8 +120,9 @@ export default function GroupAppointmentsManager() {
           )
         )
       `)
-      .eq('appointment_type', 'group');
-
+      .eq('appointment_type', 'group')
+      .eq("counselor_id", userId);
+  
     if (error) {
       console.error('Error fetching group appointments:', error);
     } else {
@@ -123,13 +143,24 @@ export default function GroupAppointmentsManager() {
       showSnackbar('Please select at least two users for a group appointment', 'error');
       return;
     }
-
+  
     if (!selectedCategory) {
       showSnackbar('Please select a category for the group appointment', 'error');
       return;
     }
-
+  
     try {
+      // Get the current session to get the counselor ID
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError || !session) {
+        console.error('Error getting session:', sessionError);
+        showSnackbar('Authentication error. Please try again.', 'error');
+        return;
+      }
+  
+      const counselorId = session.user.id;
+  
       // Create a new group appointment
       const { data: newAppointment, error: appointmentError } = await supabase
         .from('appointments')
@@ -137,37 +168,38 @@ export default function GroupAppointmentsManager() {
           appointment_type: 'group',
           status: 'pending',
           reason: groupReason,
-          category: selectedCategory
+          category: selectedCategory,
+          counselor_id: counselorId  // Add the counselor_id field
         })
         .select()
         .single();
-
+  
       if (appointmentError) throw appointmentError;
-
+  
       // Create group appointment entries for each selected user
       const groupAppointmentEntries = selectedUsers.map(userId => ({
         user_id: userId,
         appointment_id: newAppointment.appointment_id,
         problem: groupReason
       }));
-
+  
       const { error: groupError } = await supabase
         .from('groupappointments')
         .insert(groupAppointmentEntries);
-
+  
       if (groupError) throw groupError;
-
+  
       // Reset states
       setSelectedUsers([]);
       setGroupReason('');
       setSelectedCategory('');
       setOpenGroupModal(false);
-
+  
       showSnackbar('Group appointment created successfully!', 'success');
       fetchGroupAppointments();
     } catch (error) {
       console.error('Error creating group appointment:', error);
-      showSnackbar('Failed to create group appointment', 'error');
+      showSnackbar(`Failed to create group appointment: ${error.message || 'Unknown error'}`, 'error');
     }
   };
 

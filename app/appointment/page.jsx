@@ -36,6 +36,17 @@ export default function AppointmentPage() {
     const [showSuccessToast, setShowSuccessToast] = useState(false);
     const [toastMessage, setToastMessage] = useState('');
     const [currentMonthDays, setCurrentMonthDays] = useState([]);
+    const [session, setSession] = useState(null);
+    
+      useEffect(() => {
+        const getSession = async () => {
+          const {
+            data: { session },
+          } = await supabase.auth.getSession();
+          setSession(session);
+        };
+        getSession();
+      }, []);
 
     useEffect(() => {
         fetchAvailabilitySchedules();
@@ -84,12 +95,24 @@ export default function AppointmentPage() {
         setShowSuccessToast(true);
         setTimeout(() => setShowSuccessToast(false), 3000);
     };
-
     const fetchAvailabilitySchedules = async () => {
+
+        const {
+            data: { session },
+          } = await supabase.auth.getSession();
+          if (!session) {
+            console.error("No session found");
+            return;
+          }
+
+          const userId = session.user.id;
+
+
         const { data, error } = await supabase
             .from('availability_schedules')
             .select('*')
-            .eq('date', selectedDate.format('YYYY-MM-DD'));
+            .eq('date', selectedDate.format('YYYY-MM-DD'))
+            .eq("counselor_id", userId)
 
         if (error) {
             console.error('Error fetching availability schedules:', error.message);
