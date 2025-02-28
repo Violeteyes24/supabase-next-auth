@@ -318,6 +318,8 @@ export default function GroupAppointmentsManager() {
               <TableRow>
                 <TableCell sx={{ bgcolor: '#f9fafb', fontWeight: 'bold' }}>Group ID</TableCell>
                 <TableCell sx={{ bgcolor: '#f9fafb', fontWeight: 'bold' }}>Participants</TableCell>
+                {/* <TableCell sx={{ bgcolor: '#f9fafb', fontWeight: 'bold' }}>Date</TableCell>
+                <TableCell sx={{ bgcolor: '#f9fafb', fontWeight: 'bold' }}>Time</TableCell> */}
                 <TableCell sx={{ bgcolor: '#f9fafb', fontWeight: 'bold' }}>Category</TableCell>
                 <TableCell sx={{ bgcolor: '#f9fafb', fontWeight: 'bold' }}>Focus Area</TableCell>
                 <TableCell sx={{ bgcolor: '#f9fafb', fontWeight: 'bold' }}>Status</TableCell>

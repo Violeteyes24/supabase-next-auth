@@ -65,25 +65,11 @@ export default function AppointmentPage() {
 
     // Update days navigation based on selected date
     const updateDaysNavigation = (date) => {
-        // Get the first date of the selected month
-        const firstDayOfMonth = date.startOf('month');
-        // Calculate days to include in the navigation (6 days)
         const days = [];
         
-        // If we're showing the current month, start with today
-        if (date.month() === dayjs().month() && date.year() === dayjs().year()) {
-            const today = dayjs();
-            days.push(today);
-            
-            // Add 5 more days after today
-            for (let i = 1; i <= 5; i++) {
-                days.push(today.add(i, 'day'));
-            }
-        } else {
-            // For other months, show the first 6 days of the month
-            for (let i = 0; i < 6; i++) {
-                days.push(firstDayOfMonth.add(i, 'day'));
-            }
+        // Start with 2 days before the selected date
+        for (let i = -2; i <= 3; i++) {
+            days.push(date.add(i, 'day'));
         }
         
         setCurrentMonthDays(days);
