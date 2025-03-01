@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "../../lib/supabase/client";
+import { useAuth } from "../../provider/AuthProvider";
 
 export default function Auth() {
   const supabase = createClient();
@@ -12,6 +13,7 @@ export default function Auth() {
   const [otp, setOtp] = useState("");
   const [isOtpModalVisible, setOtpModalVisible] = useState(false);
   const router = useRouter();
+  const session = useAuth();
 
   useEffect(() => {
     const checkSession = async () => {
