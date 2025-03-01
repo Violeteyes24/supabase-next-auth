@@ -2,10 +2,10 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import { createClient } from "../../lib/supabase/client";
 
 export default function Auth() {
-  const supabase = createClientComponentClient();
+  const supabase = createClient();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -16,6 +16,7 @@ export default function Auth() {
   useEffect(() => {
     const checkSession = async () => {
       const { data, error } = await supabase.auth.getSession();
+      console.log(data);
       if (data.session) {
         handleNavigation(data.session.user.id);
       }
@@ -110,13 +111,14 @@ export default function Auth() {
       .select("user_type")
       .eq("user_id", userId)
       .single();
-
+      console.log(data);
     if (error) {
       console.error("Error fetching user role:", error.message);
       return;
     }
 
     const userType = data?.user_type;
+    console.log(userType);
     if (userType === "counselor") {
       router.push("/dashboard/counselor");
     } else if (userType === "secretary") {
