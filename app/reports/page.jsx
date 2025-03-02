@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Container, Grid, Paper, IconButton, Tooltip, Button } from '@mui/material';
+import { Container, Grid, Paper, Button } from '@mui/material';
 import DownloadIcon from '@mui/icons-material/Download';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
@@ -12,6 +12,7 @@ import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
 // Dynamically import components with SSR disabled
 const FrequencyChart = dynamic(() => import('../components/report components/frequent_topic'), { ssr: false });
+const FrequentTopicText = dynamic(() => import('../components/report components/frequent_topic_text'), { ssr: false });
 const EmotionalStateChart = dynamic(() => import('../components/report components/emotional_state'), { ssr: false });
 const DemographicChart = dynamic(() => import('../components/report components/demographics'), { ssr: false });
 const FeedbackChart = dynamic(() => import('../components/report components/user_feedback'), { ssr: false });
@@ -173,7 +174,7 @@ export default function ReportsPage() {
                     <Grid container spacing={4}>
                         {[
                             { component: <EmotionalStateChart />, title: "Overall Mood State", description: "Emotional state distribution of users" },
-                            { component: <FrequencyChart />, title: "Frequent Topics", description: "Most discussed topics by frequency" },
+                            { component: <FrequentTopicText />, title: "Frequent Topics", description: "Most discussed topics by frequency" },
                             { component: <DemographicChart />, title: "Demographic Report", description: "User distribution by demographic factors" },
                             { component: <FeedbackChart />, title: "Feedback Report", description: "User satisfaction metrics and trends" },
                             { component: <AppointmentTypeChart />, title: "Appointment Types", description: "Distribution of appointment categories" },
@@ -199,23 +200,6 @@ export default function ReportsPage() {
                                         flexDirection: 'column'
                                     }}
                                 >
-                                    <Tooltip title="Download as PDF">
-                                        <IconButton
-                                            sx={{
-                                                position: 'absolute',
-                                                top: 8,
-                                                right: 8,
-                                                backgroundColor: 'rgba(255, 255, 255, 0.9)',
-                                                '&:hover': {
-                                                    backgroundColor: 'rgba(255, 255, 255, 1)',
-                                                },
-                                                zIndex: 1,
-                                            }}
-                                            onClick={() => handleDownloadPDF(`chart-${index}`, item.title)}
-                                        >
-                                            <DownloadIcon />
-                                        </IconButton>
-                                    </Tooltip>
                                     <div id={`chart-${index}`} className="flex-1">
                                         {item.component}
                                     </div>
