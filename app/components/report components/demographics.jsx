@@ -10,21 +10,37 @@ const DemographicsChart = () => {
 
     useEffect(() => {
         const fetchData = async () => {
-            const { data: demographics, error } = await supabase
-                .rpc('get_demographics');
-
+            // Fetch only the gender from "users" table
+            const { data: users, error } = await supabase
+                .from('users')
+                .select('gender');
             if (error) {
-                console.error('Error fetching demographics:', error);
+                console.error('Error fetching users:', error);
                 return;
             }
-
-            setData(demographics);
+            let femaleCount = 0, maleCount = 0, otherCount = 0;
+            users.forEach(row => {
+                const gender = row.gender ? row.gender.toLowerCase() : '';
+                if (gender === 'female') {
+                    femaleCount++;
+                } else if (gender === 'male') {
+                    maleCount++;
+                } else {
+                    otherCount++;
+                }
+            });
+            const chartData = [
+                { name: 'Female', value: femaleCount },
+                { name: 'Male', value: maleCount },
+                { name: 'Other', value: otherCount }
+            ];
+            setData(chartData);
         };
 
         fetchData();
     }, [supabase]);
 
-    const COLORS = ['#8884d8', '#83a6ed', '#8dd1e1', '#82ca9d'];
+    const COLORS = ['#8884d8', '#83a6ed', '#8dd1e1'];
 
     return (
         <div style={{ width: '100%', height: 300 }}>
