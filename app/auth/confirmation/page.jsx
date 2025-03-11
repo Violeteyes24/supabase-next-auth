@@ -1,12 +1,11 @@
 // /app/auth/confirmation/page.jsx
 'use client'
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 
-export default function ConfirmationPage() {
+function ConfirmationContent() {
     const [message, setMessage] = useState('');
-    /* eslint-disable react-hooks/rules-of-hooks */
     const searchParams = useSearchParams();
     const code = searchParams.get('code');  // Get 'code' query parameter
     const email = searchParams.get('email'); // Get 'email' query parameter
@@ -28,5 +27,13 @@ export default function ConfirmationPage() {
         <div className="confirmation-page">
             <h1>{message}</h1>
         </div>
+    );
+}
+
+export default function ConfirmationPage() {
+    return (
+        <Suspense fallback={<div>Loading...</div>}>
+            <ConfirmationContent />
+        </Suspense>
     );
 }
