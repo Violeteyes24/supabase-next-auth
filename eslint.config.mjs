@@ -9,9 +9,7 @@ export default [
     languageOptions: {
       globals: globals.browser,
     },
-    rules: {
-      'react-hooks/rules-of-hooks': 'off', // Disable the rule globally
-    },
+    rules: {}, // Disable all rules
   },
   pluginJs.configs.recommended,
   pluginReact.configs.flat.recommended,
