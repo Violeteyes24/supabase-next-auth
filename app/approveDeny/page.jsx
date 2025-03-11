@@ -15,6 +15,8 @@ export default function ApproveDenyPage() {
     const [proofImage, setProofImage] = useState(null);
     const [openViewModal, setOpenViewModal] = useState(false);
     const [loading, setLoading] = useState(true);
+    const [openProfileModal, setOpenProfileModal] = useState(false);
+    const [selectedProfile, setSelectedProfile] = useState(null);
 
     useEffect(() => {
         fetchRegistrants();
@@ -89,6 +91,11 @@ export default function ApproveDenyPage() {
             setProofImage(data.proof_image_url);
             setOpenViewModal(true);
         }
+    };
+
+    const handleProfileClick = (registrant) => {
+        setSelectedProfile(registrant);
+        setOpenProfileModal(true);
     };
 
     const handleLogout = async () => {
@@ -171,10 +178,15 @@ export default function ApproveDenyPage() {
                                                     <img
                                                         src={registrant.profile_image_url || "https://static.vecteezy.com/system/resources/previews/021/548/095/original/default-profile-picture-avatar-user-avatar-icon-person-icon-head-icon-profile-picture-icons-default-anonymous-user-male-and-female-businessman-photo-placeholder-social-network-avatar-portrait-free-vector.jpg"} // use profile_image_url if exists, else use placeholder
                                                         alt="Profile"
-                                                        className="w-10 h-10 rounded-full object-cover border border-gray-200"
+                                                        className="w-10 h-10 rounded-full object-cover border border-gray-200 cursor-pointer"
+                                                        onClick={() => handleProfileClick(registrant)}
                                                     />
                                                 </td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{registrant.name}</td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                                    <span onClick={() => handleProfileClick(registrant)} className="hover:underline cursor-pointer">
+                                                        {registrant.name}
+                                                    </span>
+                                                </td>
                                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 capitalize">{registrant.user_type}</td>
                                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{registrant.credentials}</td>
                                                 <td className="px-6 py-4 text-sm text-gray-500 max-w-xs truncate">{registrant.short_biography}</td>
@@ -296,6 +308,70 @@ export default function ApproveDenyPage() {
                             </>
                         )}
                     </div>
+                </Box>
+            </Modal>
+
+            {/* New Profile Modal */}
+            <Modal 
+                open={openProfileModal} 
+                onClose={() => setOpenProfileModal(false)}
+                aria-labelledby="profile-modal"
+            >
+                <Box
+                    sx={{
+                        position: 'absolute',
+                        top: '50%',
+                        left: '50%',
+                        transform: 'translate(-50%, -50%)',
+                        bgcolor: 'white',
+                        borderRadius: '8px',
+                        boxShadow: 24,
+                        p: 4,
+                        width: 500,
+                        maxWidth: '90vw',
+                        maxHeight: '90vh',
+                        overflow: 'auto'
+                    }}
+                >
+                    {selectedProfile && (
+                        <div className="space-y-4">
+                            <div className="flex items-center space-x-4">
+                                <img
+                                    src={selectedProfile.profile_image_url || "https://static.vecteezy.com/system/resources/previews/021/548/095/original/default-profile-picture-avatar-user-avatar-icon-person-icon-head-icon-profile-picture-icons-default-anonymous-user-male-and-female-businessman-photo-placeholder-social-network-avatar-portrait-free-vector.jpg"}
+                                    alt="Profile"
+                                    className="w-16 h-16 rounded-full object-cover border border-gray-200"
+                                />
+                                <div>
+                                    <h2 className="text-xl font-bold text-gray-800">{selectedProfile.name}</h2>
+                                    <p className="text-sm text-gray-600 capitalize">{selectedProfile.user_type}</p>
+                                </div>
+                            </div>
+                            <div>
+                                <h3 className="text-lg font-semibold text-gray-700">Credentials</h3>
+                                <p className="text-gray-800">{selectedProfile.credentials}</p>
+                            </div>
+                            <div>
+                                <h3 className="text-lg font-semibold text-gray-700">Biography</h3>
+                                <p className="text-gray-800">{selectedProfile.short_biography}</p>
+                            </div>
+                            <div>
+                                <h3 className="text-lg font-semibold text-gray-700">Department</h3>
+                                <p className="text-gray-800">{selectedProfile.department_assigned}</p>
+                            </div>
+                            <div className="flex justify-end space-x-2">
+                                <Button 
+                                    variant="outlined" 
+                                    onClick={() => setOpenProfileModal(false)}
+                                    sx={{
+                                        borderColor: '#d1d5db',
+                                        color: '#4b5563'
+                                    }}
+                                >
+                                    Close
+                                </Button>
+                            </div>
+                        </div>
+                    )}
                 </Box>
             </Modal>
         </div>
