@@ -223,7 +223,8 @@ const fetchConversations = async () => {
   const fetchUsers = async () => {
     const { data, error } = await supabase
       .from("users")
-      .select("user_id, name");
+      .select("user_id, name")
+      .eq("user_type", "student"); // Filter added to show only students
 
     if (error) {
       console.error("Error fetching users:", error);

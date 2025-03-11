@@ -34,7 +34,7 @@ export default function ApproveDenyPage() {
         setLoading(true);
         const { data, error } = await supabase
             .from("users")
-            .select("user_id, name, credentials, department_assigned, short_biography, user_type, approval_status")
+            .select("user_id, name, credentials, department_assigned, short_biography, user_type, approval_status, profile_image_url") // added profile_image_url
             .in("user_type", ["counselor", "secretary"])
             .not("is_director", "eq", true);
 
@@ -169,7 +169,7 @@ export default function ApproveDenyPage() {
                                             <tr key={registrant.user_id} className="hover:bg-gray-50 transition-colors">
                                                 <td className="px-6 py-4 whitespace-nowrap">
                                                     <img
-                                                        src="https://static.vecteezy.com/system/resources/previews/021/548/095/original/default-profile-picture-avatar-user-avatar-icon-person-icon-head-icon-profile-picture-icons-default-anonymous-user-male-and-female-businessman-photo-placeholder-social-network-avatar-portrait-free-vector.jpg"
+                                                        src={registrant.profile_image_url || "https://static.vecteezy.com/system/resources/previews/021/548/095/original/default-profile-picture-avatar-user-avatar-icon-person-icon-head-icon-profile-picture-icons-default-anonymous-user-male-and-female-businessman-photo-placeholder-social-network-avatar-portrait-free-vector.jpg"} // use profile_image_url if exists, else use placeholder
                                                         alt="Profile"
                                                         className="w-10 h-10 rounded-full object-cover border border-gray-200"
                                                     />
