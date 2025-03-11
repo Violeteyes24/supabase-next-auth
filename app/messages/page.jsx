@@ -1,6 +1,6 @@
 "use client";
 import { useRouter, useSearchParams } from "next/navigation";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import Sidebar from "../components/dashboard components/sidebar";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { FaPlus, FaArrowLeft } from "react-icons/fa";
@@ -10,7 +10,7 @@ import { Add } from "@mui/icons-material";
 import { AddConversation } from "../../actions/conversations/conversation";
 import { sendMessage } from "../../actions/conversations/messages/messages";
 
-export default function MessagePage() {
+function MessageContent() {
   const router = useRouter();
   const supabase = createClientComponentClient();
   const [session, setSession] = useState(null);
@@ -623,5 +623,13 @@ const fetchConversations = async () => {
         </div>
       )}
     </div>
+  );
+}
+
+export default function MessagePage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <MessageContent />
+    </Suspense>
   );
 }
