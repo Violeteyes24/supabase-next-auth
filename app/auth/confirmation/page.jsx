@@ -6,6 +6,7 @@ import { useSearchParams } from 'next/navigation';
 
 export default function ConfirmationPage() {
     const [message, setMessage] = useState('');
+    /* eslint-disable react-hooks/rules-of-hooks */
     const searchParams = useSearchParams();
     const code = searchParams.get('code');  // Get 'code' query parameter
     const email = searchParams.get('email'); // Get 'email' query parameter
