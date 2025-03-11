@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Container, Grid, Box, Paper, Typography } from '@mui/material';
+import { Container, Grid, Box, Paper, Typography, Avatar, Chip } from '@mui/material';
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { useRouter } from "next/navigation";
 
@@ -13,6 +13,8 @@ import AppointmentCard from '../../components/appointment components/appointment
 export default function CounselorPage() {
     const supabase = createClientComponentClient();
     const [userName, setUserName] = useState('');
+    const [profileImageUrl, setProfileImageUrl] = useState('');
+    const [userType, setUserType] = useState('');
     const [totalUsers, setTotalUsers] = useState(0);
     const [appointmentsThisMonth, setAppointmentsThisMonth] = useState(0);
     const [activeCounselors, setActiveCounselors] = useState(0);
@@ -33,7 +35,7 @@ export default function CounselorPage() {
                 if (user) {
                     const { data: profile, error: profileError } = await supabase
                         .from('users')
-                        .select('name')
+                        .select('name, profile_image_url, user_type')
                         .eq('user_id', user.id)
                         .single();
 
@@ -43,6 +45,8 @@ export default function CounselorPage() {
                     }
 
                     setUserName(profile?.name || '');
+                    setProfileImageUrl(profile?.profile_image_url || '');
+                    setUserType(profile?.user_type || '');
                 }
             } catch (err) {
                 console.error('Unexpected error fetching user:', err);
@@ -149,6 +153,35 @@ export default function CounselorPage() {
         { title: 'Average Mood Score', value: averageMoodScore, icon: 'smile' },
     ];
 
+    // Helper function to get chip color based on user type
+    const getUserChipColor = (type) => {
+        switch(type.toLowerCase()) {
+            case 'counselor':
+                return {
+                    bg: '#4F46E5',
+                    text: 'white'
+                };
+            case 'admin':
+                return {
+                    bg: '#EF4444',
+                    text: 'white'
+                };
+            case 'user':
+            case 'student':
+                return {
+                    bg: '#10B981',
+                    text: 'white'
+                };
+            default:
+                return {
+                    bg: '#6B7280',
+                    text: 'white'
+                };
+        }
+    };
+
+    const chipColor = getUserChipColor(userType);
+
     return (
         <Box className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 flex">
             <Sidebar handleLogout={handleLogout} />
@@ -159,9 +192,50 @@ export default function CounselorPage() {
                     overflow: 'auto',
                     px: 3,
                     pt: 4,
-                    pb: 6
+                    pb: 6,
+                    position: 'relative' // Add this to make it a positioning context
                 }}
             >
+                {/* Top Right Profile Image with User Type */}
+                {profileImageUrl && (
+                    <Box
+                        sx={{
+                            position: 'absolute',
+                            top: 16,
+                            right: 24,
+                            zIndex: 10,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 2
+                        }}
+                    >
+                        <Chip
+                            label={userType ? userType.charAt(0).toUpperCase() + userType.slice(1) : 'User'}
+                            sx={{ 
+                                backgroundColor: chipColor.bg,
+                                color: chipColor.text,
+                                fontWeight: 'bold',
+                                textTransform: 'capitalize'
+                            }}
+                        />
+                        <Avatar 
+                            src={profileImageUrl} 
+                            alt="Profile" 
+                            sx={{ 
+                                width: 48, 
+                                height: 48, 
+                                border: '2px solid white',
+                                boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
+                                cursor: 'pointer',
+                                transition: 'transform 0.2s',
+                                '&:hover': {
+                                    transform: 'scale(1.05)'
+                                }
+                            }}
+                        />
+                    </Box>
+                )}
+
                 <Container maxWidth="lg">
                     {/* Header with animated gradient */}
                     <Box className="text-center mb-8">
