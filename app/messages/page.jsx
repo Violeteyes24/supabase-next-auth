@@ -51,6 +51,13 @@ function MessageContent() {
       setSession(session);
     };
     getSession();
+    // Subscribe to auth state changes for persistent session handling
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      setSession(session);
+    });
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
@@ -93,9 +100,23 @@ function MessageContent() {
         )
         .subscribe();
 
+      // Subscribe to real-time conversation changes
+      const conversationChannel = supabase
+        .channel("custom-all-channel")
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "conversations" },
+          (payload) => {
+            console.log("Change received!", payload);
+            fetchConversations();
+          }
+        )
+        .subscribe();
+
       return () => {
         supabase.removeChannel(messageChannel);
         supabase.removeChannel(predefinedMessageChannel);
+        supabase.removeChannel(conversationChannel);
       };
     }
   }, [session, conversation]);

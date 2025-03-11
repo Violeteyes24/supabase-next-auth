@@ -63,6 +63,18 @@ export default function AppointmentPage() {
         };
     }, [selectedDate]);
 
+    useEffect(() => {
+        const appointmentChannel = supabase.channel('appointments-channel')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'appointments' }, (payload) => {
+              console.log('Appointments change received!', payload);
+          })
+          .subscribe();
+    
+        return () => {
+            supabase.removeChannel(appointmentChannel);
+        }
+    }, []);
+
     // Update days navigation based on selected date
     const updateDaysNavigation = (date) => {
         const days = [];
@@ -378,46 +390,58 @@ export default function AppointmentPage() {
                                     </Button>
                                 </div>
                             ) : (
-                                availabilitySchedules.map((schedule, index) => (
-                                    <div
-                                        key={index}
-                                        className={`flex justify-between items-center p-4 rounded-lg ${
-                                            schedule.is_available 
-                                                ? 'bg-emerald-50 border border-emerald-200' 
-                                                : 'bg-red-50 border border-red-200'
-                                        } shadow-sm transition-all hover:shadow-md`}
-                                    >
-                                        <div className="flex items-center gap-3">
-                                            <div className="bg-white p-2 rounded-full shadow-sm">
-                                                <AccessTimeIcon sx={{ color: '#10b981' }} />
-                                            </div>
-                                            <span className="font-medium">{`${formatTime(schedule.start_time)} - ${formatTime(schedule.end_time)}`}</span>
-                                        </div>
-                                        <div className="flex items-center space-x-2">
-                                            <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                                <>
+                                    {availabilitySchedules.map((schedule, index) => (
+                                        <div
+                                            key={index}
+                                            className={`flex justify-between items-center p-4 rounded-lg ${
                                                 schedule.is_available 
-                                                    ? 'bg-emerald-100 text-emerald-800' 
-                                                    : 'bg-red-100 text-red-800'
-                                            }`}>
-                                                {schedule.is_available ? 'Available' : 'Not Available'}
-                                            </span>
-                                            <IconButton 
-                                                onClick={() => handleReschedule(schedule)}
-                                                size="small"
-                                                sx={{ color: '#4b5563' }}
-                                            >
-                                                <EditIcon fontSize="small" />
-                                            </IconButton>
-                                            <IconButton 
-                                                onClick={() => handleCancel(schedule)}
-                                                size="small"
-                                                sx={{ color: '#ef4444' }}
-                                            >
-                                                <DeleteIcon fontSize="small" />
-                                            </IconButton>
+                                                    ? 'bg-emerald-50 border border-emerald-200' 
+                                                    : 'bg-red-50 border border-red-200'
+                                            } shadow-sm transition-all hover:shadow-md`}
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <div className="bg-white p-2 rounded-full shadow-sm">
+                                                    <AccessTimeIcon sx={{ color: '#10b981' }} />
+                                                </div>
+                                                <span className="font-medium">{`${formatTime(schedule.start_time)} - ${formatTime(schedule.end_time)}`}</span>
+                                            </div>
+                                            <div className="flex items-center space-x-2">
+                                                <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                                                    schedule.is_available 
+                                                        ? 'bg-emerald-100 text-emerald-800' 
+                                                        : 'bg-red-100 text-red-800'
+                                                }`}>
+                                                    {schedule.is_available ? 'Available' : 'Not Available'}
+                                                </span>
+                                                <IconButton 
+                                                    onClick={() => handleReschedule(schedule)}
+                                                    size="small"
+                                                    sx={{ color: '#4b5563' }}
+                                                >
+                                                    <EditIcon fontSize="small" />
+                                                </IconButton>
+                                                <IconButton 
+                                                    onClick={() => handleCancel(schedule)}
+                                                    size="small"
+                                                    sx={{ color: '#ef4444' }}
+                                                >
+                                                    <DeleteIcon fontSize="small" />
+                                                </IconButton>
+                                            </div>
                                         </div>
+                                    ))}
+                                    <div className="flex justify-center pt-4">
+                                        <Button 
+                                            variant="outlined" 
+                                            color="primary"
+                                            onClick={() => setOpenModal(true)}
+                                            startIcon={<AddIcon />}
+                                        >
+                                            Add Availability
+                                        </Button>
                                     </div>
-                                ))
+                                </>
                             )}
                         </div>
                     </div>
