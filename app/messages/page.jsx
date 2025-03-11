@@ -137,38 +137,6 @@ export default function MessagePage() {
     }
   };
 
-//   const sendMessage = async (option) => {
-//     if (!option || !conversation) {
-//       console.error("No message or user selected");
-//       return;
-//     }
-
-//     const { error, data } = await supabase
-//       .from("messages")
-//       .insert([
-//         {
-//           sender_id: session?.user.id,
-//           sent_at: new Date().toISOString(),
-//           received_at: null,
-//           is_read: false,
-//           conversation_id: conversation
-//             ? conversation.conversation_id
-//             : newUser.user_id,
-//           message_type: "text",
-//           read_at: null,
-//           is_delivered: false,
-//           message_content: option.message_content,
-//         },
-//       ])
-//       .select();
-
-//     if (error) {
-//       console.error("Error sending message:", error);
-//     } else {
-//       fetchMessages();
-//     }
-//   };
-
 const fetchConversations = async () => {
   setLoading(true);
   try {
@@ -179,7 +147,6 @@ const fetchConversations = async () => {
       return;
     }
 
-    // Query the conversation_list_view instead of conversations table
     let { data, error } = await supabase
       .from("conversation_list_view")
       .select("*")
@@ -192,34 +159,38 @@ const fetchConversations = async () => {
       return;
     }
 
-    // Format the data to match your component's expectations
-    const formattedConversations =
-      data?.map((conv) => {
-        // Determine which name to display based on who the current user is
-        const displayName =
-          conv.user_id === currentUserId ? conv.creator_name : conv.user_name;
+    // Format the data and compute friend_id (the other participant)
+    const formattedConversations = data?.map((conv) => {
+      const displayName =
+        conv.user_id === currentUserId ? conv.creator_name : conv.user_name;
+      const profileImage =
+        conv.user_id === currentUserId
+          ? conv.creator_profile_image
+          : conv.user_profile_image;
+      return {
+        ...conv,
+        name: displayName || "Unknown",
+        profile_image: profileImage,
+        friend_id: conv.user_id === currentUserId ? conv.created_by : conv.user_id,
+        sent_at: conv.last_message_sent_at || conv.created_at,
+        message_content:
+          conv.last_message_content || conv.conversation_type || "New conversation",
+      };
+    }) || [];
 
-        // Use the appropriate profile image
-        const profileImage =
-          conv.user_id === currentUserId
-            ? conv.creator_profile_image
-            : conv.user_profile_image;
-
-        return {
-          conversation_id: conv.conversation_id,
-          user_name: conv.user_name,
-          creater_name: conv.creator_name,
-          sent_at: conv.created_at,
-          name: displayName || "Unknown",
-          profile_image: profileImage,
-          message_content:
-            conv.last_message_content ||
-            conv.conversation_type ||
-            "New conversation",
-        };
-      }) || [];
-
-    setConversations(formattedConversations);
+    // Aggregate conversations by friend (group by displayName)
+    const aggregated = Object.values(
+      formattedConversations.reduce((acc, conv) => {
+        if (
+          !acc[conv.name] ||
+          new Date(conv.sent_at) > new Date(acc[conv.name].sent_at)
+        ) {
+          acc[conv.name] = conv;
+        }
+        return acc;
+      }, {})
+    );
+    setConversations(aggregated);
   } catch (err) {
     console.error("Error fetching conversations:", err);
     setConversations([]);
@@ -313,16 +284,25 @@ const fetchConversations = async () => {
       setShowSidebar(false);
     }
 
+    // Fetch all conversation ids for the selected friend
+    const friendId = conversation.friend_id;
+    const { data: convs, error: convError } = await supabase
+      .from("conversations")
+      .select("conversation_id")
+      .or(
+        `(user_id.eq.${friendId} and created_by.eq.${session.user.id}),(user_id.eq.${session.user.id} and created_by.eq.${friendId})`
+      );
+    if (convError) {
+      console.error("Error fetching conversations for friend:", convError);
+      return;
+    }
+    const conversationIds = convs?.map((c) => c.conversation_id) || [];
+
+    // Now fetch messages from all relevant conversations
     const { data, error } = await supabase
       .from("messages")
-      .select(
-        `
-                *,
-                sender:sender_id(name),
-                recipient:conversation_id(name)
-            `
-      )
-      .eq("conversation_id", conversation.conversation_id)
+      .select("*")
+      .in("conversation_id", conversationIds)
       .order("sent_at", { ascending: true });
 
     if (error) {
@@ -476,16 +456,16 @@ const fetchConversations = async () => {
         <div className="bg-gray-800 text-white py-4 px-6 shadow-md flex items-center">
           {conversation ? (
             <>
-              <div className="w-full h-8 bg-emerald-600 text-white rounded-full mr-3 flex items-center justify-center font-semibold">
+              <div className="w-full h-8 bg-gray-800 text-white rounded-full mr-3 flex items-center justify-center font-semibold">
                 {conversation.user_id === session.user.id
                   ? conversation.creator_name
                   : conversation.user_name}
               </div>
-              <span className="font-semibold">
+              {/* <span className="font-semibold">
                 {conversation.user_id === session.user.id
                   ? conversation.user_name
                   : conversation.creator_name}
-              </span>
+              </span> */}
             </>
           ) : (
             <span className="font-semibold">Select a conversation</span>

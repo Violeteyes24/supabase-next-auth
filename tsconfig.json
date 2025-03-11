@@ -21,14 +21,19 @@
       {
         "name": "next"
       }
-    ]
+    ],
+    "strictNullChecks": true
   },
   "include": [
     "next-env.d.ts",
     ".next/types/**/*.ts",
     "**/*.ts",
-    "**/*.tsx"
-, "app/dashboard/secretary/page.jsx", "app/dashboard/director/page.jsx", "app/dashboard/counselor/page.jsx", "app/test/page.jsx"  ],
+    "**/*.tsx",
+    "app/dashboard/secretary/page.jsx",
+    "app/dashboard/director/page.jsx",
+    "app/dashboard/counselor/page.jsx",
+    "app/test/page.jsx"
+  ],
   "exclude": [
     "node_modules"
   ]
