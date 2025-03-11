@@ -17,6 +17,7 @@ export default function ApproveDenyPage() {
     const [loading, setLoading] = useState(true);
     const [openProfileModal, setOpenProfileModal] = useState(false);
     const [selectedProfile, setSelectedProfile] = useState(null);
+    const [openImageModal, setOpenImageModal] = useState(false);
 
     useEffect(() => {
         fetchRegistrants();
@@ -336,10 +337,12 @@ export default function ApproveDenyPage() {
                     {selectedProfile && (
                         <div className="space-y-4">
                             <div className="flex items-center space-x-4">
+                                {/* Make the profile picture clickable to expand */}
                                 <img
                                     src={selectedProfile.profile_image_url || "https://static.vecteezy.com/system/resources/previews/021/548/095/original/default-profile-picture-avatar-user-avatar-icon-person-icon-head-icon-profile-picture-icons-default-anonymous-user-male-and-female-businessman-photo-placeholder-social-network-avatar-portrait-free-vector.jpg"}
                                     alt="Profile"
-                                    className="w-16 h-16 rounded-full object-cover border border-gray-200"
+                                    className="w-16 h-16 rounded-full object-cover border border-gray-200 cursor-pointer"
+                                    onClick={() => setOpenImageModal(true)}
                                 />
                                 <div>
                                     <h2 className="text-xl font-bold text-gray-800">{selectedProfile.name}</h2>
@@ -372,6 +375,49 @@ export default function ApproveDenyPage() {
                             </div>
                         </div>
                     )}
+                </Box>
+            </Modal>
+
+            {/* New Image Modal for enlarged profile picture */}
+            <Modal 
+                open={openImageModal} 
+                onClose={() => setOpenImageModal(false)}
+                aria-labelledby="enlarged-image-modal"
+            >
+                <Box
+                    sx={{
+                        position: 'absolute',
+                        top: '50%',
+                        left: '50%',
+                        transform: 'translate(-50%, -50%)',
+                        bgcolor: 'white',
+                        borderRadius: '8px',
+                        boxShadow: 24,
+                        p: 4,
+                        maxWidth: '90vw',
+                        maxHeight: '90vh',
+                        overflow: 'auto'
+                    }}
+                >
+                    {selectedProfile && (
+                        <img
+                            src={selectedProfile.profile_image_url || "https://static.vecteezy.com/system/resources/previews/021/548/095/original/default-profile-picture-avatar-user-avatar-icon-person-icon-head-icon-profile-picture-icons-default-anonymous-user-male-and-female-businessman-photo-placeholder-social-network-avatar-portrait-free-vector.jpg"}
+                            alt="Enlarged Profile"
+                            className="w-full h-auto"
+                        />
+                    )}
+                    <div className="flex justify-end mt-4">
+                        <Button 
+                            variant="outlined" 
+                            onClick={() => setOpenImageModal(false)}
+                            sx={{
+                                borderColor: '#d1d5db',
+                                color: '#4b5563'
+                            }}
+                        >
+                            Close
+                        </Button>
+                    </div>
                 </Box>
             </Modal>
         </div>
