@@ -76,7 +76,7 @@ export default function NotificationsPage() {
         fetchNotifications();
         fetchUsers();
 
-        const subscription = supabase
+        const notificationSubscription = supabase
             .channel("realtime-notifications")
             .on(
                 "postgres_changes",
@@ -90,8 +90,62 @@ export default function NotificationsPage() {
             )
             .subscribe();
 
+        // Modified appointment cancellation subscription
+        let appointmentSubscription;
+        (async () => {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) {
+                console.error("No session found for appointment subscription");
+                return;
+            }
+            const currentUserId = session.user.id;
+            appointmentSubscription = supabase
+                .channel("realtime-appointments")
+                .on(
+                    "postgres_changes",
+                    {
+                        event: "UPDATE",
+                        schema: "public",
+                        table: "appointments",
+                        filter: `status=eq.cancelled`
+                    },
+                    async (payload) => {
+                        if (payload.new.user_id === currentUserId) {
+                            // Get the name of the person who cancelled
+                            const { data: cancellerData, error: cancellerError } = await supabase
+                                .from("users")
+                                .select("name")
+                                .eq("user_id", payload.new.counselor_id)
+                                .single();
+                            console.log("canceller: ", data)
+                            const cancellerName = cancellerError ? "Unknown" : cancellerData.name;
+                            const message = `Your appointment has been cancelled by ${cancellerName}`;
+                            
+                            showAlert(message, "warning");
+                            
+                            // Add a system notification to the list
+                            const systemNotification = {
+                                message: message,
+                                items: [{
+                                    notification_id: "system-" + new Date().getTime(),
+                                    target_group: "system",
+                                    sent_at: new Date().toISOString(),
+                                    sender: "System"
+                                }]
+                            };
+                            
+                            setNotifications(prev => [systemNotification, ...prev]);
+                        }
+                    }
+                )
+                .subscribe();
+        })();
+
         return () => {
-            supabase.removeChannel(subscription);
+            supabase.removeChannel(notificationSubscription);
+            if (appointmentSubscription) {
+                supabase.removeChannel(appointmentSubscription);
+            }
         };
     }, [users]);
 
@@ -208,6 +262,7 @@ export default function NotificationsPage() {
             case 'secretaries': return 'All Secretaries';
             case 'counselors_and_secretaries': return 'All Counselors and Secretaries';
             case 'students': return 'All Students';
+            case 'system': return 'System';
             default: return 'Unknown Group';
         }
     };
@@ -233,6 +288,7 @@ export default function NotificationsPage() {
             case 'secretaries': return '👩‍💼';
             case 'counselors_and_secretaries': return '👥';
             case 'students': return '👨‍🎓';
+            case 'system': return '🤖';
             default: return '👤';
         }
     };
@@ -242,6 +298,13 @@ export default function NotificationsPage() {
         const date = new Date(dateString);
         return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ' at ' + 
                date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+    };
+
+    const getSenderName = (notification) => {
+        if (notification.items[0].target_group === 'system') {
+            return 'System';
+        }
+        return notification.items[0].users?.name || 'Unknown';
     };
 
     return (
@@ -291,12 +354,17 @@ export default function NotificationsPage() {
                                     <div className="p-4">
                                         <div className="flex justify-between items-start mb-2">
                                             <div className="flex items-center">
-                                                <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-lg text-emerald-600 mr-3">
+                                                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg mr-3 
+                                                    ${group.items[0].target_group === 'system' ? 'bg-blue-100 text-blue-600' : 'bg-emerald-100 text-emerald-600'}`}>
                                                     {getTargetGroupIcon(group.items[0].target_group)}
                                                 </div>
                                                 <div>
-                                                    <div className="font-medium text-gray-800">{getTargetGroupLabel(group.items[0].target_group)}</div>
-                                                    <div className="text-xs text-gray-500">{formatDate(group.items[0].sent_at)}</div>
+                                                    <div className="font-medium text-gray-800">
+                                                        {group.items[0].target_group === 'system' ? 'System' : getTargetGroupLabel(group.items[0].target_group)}
+                                                    </div>
+                                                    <div className="text-xs text-gray-500">
+                                                        {formatDate(group.items[0].sent_at)}
+                                                    </div>
                                                 </div>
                                             </div>
                                             <Badge color="primary" badgeContent={group.items.length} max={99} />
@@ -307,7 +375,7 @@ export default function NotificationsPage() {
                             ))
                         ) : (
                             <div className="p-8 text-center text-gray-500">
-                                <div className="text-5xl mb-4">📭</div>
+                       <div className="text-5xl mb-4">📭</div>
                                 <p>No sent notifications yet.</p>
                                 <p className="text-sm mt-1">Create a new notification to get started.</p>
                             </div>
@@ -375,8 +443,6 @@ export default function NotificationsPage() {
                     <h1 className="text-xl font-bold">
                         {selectedNotification ? "View Notification" : "Compose Notification"}
                     </h1>
-
-                    
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-6 space-y-4">
@@ -384,15 +450,18 @@ export default function NotificationsPage() {
                         <div className="bg-white rounded-lg shadow-md p-6 max-w-3xl mx-auto">
                             <div className="mb-6">
                                 <div className="flex items-center mb-4">
-                                    <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center text-2xl text-emerald-600 mr-4">
+                                    <div className={`w-12 h-12 rounded-full flex items-center justify-center text-2xl mr-4
+                                        ${selectedNotification.items[0].target_group === 'system' ? 'bg-blue-100 text-blue-600' : 'bg-emerald-100 text-emerald-600'}`}>
                                         {getTargetGroupIcon(selectedNotification.items[0].target_group)}
                                     </div>
                                     <div>
                                         <h2 className="text-xl font-bold text-gray-800">
-                                            {getTargetGroupLabel(selectedNotification.items[0].target_group)}
+                                            {selectedNotification.items[0].target_group === 'system' ? 'System Notification' : getTargetGroupLabel(selectedNotification.items[0].target_group)}
                                         </h2>
                                         <div className="text-sm text-gray-500">
-                                            Sent on {formatDate(selectedNotification.items[0].sent_at)}
+                                            {selectedNotification.items[0].target_group === 'system' ? 
+                                                'System Alert' : 
+                                                `Sent on ${formatDate(selectedNotification.items[0].sent_at)}`}
                                         </div>
                                     </div>
                                 </div>
@@ -402,7 +471,9 @@ export default function NotificationsPage() {
                                     </div>
                                 </div>
                                 <div className="text-sm text-gray-500">
-                                    Delivered to {selectedNotification.items.length} recipients
+                                    {selectedNotification.items[0].target_group === 'system' ? 
+                                        'Automated system notification' : 
+                                        `Delivered to ${selectedNotification.items.length} recipients`}
                                 </div>
                             </div>
                             <div className="flex justify-end space-x-3">
@@ -412,16 +483,18 @@ export default function NotificationsPage() {
                                 >
                                     Close
                                 </button>
-                                <button 
-                                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md transition-colors duration-200"
-                                    onClick={() => {
-                                        setNotificationContent(selectedNotification.message);
-                                        setTargetGroup(selectedNotification.items[0].target_group);
-                                        setSelectedNotification(null);
-                                    }}
-                                >
-                                    Re-use Content
-                                </button>
+                                {selectedNotification.items[0].target_group !== 'system' && (
+                                    <button 
+                                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md transition-colors duration-200"
+                                        onClick={() => {
+                                            setNotificationContent(selectedNotification.message);
+                                            setTargetGroup(selectedNotification.items[0].target_group);
+                                            setSelectedNotification(null);
+                                        }}
+                                    >
+                                        Re-use Content
+                                    </button>
+                                )}
                             </div>
                         </div>
                     ) : (
@@ -531,4 +604,4 @@ export default function NotificationsPage() {
             </Snackbar>
         </div>
     );
-}
+}             
