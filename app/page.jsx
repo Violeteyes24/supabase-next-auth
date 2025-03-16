@@ -56,7 +56,7 @@ export default async function Home() {
         <p className="text-green-100 mb-6">Your mental wellness journey continues</p>
         <div className="space-y-4">
           <Link 
-            href="/dashboard" 
+            href="/dashboard/counselor" 
             className="w-full inline-block bg-green-500 hover:bg-green-600 text-white font-semibold py-3 px-8 rounded-lg transition-colors duration-200 shadow-lg"
           >
             Go to Dashboard

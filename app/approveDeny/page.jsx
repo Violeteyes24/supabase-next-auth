@@ -34,19 +34,37 @@ export default function ApproveDenyPage() {
     const [snackbarSeverity, setSnackbarSeverity] = useState('success');
     const [currentUser, setCurrentUser] = useState(null);
 
+    // Log initial state and after first render
+    useEffect(() => {
+        console.log("Component mounted - Initial state:", {
+            registrantsLength: registrants.length,
+            filteredRegistrantsLength: filteredRegistrants.length
+        });
+        
+        // This will run once after component mounts
+    }, []);
+
     useEffect(() => {
         fetchRegistrants();
         fetchCurrentUser();
 
         const userChannel = supabase.channel('user-changes')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, () => {
-                fetchRegistrants(); // Refetch registrants on any change
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, (payload) => {
+                console.log("Realtime user change detected:", payload);
+                // Only refetch if it's not triggered by our own updates
+                if (payload.eventType !== 'UPDATE' || !payload.new || payload.new.approval_status === payload.old?.approval_status) {
+                    console.log("Refetching registrants due to external change");
+                    fetchRegistrants();
+                } else {
+                    console.log("Skipping refetch for our own update");
+                }
             })
             .subscribe();
 
         const assignmentChannel = supabase.channel('assignment-changes')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'secretary_assignments' }, () => {
-                fetchSecretaryAssignments(); // Refetch assignments on any change
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'secretary_assignments' }, (payload) => {
+                console.log("Realtime assignment change detected:", payload);
+                fetchSecretaryAssignments();
             })
             .subscribe();
 
@@ -58,6 +76,12 @@ export default function ApproveDenyPage() {
 
     // Effect for filtering registrants based on search and user type
     useEffect(() => {
+        console.log("Filter effect running with:", { 
+            registrantsLength: registrants.length, 
+            searchTerm, 
+            selectedUserType 
+        });
+        
         if (!registrants.length) {
             setFilteredRegistrants([]);
             return;
@@ -68,6 +92,7 @@ export default function ApproveDenyPage() {
         // Filter by user type if not "all"
         if (selectedUserType !== 'all') {
             filtered = filtered.filter(reg => reg.user_type === selectedUserType);
+            console.log("After user type filter:", filtered.length);
         }
         
         // Filter by search term
@@ -79,9 +104,11 @@ export default function ApproveDenyPage() {
                 reg.department_assigned?.toLowerCase().includes(term) ||
                 reg.short_biography?.toLowerCase().includes(term)
             );
+            console.log("After search term filter:", filtered.length);
         }
         
         setFilteredRegistrants(filtered);
+        console.log("Final filtered registrants:", filtered.length);
     }, [registrants, searchTerm, selectedUserType]);
 
     const fetchCurrentUser = async () => {
@@ -127,47 +154,96 @@ export default function ApproveDenyPage() {
 
     const fetchRegistrants = async () => {
         setLoading(true);
-        const { data, error } = await supabase
-            .from("users")
-            .select("user_id, name, credentials, department_assigned, short_biography, user_type, approval_status, profile_image_url")
-            .in("user_type", ["counselor", "secretary", "student"])
-            .not("is_director", "eq", true);
+        try {
+            const { data, error } = await supabase
+                .from("users")
+                .select("user_id, name, credentials, department_assigned, short_biography, user_type, approval_status, profile_image_url")
+                .in("user_type", ["counselor", "secretary", "student"])
+                .not("is_director", "eq", true);
 
-        console.log("Fetched registrants:", data);
-        if (error) {
-            console.error("Fetch registrants error:", error.message, error.details, error.hint);
-        } else {
-            setRegistrants(data || []);
-            setFilteredRegistrants(data || []);
+            console.log("Fetched registrants:", data);
+            
+            if (error) {
+                console.error("Fetch registrants error:", error.message, error.details, error.hint);
+                return; // Don't update state on error
+            }
+            
+            if (!data || data.length === 0) {
+                console.log("No registrants found or empty data returned");
+                setRegistrants([]);
+                setFilteredRegistrants([]);
+            } else {
+                console.log("Setting registrants state with length:", data.length);
+                // Create copies of the arrays to ensure new references
+                const registrantsCopy = [...data];
+                setRegistrants(registrantsCopy);
+                setFilteredRegistrants(registrantsCopy);
+                console.log("Set registrants state:", registrantsCopy.length);
+                console.log("Set filteredRegistrants state:", registrantsCopy.length);
+            }
+        } catch (err) {
+            console.error("Unexpected error in fetchRegistrants:", err);
+        } finally {
+            setLoading(false);
         }
-        setLoading(false);
     };
 
     const handleApprove = async (id) => {
-        const { data, error } = await supabase
-            .from('users')
-            .update({ approval_status: 'approved' })
-            .eq('user_id', id)
-            .select();
+        try {
+            // Optimistically update UI first
+            setRegistrants(prev => 
+                prev.map(reg => 
+                    reg.user_id === id ? {...reg, approval_status: 'approved'} : reg
+                )
+            );
+            
+            const { data, error } = await supabase
+                .from('users')
+                .update({ approval_status: 'approved' })
+                .eq('user_id', id)
+                .select();
 
-        if (error) {
-            console.error("Error approving registrant:", error.message, error.details, error.hint);
-        } else {
-            console.log("Registrant approved:", data);
+            if (error) {
+                console.error("Error approving registrant:", error.message, error.details, error.hint);
+                // Revert the optimistic update on error
+                fetchRegistrants();
+            } else {
+                console.log("Registrant approved:", data);
+                // We don't need to refetch as we've already updated the UI and
+                // the realtime subscription should be prevented from causing a refetch
+            }
+        } catch (err) {
+            console.error("Unexpected error in handleApprove:", err);
+            fetchRegistrants(); // Revert on unexpected error
         }
     };
 
     const handleDeny = async (id) => {
-        const { data, error } = await supabase
-            .from('users')
-            .update({ approval_status: 'denied' })
-            .eq('user_id', id)
-            .select();
+        try {
+            // Optimistically update UI first
+            setRegistrants(prev => 
+                prev.map(reg => 
+                    reg.user_id === id ? {...reg, approval_status: 'denied'} : reg
+                )
+            );
+            
+            const { data, error } = await supabase
+                .from('users')
+                .update({ approval_status: 'denied' })
+                .eq('user_id', id)
+                .select();
 
-        if (error) {
-            console.error("Error denying registrant:", error.message, error.details, error.hint);
-        } else {
-            console.log("Registrant denied:", data);
+            if (error) {
+                console.error("Error denying registrant:", error.message, error.details, error.hint);
+                // Revert the optimistic update on error
+                fetchRegistrants();
+            } else {
+                console.log("Registrant denied:", data);
+                // We don't need to refetch as we've already updated the UI
+            }
+        } catch (err) {
+            console.error("Unexpected error in handleDeny:", err);
+            fetchRegistrants(); // Revert on unexpected error
         }
     };
 
@@ -327,11 +403,11 @@ export default function ApproveDenyPage() {
     const isCurrentUserCounselor = currentUser?.user_type === 'counselor';
 
     return (
-        <div className="flex h-screen bg-gray-50">
+        <div className="flex min-h-screen bg-gray-50">
             <Sidebar handleLogout={handleLogout} />
 
             {/* Main Content */}
-            <div className="flex-1 flex flex-col text-gray-800 ml-20 p-8 overflow-hidden">
+            <div className="flex-1 flex flex-col text-gray-800 ml-20 p-8 overflow-auto">
                 <div className="flex justify-between items-center mb-8">
                     <h1 className="text-3xl font-bold text-emerald-700">Registrant Approval</h1>
                     <div className="bg-white p-2 rounded-lg shadow-sm">
@@ -340,7 +416,7 @@ export default function ApproveDenyPage() {
                 </div>
 
                 {/* Card Container */}
-                <div className="bg-white rounded-xl shadow-md p-6 flex-1 overflow-hidden flex flex-col">
+                <div className="bg-white rounded-xl shadow-md p-6 flex-1 overflow-hidden flex flex-col max-h-[60vh]">
                     <div className="mb-4">
                         <h2 className="text-xl font-semibold text-gray-700 mb-2">Pending Registrants</h2>
                         <p className="text-gray-500 text-sm">Approve or deny account requests from counselors, secretaries, and students</p>
@@ -383,41 +459,41 @@ export default function ApproveDenyPage() {
                     </div>
 
                     {/* Table Container with Shadow */}
-                    <div className="overflow-hidden rounded-lg border border-gray-200 flex-1 flex flex-col">
+                    <div className="overflow-auto rounded-lg border border-gray-200 flex-1">
                         {/* Table Header */}
-                        <div className="overflow-x-auto flex-1">
-                            <table className="min-w-full divide-y divide-gray-200">
-                                <thead className="bg-gray-50">
+                        <div className="overflow-auto w-full h-full">
+                            <table className="min-w-full divide-y divide-gray-200 table-auto">
+                                <thead className="bg-gray-50 sticky top-0 z-10">
                                     <tr>
-                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Picture</th>
-                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User Type</th>
-                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Department</th>
-                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                        <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-16">Picture</th>
+                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-40">Name</th>
+                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">User Type</th>
+                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-40">Department</th>
+                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24">Status</th>
+                                        <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-40">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody className="bg-white divide-y divide-gray-200">
                                     {loading ? (
                                         <tr>
-                                            <td colSpan="8" className="px-6 py-4 text-center text-sm text-gray-500">
+                                            <td colSpan="6" className="px-6 py-4 text-center text-sm text-gray-500">
                                                 Loading registrants...
                                             </td>
                                         </tr>
                                     ) : filteredRegistrants.length === 0 ? (
                                         <tr>
-                                            <td colSpan="8" className="px-6 py-4 text-center text-sm text-gray-500">
+                                            <td colSpan="6" className="px-6 py-4 text-center text-sm text-gray-500">
                                                 {searchTerm || selectedUserType !== 'all' 
                                                     ? "No matching registrants found" 
                                                     : "No registrants found"}
                                             </td>
                                         </tr>
                                     ) : (
-                                        filteredRegistrants.map((registrant) => (
-                                            <tr key={registrant.user_id} className="hover:bg-gray-50 transition-colors">
+                                        filteredRegistrants.map((registrant, index) => (
+                                            <tr key={registrant.user_id || index} className="hover:bg-gray-50 transition-colors">
                                                 <td className="px-6 py-4 whitespace-nowrap">
                                                     <img
-                                                        src={registrant.profile_image_url || "https://static.vecteezy.com/system/resources/previews/021/548/095/original/default-profile-picture-avatar-user-avatar-icon-person-icon-head-icon-profile-picture-icons-default-anonymous-user-male-and-female-businessman-photo-placeholder-social-network-avatar-portrait-free-vector.jpg"} // use profile_image_url if exists, else use placeholder
+                                                        src={registrant.profile_image_url || "https://static.vecteezy.com/system/resources/previews/021/548/095/original/default-profile-picture-avatar-user-avatar-icon-person-icon-head-icon-profile-picture-icons-default-anonymous-user-male-and-female-businessman-photo-placeholder-social-network-avatar-portrait-free-vector.jpg"}
                                                         alt="Profile"
                                                         className="w-10 h-10 rounded-full object-cover border border-gray-200 cursor-pointer"
                                                         onClick={() => handleProfileClick(registrant)}
@@ -425,34 +501,34 @@ export default function ApproveDenyPage() {
                                                 </td>
                                                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                                                     <span onClick={() => handleProfileClick(registrant)} className="hover:underline cursor-pointer">
-                                                        {registrant.name}
+                                                        {registrant.name || "Unnamed"}
                                                     </span>
                                                 </td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 capitalize">{registrant.user_type}</td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{registrant.department_assigned}</td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 capitalize">{registrant.user_type || "Unknown"}</td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{registrant.department_assigned || "No Department"}</td>
                                                 <td className="px-6 py-4 whitespace-nowrap text-sm">
                                                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusBadgeClass(registrant.approval_status)}`}>
                                                         {registrant.approval_status || 'pending'}
                                                     </span>
                                                 </td>
                                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">
-                                                    <div className="flex justify-center space-x-2">
+                                                    <div className="flex justify-center space-x-1">
                                                         <button
-                                                            className="bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1.5 rounded text-xs font-medium transition-colors duration-150 ease-in-out"
+                                                            className="bg-emerald-500 hover:bg-emerald-600 text-white px-2 py-1 rounded text-xs font-medium transition-colors duration-150 ease-in-out"
                                                             onClick={() => handleApprove(registrant.user_id)}
                                                             disabled={registrant.approval_status === 'approved'}
                                                         >
                                                             Approve
                                                         </button>
                                                         <button
-                                                            className="bg-red-500 hover:bg-red-600 text-white px-3 py-1.5 rounded text-xs font-medium transition-colors duration-150 ease-in-out"
+                                                            className="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-xs font-medium transition-colors duration-150 ease-in-out"
                                                             onClick={() => handleDeny(registrant.user_id)}
                                                             disabled={registrant.approval_status === 'denied'}
                                                         >
                                                             Deny
                                                         </button>
                                                         <button
-                                                            className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1.5 rounded text-xs font-medium transition-colors duration-150 ease-in-out"
+                                                            className="bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded text-xs font-medium transition-colors duration-150 ease-in-out"
                                                             onClick={() => handleView(registrant.user_id)}
                                                         >
                                                             View
@@ -469,7 +545,7 @@ export default function ApproveDenyPage() {
                 </div>
 
                 {/* Secretary Assignments Section */}
-                <div className="bg-white rounded-xl shadow-md p-6 mt-6">
+                <div className="bg-white rounded-xl shadow-md p-6 mt-8 mb-8">
                     <div className="flex justify-between items-center mb-4">
                         <h2 className="text-xl font-semibold text-gray-700">Secretary Assignments</h2>
                         <button
