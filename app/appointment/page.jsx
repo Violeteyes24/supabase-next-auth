@@ -278,6 +278,7 @@ export default function AppointmentPage() {
         try {
             const { data, error } = await supabase
                 .from('availability_schedules')
+                // .update({ is_available: true })
                 .delete()
                 .eq('availability_schedule_id', selectedSchedule.availability_schedule_id);
 
@@ -560,8 +561,8 @@ export default function AppointmentPage() {
                             <h2 className="mb-4 text-xl font-bold text-gray-800">Confirm Schedule</h2>
                             <p className="text-gray-600 mb-2">Are you sure you want to add the availability schedule?</p>
                             <div className="bg-gray-100 p-3 rounded-lg mb-4">
-                                <p className="font-medium">Date: <span className="text-gray-700">{selectedDate.format('MMMM DD, YYYY')}</span></p>
-                                <p className="font-medium">Time: <span className="text-gray-700">{startTime.format('hh:mm A')} - {endTime.format('hh:mm A')}</span></p>
+                                <p className="font-medium text-black">Date: <span className="text-gray-700">{selectedDate.format('MMMM DD, YYYY')}</span></p>
+                                <p className="font-medium text-black">Time: <span className="text-gray-700">{startTime.format('hh:mm A')} - {endTime.format('hh:mm A')}</span></p>
                             </div>
                             <div className="mt-4 flex justify-end gap-2">
                                 <Button variant="outlined" onClick={() => setOpenConfirmModal(false)}>

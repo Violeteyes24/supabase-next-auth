@@ -28,6 +28,26 @@ export default function AppointmentCard() {
     };
     getSession();
     fetchAppointments();
+
+    // Add real-time subscription
+    const appointmentChannel = supabase.channel('appointments-changes')
+      .on('postgres_changes', 
+        { 
+          event: '*', 
+          schema: 'public', 
+          table: 'appointments' 
+        }, 
+        (payload) => {
+          console.log('Appointment change received:', payload);
+          fetchAppointments(); // Refresh appointments when changes occur
+        }
+      )
+      .subscribe();
+
+    // Cleanup subscription
+    return () => {
+      supabase.removeChannel(appointmentChannel);
+    };
   }, []);
 
   const fetchAppointments = async () => {
@@ -128,10 +148,11 @@ export default function AppointmentCard() {
 
   const handleConfirmCancel = async () => {
     try {
+      // Instead of deleting the appointment record, update the availability schedule to mark it as unavailable.
       const { data, error } = await supabase
-        .from("appointments")
-        .delete()
-        .eq("appointment_id", selectedAppointment.appointment_id);
+        .from("availability_schedules")
+        .update({ is_available: false })
+        .eq("availability_schedule_id", selectedAppointment.availability_schedule_id);
 
       if (error) {
         console.error(
@@ -145,10 +166,14 @@ export default function AppointmentCard() {
       }
 
       console.log("Appointment canceled:", data);
-      setOpenCancelModal(false);
       setSuccessMessage("Appointment canceled successfully.");
       setError(null);
-      fetchAppointments();
+
+      // Add a delay before closing the modal then refresh appointments
+      setTimeout(() => {
+        setOpenCancelModal(false);
+        fetchAppointments();
+      }, 1500);
     } catch (error) {
       console.error("Unexpected error:", error);
       setError("An unexpected error occurred while canceling the appointment.");

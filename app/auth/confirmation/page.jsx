@@ -11,17 +11,17 @@ const ConfirmationContent = () => {
     const code = searchParams.get('code');
     const email = searchParams.get('email');
     
-    // Use root URL instead of hardcoded Vercel URL
-    const rootUrl = '/';
+    // Login page URL
+    const loginPageUrl = '/login';
 
     useEffect(() => {
         if (code && email) {
             setStatus('success');
-            setMessage(`Your email (${decodeURIComponent(email)}) has been confirmed!`); 
+            setMessage(`Your email (${decodeURIComponent(email)}) has been confirmed!`);
             
             // Redirect after successful confirmation
             const timer = setTimeout(() => {
-                window.location.href = rootUrl;
+                window.location.href = loginPageUrl;
             }, 3000);
             
             return () => clearTimeout(timer);
@@ -100,10 +100,10 @@ const ConfirmationContent = () => {
                         <div className="mt-6">
                             <p className="text-gray-700 mb-4">Please try again or contact our support team for assistance.</p>
                             <a 
-                                href={rootUrl}
+                                href={loginPageUrl}
                                 className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition duration-200"
                             >
-                                Return to Home
+                                Return to Login
                             </a>
                         </div>
                     )}
