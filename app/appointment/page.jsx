@@ -4,7 +4,7 @@ import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import React, { useState, useEffect } from 'react';
 import Sidebar from "../components/dashboard components/sidebar";
 import AppointmentCard from "../components/appointment components/appointment_card";
-import { Modal, Box, Button, TextField, IconButton } from '@mui/material';
+import { Modal, Box, Button, TextField, IconButton, Switch, FormControlLabel } from '@mui/material';
 import { DatePicker, TimePicker, LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs from 'dayjs';
@@ -37,16 +37,149 @@ export default function AppointmentPage() {
     const [toastMessage, setToastMessage] = useState('');
     const [currentMonthDays, setCurrentMonthDays] = useState([]);
     const [session, setSession] = useState(null);
+    const [completedAppointments, setCompletedAppointments] = useState([]);
+    const [showGroupCompleted, setShowGroupCompleted] = useState(false);
     
-      useEffect(() => {
-        const getSession = async () => {
-          const {
-            data: { session },
-          } = await supabase.auth.getSession();
-          setSession(session);
-        };
-        getSession();
-      }, []);
+    // Get current time in local timezone
+    const getCurrentTime = () => {
+      const now = new Date();
+      return now.toLocaleTimeString(); // Example: "10:45:30 AM"
+    };
+    
+    // Helper to convert time string to Date object for comparison
+    const timeToDate = (timeStr, dateStr) => {
+      const [hours, minutes] = timeStr.split(':');
+      const [year, month, day] = dateStr.split('-');
+      return new Date(year, month - 1, day, hours, minutes);
+    };
+    
+    // Function to check and complete expired appointments
+    const checkAndCompleteAppointments = async (userId) => {
+      try {
+        // First, check if user is a counselor
+        const { data: userData, error: userError } = await supabase
+          .from('users')
+          .select('user_type')
+          .eq('user_id', userId)
+          .single();
+          
+        if (userError || userData?.user_type !== 'counselor') {
+          return;
+        }
+        
+        // Get current date in YYYY-MM-DD format
+        const now = new Date();
+        const currentDate = now.toISOString().split('T')[0];
+        
+        // Get all incomplete appointments for this counselor
+        const { data: appointments, error: aptError } = await supabase
+          .from('appointments')
+          .select('*, availability_schedules(*)')
+          .eq('counselor_id', userId)
+          .neq('status', 'completed')
+          .order('availability_schedule_id');
+          
+        if (aptError) {
+          console.error('Error fetching appointments:', aptError);
+          return;
+        }
+        
+        // Identify expired appointments
+        const expiredAppointments = appointments.filter(apt => {
+          if (!apt.availability_schedules) return false;
+          
+          const aptDate = apt.availability_schedules.date;
+          const endTime = apt.availability_schedules.end_time;
+          
+          // Compare date and time with current time
+          const appointmentEndTime = timeToDate(endTime, aptDate);
+          return appointmentEndTime <= now;
+        });
+        
+        // Update status to completed for expired appointments
+        if (expiredAppointments.length > 0) {
+          // Update appointment status
+          for (const apt of expiredAppointments) {
+            await supabase
+              .from('appointments')
+              .update({ status: 'completed' })
+              .eq('appointment_id', apt.appointment_id);
+              
+            // Update availability schedule
+            await supabase
+              .from('availability_schedules')
+              .update({ is_available: false })
+              .eq('availability_schedule_id', apt.availability_schedule_id);
+          }
+          
+          console.log(`${expiredAppointments.length} appointments automatically completed`);
+        }
+        
+        // Get all incomplete group appointments for this counselor
+        const { data: groupAppointments, error: groupAptError } = await supabase
+          .from('appointments')
+          .select('*, availability_schedules(*)')
+          .eq('counselor_id', userId)
+          .eq('appointment_type', 'group')
+          .neq('status', 'completed')
+          .order('availability_schedule_id');
+          
+        if (groupAptError) {
+          console.error('Error fetching group appointments:', groupAptError);
+          return;
+        }
+        
+        // Identify expired group appointments
+        const expiredGroupAppointments = groupAppointments.filter(apt => {
+          if (!apt.availability_schedules) return false;
+          
+          const aptDate = apt.availability_schedules.date;
+          const endTime = apt.availability_schedules.end_time;
+          
+          // Compare date and time with current time
+          const appointmentEndTime = timeToDate(endTime, aptDate);
+          return appointmentEndTime <= now;
+        });
+        
+        // Update status to completed for expired group appointments
+        if (expiredGroupAppointments.length > 0) {
+          // Update appointment status
+          for (const apt of expiredGroupAppointments) {
+            await supabase
+              .from('appointments')
+              .update({ status: 'completed' })
+              .eq('appointment_id', apt.appointment_id);
+              
+            // Update availability schedule
+            await supabase
+              .from('availability_schedules')
+              .update({ is_available: false })
+              .eq('availability_schedule_id', apt.availability_schedule_id);
+          }
+          
+          console.log(`${expiredGroupAppointments.length} group appointments automatically completed`);
+        }
+      } catch (error) {
+        console.error('Error checking appointments:', error);
+      }
+    };
+
+    useEffect(() => {
+      const getSession = async () => {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        setSession(session);
+        
+        // If user is logged in, check and complete expired appointments
+        if (session?.user) {
+          const userId = session.user.id;
+          checkAndCompleteAppointments(userId);
+          fetchCompletedAppointments(userId);
+        }
+      };
+      getSession();
+    }, []);
 
     useEffect(() => {
         fetchAvailabilitySchedules();
@@ -166,15 +299,15 @@ export default function AppointmentPage() {
     const handleConfirmAddSchedule = async () => {
         try {
             // Fetch the authenticated user
-            const { data: { user }, error: userError } = await supabase.auth.getUser();
-
-            if (userError || !user) {
+            const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+            
+            if (sessionError || !session) {
                 setErrorMessage('Unable to fetch user data. Please log in again.');
                 setOpenErrorModal(true);
                 return;
             }
-
-            const counselorId = user.id;
+            
+            const counselorId = session.user.id;
 
             // Validate if there's already an existing schedule for the selected date and time range
             const { data: existingSchedules, error: fetchError } = await supabase
@@ -323,6 +456,87 @@ export default function AppointmentPage() {
         borderRadius: 2,
     };
 
+    // New function to fetch completed appointments
+    const fetchCompletedAppointments = async (userId) => {
+      try {
+        // First, check if user is a counselor
+        const { data: userData, error: userError } = await supabase
+          .from('users')
+          .select('user_type')
+          .eq('user_id', userId)
+          .single();
+          
+        if (userError || userData?.user_type !== 'counselor') {
+          return;
+        }
+        
+        // Fetch completed individual appointments
+        if (!showGroupCompleted) {
+          const { data, error } = await supabase
+            .from('appointments')
+            .select('*, availability_schedules(*), users!appointments_user_id_fkey(*)')
+            .eq('counselor_id', userId)
+            .eq('status', 'completed')
+            .eq('appointment_type', 'individual')
+            .order('availability_schedules(date)', { ascending: false });
+            
+          if (error) {
+            console.error('Error fetching completed appointments:', error);
+            return;
+          }
+          
+          setCompletedAppointments(data || []);
+        } 
+        // Fetch completed group appointments
+        else {
+          const { data: groupData, error: groupError } = await supabase
+            .from('appointments')
+            .select(`
+              *,
+              availability_schedules(*),
+              groupappointments(*, users(*))
+            `)
+            .eq('counselor_id', userId)
+            .eq('status', 'completed')
+            .eq('appointment_type', 'group')
+            .order('availability_schedules(date)', { ascending: false });
+            
+          if (groupError) {
+            console.error('Error fetching completed group appointments:', groupError);
+            return;
+          }
+          
+          setCompletedAppointments(groupData || []);
+        }
+      } catch (error) {
+        console.error('Error fetching completed appointments:', error);
+      }
+    };
+
+    // Add an effect to refetch when toggle changes
+    useEffect(() => {
+        const fetchData = async () => {
+            const {
+                data: { session },
+            } = await supabase.auth.getSession();
+            
+            if (!session) {
+                console.error("No session found");
+                return;
+            }
+            
+            const userId = session.user.id;
+            fetchCompletedAppointments(userId);
+        };
+        
+        fetchData();
+    }, [showGroupCompleted]);
+
+    // Toggle between completed individual and group appointments
+    const handleToggleCompleted = () => {
+        setShowGroupCompleted(!showGroupCompleted);
+    };
+
     return (
         <LocalizationProvider dateAdapter={AdapterDayjs}>
             <div className="h-screen bg-gray-50 flex">
@@ -454,9 +668,81 @@ export default function AppointmentPage() {
                             <AppointmentCard />
                         </div>
                         
-                        <div className="bg-white p-6 rounded-lg shadow-md">
+                        <div className="bg-white p-6 rounded-lg shadow-md mb-6">
                             {/* <h2 className="text-xl font-semibold text-gray-800 mb-4">Group Appointments</h2> */}
                             <GroupAppointmentsManager />
+                        </div>
+
+                        {/* Completed Appointments Section */}
+                        <div className="bg-white p-6 rounded-lg shadow-md">
+                            <div className="flex justify-between items-center mb-4">
+                                <h2 className="text-xl font-semibold text-gray-800">Completed Appointments</h2>
+                                <FormControlLabel
+                                    control={
+                                        <Switch
+                                            checked={showGroupCompleted}
+                                            onChange={handleToggleCompleted}
+                                            color="primary"
+                                        />
+                                    }
+                                    label={showGroupCompleted ? "Group Appointments" : "Individual Appointments"}
+                                />
+                            </div>
+
+                            {completedAppointments.length === 0 ? (
+                                <div className="text-center py-10 text-gray-500">
+                                    <p className="text-lg font-medium">No completed {showGroupCompleted ? 'group' : 'individual'} appointments found</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-4">
+                                    {completedAppointments.map((appointment) => (
+                                        <div
+                                            key={appointment.appointment_id}
+                                            className="flex justify-between items-center p-4 rounded-lg bg-gray-50 border border-gray-200 shadow-sm"
+                                        >
+                                            <div className="flex flex-col">
+                                                {!showGroupCompleted && appointment.users && (
+                                                    <p className="font-medium text-emerald-700">
+                                                        {appointment.users.first_name} {appointment.users.last_name}
+                                                    </p>
+                                                )}
+                                                {showGroupCompleted && (
+                                                    <>
+                                                        <p className="font-medium text-emerald-700">
+                                                            Group Session ({appointment.groupappointments?.length || 0} participants)
+                                                        </p>
+                                                        <div className="mt-1">
+                                                            {appointment.groupappointments && appointment.groupappointments.length > 0 ? (
+                                                                <div className="grid grid-cols-1 gap-1">
+                                                                    {appointment.groupappointments.map((participant, index) => (
+                                                                        <p key={participant.g_appointment_id} className="text-sm text-gray-600">
+                                                                            {participant.users?.first_name} {participant.users?.last_name}
+                                                                        </p>
+                                                                    ))}
+                                                                </div>
+                                                            ) : (
+                                                                <p className="text-sm text-gray-500 italic">No participants data available</p>
+                                                            )}
+                                                        </div>
+                                                    </>
+                                                )}
+                                                <p className="text-gray-600">
+                                                    {appointment.availability_schedules && 
+                                                        `${dayjs(appointment.availability_schedules.date).format('MMM DD, YYYY')} • 
+                                                        ${formatTime(appointment.availability_schedules.start_time)} - 
+                                                        ${formatTime(appointment.availability_schedules.end_time)}`}
+                                                </p>
+                                                <p className="text-gray-500 text-sm mt-1">
+                                                    {appointment.reason ? appointment.reason : (showGroupCompleted ? 'Group counseling' : 'Individual counseling')}
+                                                </p>
+                                            </div>
+                                            <span className="px-3 py-1 rounded-full text-sm font-medium bg-gray-200 text-gray-800">
+                                                Completed
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     </div>
 
