@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
-import { Modal, Box, Button, Typography, TextField } from "@mui/material";
+import { Modal, Box, Button, Typography, TextField, TablePagination } from "@mui/material";
 import { TimePicker, LocalizationProvider } from "@mui/x-date-pickers";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import dayjs from "dayjs";
@@ -18,6 +18,8 @@ export default function AppointmentCard() {
   const [endTime, setEndTime] = useState(dayjs());
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState(null);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(5);
 
   useEffect(() => {
     const getSession = async () => {
@@ -184,6 +186,15 @@ export default function AppointmentCard() {
     return dayjs(time, "HH:mm").format("hh:mm A");
   };
 
+  const handleChangePage = (event, newPage) => {
+    setPage(newPage);
+  };
+
+  const handleChangeRowsPerPage = (event) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
+
   return (
     <LocalizationProvider dateAdapter={AdapterDayjs}>
       <div className="border rounded-lg shadow-xl p-6 bg-white">
@@ -228,96 +239,117 @@ export default function AppointmentCard() {
 
         {/* Table Section */}
         {appointments.length > 0 ? (
-          <div className="overflow-auto max-h-96 rounded-lg border border-gray-200">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-800">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                    Client
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                    Appointment type and Reason{" "}
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                    Schedule
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {appointments
-                  .filter(
-                    (appointment) =>
-                      appointment.users && appointment.availability_schedules
-                  )
-                  .map((appointment, index) => (
-                    <tr
-                      key={index}
-                      className="hover:bg-gray-50 transition-colors duration-200"
-                    >
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <div className="flex-shrink-0 h-10 w-10">
-                            <img
-                              className="h-10 w-10 rounded-full object-cover border-2 border-emerald-400"
-                              src="https://static.vecteezy.com/system/resources/previews/021/548/095/original/default-profile-picture-avatar-user-avatar-icon-person-icon-head-icon-profile-picture-icons-default-anonymous-user-male-and-female-businessman-photo-placeholder-social-network-avatar-portrait-free-vector.jpg"
-                              alt="Profile"
-                            />
-                          </div>
-                          <div className="ml-4">
-                            <div className="text-sm font-medium text-gray-900">
-                              {appointment.users.name}
+          <div className="rounded-lg border border-gray-200">
+            <div className="overflow-auto max-h-96">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-800 sticky top-0">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                      Client
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                      Appointment type and Reason{" "}
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                      Schedule
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {appointments
+                    .filter(
+                      (appointment) =>
+                        appointment.users && appointment.availability_schedules
+                    )
+                    .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                    .map((appointment, index) => (
+                      <tr
+                        key={index}
+                        className="hover:bg-gray-50 transition-colors duration-200"
+                      >
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            <div className="flex-shrink-0 h-10 w-10">
+                              <img
+                                className="h-10 w-10 rounded-full object-cover border-2 border-emerald-400"
+                                src="https://static.vecteezy.com/system/resources/previews/021/548/095/original/default-profile-picture-avatar-user-avatar-icon-person-icon-head-icon-profile-picture-icons-default-anonymous-user-male-and-female-businessman-photo-placeholder-social-network-avatar-portrait-free-vector.jpg"
+                                alt="Profile"
+                              />
                             </div>
-                            <div className="text-sm text-gray-500">
-                              Client #{appointment.user_id.slice(0, 8)}
+                            <div className="ml-4">
+                              <div className="text-sm font-medium text-gray-900">
+                                {appointment.users.name}
+                              </div>
+                              <div className="text-sm text-gray-500">
+                                Client #{appointment.user_id.slice(0, 8)}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
-                          {appointment.appointment_type || "Consultation"}
-                        </div>
-                        <div className="text-sm text-gray-500">
-                          {appointment.reason || "General session"}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
-                          {dayjs(
-                            appointment.availability_schedules.date
-                          ).format("MMMM D, YYYY")}
-                        </div>
-                        <div className="text-sm text-gray-500">
-                          {formatTime(
-                            appointment.availability_schedules.start_time
-                          )}{" "}
-                          -{" "}
-                          {formatTime(
-                            appointment.availability_schedules.end_time
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
-                        <button
-                          className="rounded-md bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-600 shadow-sm hover:bg-emerald-100"
-                          onClick={() => handleReschedule(appointment)}
-                        >
-                          Reschedule
-                        </button>
-                        <button
-                          className="rounded-md bg-red-50 px-3 py-2 text-sm font-semibold text-red-600 shadow-sm hover:bg-red-100"
-                          onClick={() => handleCancel(appointment)}
-                        >
-                          Cancel
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-gray-900">
+                            {appointment.appointment_type || "Consultation"}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            {appointment.reason || "General session"}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-gray-900">
+                            {dayjs(
+                              appointment.availability_schedules.date
+                            ).format("MMMM D, YYYY")}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            {formatTime(
+                              appointment.availability_schedules.start_time
+                            )}{" "}
+                            -{" "}
+                            {formatTime(
+                              appointment.availability_schedules.end_time
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
+                          <button
+                            className="rounded-md bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-600 shadow-sm hover:bg-emerald-100"
+                            onClick={() => handleReschedule(appointment)}
+                          >
+                            Reschedule
+                          </button>
+                          <button
+                            className="rounded-md bg-red-50 px-3 py-2 text-sm font-semibold text-red-600 shadow-sm hover:bg-red-100"
+                            onClick={() => handleCancel(appointment)}
+                          >
+                            Cancel
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+            <TablePagination
+              component="div"
+              count={appointments.filter(
+                appointment => appointment.users && appointment.availability_schedules
+              ).length}
+              page={page}
+              onPageChange={handleChangePage}
+              rowsPerPage={rowsPerPage}
+              onRowsPerPageChange={handleChangeRowsPerPage}
+              rowsPerPageOptions={[5, 10, 25]}
+              sx={{
+                bgcolor: '#f9fafb',
+                borderTop: '1px solid #e5e7eb',
+                '& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows': {
+                  color: '#4b5563'
+                }
+              }}
+            />
           </div>
         ) : (
           <div className="py-12 flex flex-col items-center justify-center text-center border rounded-lg border-dashed border-gray-300 bg-gray-50">

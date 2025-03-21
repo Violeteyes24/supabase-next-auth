@@ -15,6 +15,7 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  TablePagination,
   Paper,
   TextField,
   Chip,
@@ -67,6 +68,8 @@ export default function GroupAppointmentsManager() {
   const [groupDate, setGroupDate] = useState(null);
   const [groupStartTime, setGroupStartTime] = useState(null);
   const [groupEndTime, setGroupEndTime] = useState(null);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(5);
 
   useEffect(() => {
     const getSession = async () => {
@@ -404,6 +407,15 @@ export default function GroupAppointmentsManager() {
       .toUpperCase();
   };
 
+  const handleChangePage = (event, newPage) => {
+    setPage(newPage);
+  };
+
+  const handleChangeRowsPerPage = (event) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
+
   return (
     <div className="bg-white p-6 rounded-lg shadow-lg">
       <div className="flex justify-between items-center mb-6">
@@ -463,140 +475,136 @@ export default function GroupAppointmentsManager() {
             </TableHead>
             <TableBody>
               {groupAppointments.length > 0 ? (
-                groupAppointments.map((appointment) => (
-                  <TableRow
-                    key={appointment.appointment_id}
-                    sx={{
-                      "&:hover": { backgroundColor: "#f9fafb" },
-                      verticalAlign: "top",
-                    }}
-                  >
-                    <TableCell>
-                      <Typography color="text.secondary" variant="body2">
-                        #{appointment.appointment_id.toString().slice(0, 8)}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-wrap gap-1 max-w-xs">
-                        {appointment.groupappointments?.map(
-                          (ga, index) =>
-                            ga.users?.name && (
-                              <Chip
-                                key={index}
-                                avatar={
-                                  <Avatar>{getInitials(ga.users.name)}</Avatar>
-                                }
-                                label={ga.users.name}
-                                size="small"
-                                sx={{ margin: "2px" }}
-                              />
+                groupAppointments
+                  .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                  .map((appointment) => (
+                    <TableRow
+                      key={appointment.appointment_id}
+                      sx={{
+                        "&:hover": { backgroundColor: "#f9fafb" },
+                        verticalAlign: "top",
+                      }}
+                    >
+                      <TableCell>
+                        <Typography color="text.secondary" variant="body2">
+                          #{appointment.appointment_id.toString().slice(0, 8)}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1 max-w-xs">
+                          {appointment.groupappointments?.map(
+                            (ga, index) =>
+                              ga.users?.name && (
+                                <Chip
+                                  key={index}
+                                  avatar={
+                                    <Avatar>{getInitials(ga.users.name)}</Avatar>
+                                  }
+                                  label={ga.users.name}
+                                  size="small"
+                                  sx={{ margin: "2px" }}
+                                />
+                              )
+                          )}
+                        </div>
+                        <Typography
+                          variant="caption"
+                          color="text.secondary"
+                          sx={{ display: "block", mt: 1 }}
+                        >
+                          {appointment.groupappointments?.length || 0}{" "}
+                          participants
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        {appointment.availability_schedules?.date
+                          ? dayjs(appointment.availability_schedules.date).format(
+                              "MMM D, YYYY"
                             )
-                        )}
-                      </div>
-                      <Typography
-                        variant="caption"
-                        color="text.secondary"
-                        sx={{ display: "block", mt: 1 }}
-                      >
-                        {appointment.groupappointments?.length || 0}{" "}
-                        participants
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      {appointment.availability_schedules?.date
-                        ? dayjs(appointment.availability_schedules.date).format(
-                            "MMM D, YYYY"
-                          )
-                        : "Not scheduled"}
-                    </TableCell>
-                    <TableCell>
-                      {appointment.availability_schedules?.start_time &&
-                      appointment.availability_schedules?.end_time
-                        ? `${appointment.availability_schedules.start_time.substring(
-                            0,
-                            5
-                          )} - ${appointment.availability_schedules.end_time.substring(
-                            0,
-                            5
-                          )}`
-                        : "Not scheduled"}
-                    </TableCell>
-                    <TableCell>
-                      <Chip
-                        label={appointment.category || "Uncategorized"}
-                        size="small"
-                        sx={{
-                          bgcolor:
-                            appointment.category === "Relationships"
-                              ? "#e0f2fe"
-                              : appointment.category === "Family"
-                              ? "#f0fdf4"
-                              : appointment.category === "Academic"
-                              ? "#fef3c7"
-                              : "#f3f4f6",
-                          color:
-                            appointment.category === "Relationships"
-                              ? "#0369a1"
-                              : appointment.category === "Family"
-                              ? "#15803d"
-                              : appointment.category === "Academic"
-                              ? "#b45309"
-                              : "#4b5563",
-                        }}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2">
-                        {appointment.reason || "No reason specified"}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Chip
-                        label={appointment.status}
-                        color={getStatusChipColor(appointment.status)}
-                        size="small"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex space-x-2">
-                        <Button
-                          variant="outlined"
+                          : "Not scheduled"}
+                      </TableCell>
+                      <TableCell>
+                        {appointment.availability_schedules?.start_time &&
+                        appointment.availability_schedules?.end_time
+                          ? `${dayjs(appointment.availability_schedules.start_time, 'HH:mm').format('hh:mm A')} - ${dayjs(appointment.availability_schedules.end_time, 'HH:mm').format('hh:mm A')}`
+                          : "Not scheduled"}
+                      </TableCell>
+                      <TableCell>
+                        <Chip
+                          label={appointment.category || "Uncategorized"}
                           size="small"
-                          disabled={appointment.status === "cancelled"}
-                          onClick={() => handleRescheduleGroup(appointment)}
                           sx={{
-                            borderColor: "#d1d5db",
-                            color: "#4b5563",
-                            "&:hover": {
-                              borderColor: "#9ca3af",
-                              backgroundColor: "rgba(156, 163, 175, 0.04)",
-                            },
+                            bgcolor:
+                              appointment.category === "Relationships"
+                                ? "#e0f2fe"
+                                : appointment.category === "Family"
+                                ? "#f0fdf4"
+                                : appointment.category === "Academic"
+                                ? "#fef3c7"
+                                : "#f3f4f6",
+                            color:
+                              appointment.category === "Relationships"
+                                ? "#0369a1"
+                                : appointment.category === "Family"
+                                ? "#15803d"
+                                : appointment.category === "Academic"
+                                ? "#b45309"
+                                : "#4b5563",
                           }}
-                        >
-                          Reschedule
-                        </Button>
-                        <Button
-                          variant="outlined"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2">
+                          {appointment.reason || "No reason specified"}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Chip
+                          label={appointment.status}
+                          color={getStatusChipColor(appointment.status)}
                           size="small"
-                          color="error"
-                          disabled={appointment.status === "cancelled"}
-                          onClick={() => handleCancelGroup(appointment)}
-                          sx={{
-                            "&.Mui-disabled": {
-                              borderColor: "#f3f4f6",
-                              color: "#9ca3af",
-                            },
-                          }}
-                        >
-                          Cancel
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex space-x-2">
+                          <Button
+                            variant="outlined"
+                            size="small"
+                            disabled={appointment.status === "cancelled"}
+                            onClick={() => handleRescheduleGroup(appointment)}
+                            sx={{
+                              borderColor: "#d1d5db",
+                              color: "#4b5563",
+                              "&:hover": {
+                                borderColor: "#9ca3af",
+                                backgroundColor: "rgba(156, 163, 175, 0.04)",
+                              },
+                            }}
+                          >
+                            Reschedule
+                          </Button>
+                          <Button
+                            variant="outlined"
+                            size="small"
+                            color="error"
+                            disabled={appointment.status === "cancelled"}
+                            onClick={() => handleCancelGroup(appointment)}
+                            sx={{
+                              "&.Mui-disabled": {
+                                borderColor: "#f3f4f6",
+                                color: "#9ca3af",
+                              },
+                            }}
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                  <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
                     <Box sx={{ textAlign: "center", py: 3 }}>
                       <svg
                         width="64"
@@ -631,6 +639,24 @@ export default function GroupAppointmentsManager() {
             </TableBody>
           </Table>
         </TableContainer>
+        {groupAppointments.length > 0 && (
+          <TablePagination
+            component="div"
+            count={groupAppointments.length}
+            page={page}
+            onPageChange={handleChangePage}
+            rowsPerPage={rowsPerPage}
+            onRowsPerPageChange={handleChangeRowsPerPage}
+            rowsPerPageOptions={[5, 10, 25]}
+            sx={{
+              bgcolor: '#f9fafb',
+              borderTop: '1px solid #e5e7eb',
+              '& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows': {
+                color: '#4b5563'
+              }
+            }}
+          />
+        )}
       </Paper>
 
       {/* Create Group Modal */}
