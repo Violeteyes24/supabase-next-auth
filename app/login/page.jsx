@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import LoadingButton from "../components/loading_button";
 
 export default function Auth() {
   const supabase = createClientComponentClient();
@@ -223,20 +224,18 @@ export default function Auth() {
           <div className="mt-6 text-center">
             <p className="text-gray-600 text-sm">
               Don't have an account?{" "}
-              <button
-                onClick={() => router.push("/register/counselor")}
-                disabled={loading}
+              <LoadingButton
+                href="/register/counselor"
                 className="text-green-600 hover:text-green-800 font-medium"
               >
                 Sign up as a counselor
-              </button>
-              <button
-                onClick={() => router.push("/register/secretary")}
-                disabled={loading}
+              </LoadingButton>
+              <LoadingButton 
+                href="/register/secretary"
                 className="text-green-600 hover:text-green-800 font-medium"
               >
                 or as a secretary
-              </button>
+              </LoadingButton>
             </p>
           </div>
         </div>

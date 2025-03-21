@@ -4,7 +4,7 @@ import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import React, { useState, useEffect } from 'react';
 import Sidebar from "../components/dashboard components/sidebar";
 import AppointmentCard from "../components/appointment components/appointment_card";
-import { Modal, Box, Button, TextField, IconButton, Switch, FormControlLabel } from '@mui/material';
+import { Modal, Box, Button, TextField, IconButton, Switch, FormControlLabel, Skeleton, Paper, Typography, Grid, Divider } from '@mui/material';
 import { DatePicker, TimePicker, LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs from 'dayjs';
@@ -39,6 +39,7 @@ export default function AppointmentPage() {
     const [session, setSession] = useState(null);
     const [completedAppointments, setCompletedAppointments] = useState([]);
     const [showGroupCompleted, setShowGroupCompleted] = useState(false);
+    const [loading, setLoading] = useState(true);
     
     // Get current time in local timezone
     const getCurrentTime = () => {
@@ -166,6 +167,7 @@ export default function AppointmentPage() {
 
     useEffect(() => {
       const getSession = async () => {
+        setLoading(true);
         const {
           data: { session },
         } = await supabase.auth.getSession();
@@ -174,9 +176,10 @@ export default function AppointmentPage() {
         // If user is logged in, check and complete expired appointments
         if (session?.user) {
           const userId = session.user.id;
-          checkAndCompleteAppointments(userId);
-          fetchCompletedAppointments(userId);
+          await checkAndCompleteAppointments(userId);
+          await fetchCompletedAppointments(userId);
         }
+        setLoading(false);
       };
       getSession();
     }, []);
@@ -536,6 +539,157 @@ export default function AppointmentPage() {
     const handleToggleCompleted = () => {
         setShowGroupCompleted(!showGroupCompleted);
     };
+
+    // Loading skeleton component with shimmer effect
+    const AppointmentSkeleton = () => (
+        <div className="bg-gray-100 min-h-screen flex">
+            <Box sx={{ width: 240, bgcolor: '#1E293B' }} /> {/* Sidebar placeholder */}
+            <div className="flex-1 p-6">
+                {/* Calendar navigation skeleton */}
+                <Paper 
+                    elevation={0} 
+                    sx={{ 
+                        p: 3, 
+                        mb: 4, 
+                        borderRadius: 2,
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
+                        position: 'relative',
+                        overflow: 'hidden'
+                    }}
+                >
+                    {/* Shimmer overlay */}
+                    <Box 
+                        sx={{ 
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            background: 'linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.8) 50%, rgba(255,255,255,0) 100%)',
+                            animation: 'shimmer 2s infinite',
+                            '@keyframes shimmer': {
+                                '0%': { transform: 'translateX(-100%)' },
+                                '100%': { transform: 'translateX(100%)' }
+                            },
+                            zIndex: 1
+                        }}
+                    />
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                        <Skeleton variant="text" width={200} height={40} />
+                        <Skeleton variant="rectangular" width={120} height={40} sx={{ borderRadius: 1 }} />
+                    </Box>
+                    <Box sx={{ display: 'flex', gap: 2, overflowX: 'auto', py: 2 }}>
+                        {[...Array(6)].map((_, i) => (
+                            <Skeleton 
+                                key={i} 
+                                variant="rectangular" 
+                                width={80} 
+                                height={90} 
+                                sx={{ borderRadius: 2, flexShrink: 0 }} 
+                            />
+                        ))}
+                    </Box>
+                </Paper>
+
+                {/* Appointments section skeleton */}
+                <Paper 
+                    elevation={0} 
+                    sx={{ 
+                        p: 3, 
+                        mb: 4, 
+                        borderRadius: 2,
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
+                        position: 'relative',
+                        overflow: 'hidden'
+                    }}
+                >
+                    {/* Shimmer overlay */}
+                    <Box 
+                        sx={{ 
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            background: 'linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.8) 50%, rgba(255,255,255,0) 100%)',
+                            animation: 'shimmer 2s infinite',
+                            '@keyframes shimmer': {
+                                '0%': { transform: 'translateX(-100%)' },
+                                '100%': { transform: 'translateX(100%)' }
+                            },
+                            zIndex: 1
+                        }}
+                    />
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                        <Skeleton variant="text" width={250} height={32} />
+                        <Skeleton variant="rectangular" width={150} height={40} sx={{ borderRadius: 1 }} />
+                    </Box>
+
+                    <Divider sx={{ my: 2 }} />
+
+                    {/* Time slots skeleton */}
+                    <Grid container spacing={3}>
+                        {[...Array(4)].map((_, index) => (
+                            <Grid item xs={12} md={6} lg={3} key={index}>
+                                <Skeleton 
+                                    variant="rectangular" 
+                                    height={140} 
+                                    sx={{ 
+                                        borderRadius: 2,
+                                        mb: 1
+                                    }} 
+                                />
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
+                                    <Skeleton variant="rectangular" width={70} height={30} sx={{ borderRadius: 1 }} />
+                                    <Skeleton variant="rectangular" width={70} height={30} sx={{ borderRadius: 1 }} />
+                                </Box>
+                            </Grid>
+                        ))}
+                    </Grid>
+                </Paper>
+
+                {/* Group appointments section skeleton */}
+                <Paper 
+                    elevation={0} 
+                    sx={{ 
+                        p: 3, 
+                        borderRadius: 2,
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
+                        position: 'relative',
+                        overflow: 'hidden'
+                    }}
+                >
+                    {/* Shimmer overlay */}
+                    <Box 
+                        sx={{ 
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            background: 'linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.8) 50%, rgba(255,255,255,0) 100%)',
+                            animation: 'shimmer 2s infinite',
+                            '@keyframes shimmer': {
+                                '0%': { transform: 'translateX(-100%)' },
+                                '100%': { transform: 'translateX(100%)' }
+                            },
+                            zIndex: 1
+                        }}
+                    />
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                        <Skeleton variant="text" width={230} height={32} />
+                        <Skeleton variant="rectangular" width={170} height={40} sx={{ borderRadius: 1 }} />
+                    </Box>
+
+                    <Skeleton variant="rectangular" height={300} sx={{ borderRadius: 2 }} />
+                </Paper>
+            </div>
+        </div>
+    );
+
+    if (loading) {
+        return <AppointmentSkeleton />;
+    }
 
     return (
         <LocalizationProvider dateAdapter={AdapterDayjs}>

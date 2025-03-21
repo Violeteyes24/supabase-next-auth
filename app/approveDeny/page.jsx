@@ -5,7 +5,8 @@ import React, { useState, useEffect } from 'react';
 import Sidebar from "../components/dashboard components/sidebar";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { useRouter } from 'next/navigation';
-import { Modal, Box, Button, FormControl, InputLabel, Select, MenuItem, Typography, Snackbar, Alert } from '@mui/material';
+import { Modal, Box, Button, FormControl, InputLabel, Select, MenuItem, Typography, Snackbar, Alert, Skeleton, Paper, Divider, Grid } from '@mui/material';
+import { CheckCircle, Cancel } from "@mui/icons-material";
 
 export default function ApproveDenyPage() {
     const router = useRouter();
@@ -45,34 +46,66 @@ export default function ApproveDenyPage() {
     }, []);
 
     useEffect(() => {
-        fetchRegistrants();
-        fetchCurrentUser();
-
-        const userChannel = supabase.channel('user-changes')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, (payload) => {
-                console.log("Realtime user change detected:", payload);
-                // Only refetch if it's not triggered by our own updates
-                if (payload.eventType !== 'UPDATE' || !payload.new || payload.new.approval_status === payload.old?.approval_status) {
-                    console.log("Refetching registrants due to external change");
-                    fetchRegistrants();
-                } else {
-                    console.log("Skipping refetch for our own update");
+        const fetchData = async () => {
+            try {
+                const { data: { user } } = await supabase.auth.getUser();
+                
+                if (user) {
+                    // Fetch registrants
+                    const { data: registrantsData, error: registrantsError } = await supabase
+                        .from("users")
+                        .select(`
+                            *,
+                            assignments(counselor_id, status)
+                        `)
+                        .eq("status", "pending");
+                        
+                    if (registrantsError) throw registrantsError;
+                        
+                    // Fetch counselors
+                    const { data: counselorsData, error: counselorsError } = await supabase
+                        .from("users")
+                        .select("*")
+                        .eq("user_type", "counselor");
+                        
+                    if (counselorsError) throw counselorsError;
+                    
+                    setRegistrants(registrantsData || []);
+                    setFilteredRegistrants(registrantsData || []);
+                    setCounselors(counselorsData || []);
+                    setLoading(false);
                 }
-            })
-            .subscribe();
-
-        const assignmentChannel = supabase.channel('assignment-changes')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'secretary_assignments' }, (payload) => {
-                console.log("Realtime assignment change detected:", payload);
-                fetchSecretaryAssignments();
-            })
-            .subscribe();
-
-        return () => {
-            supabase.removeChannel(userChannel);
-            supabase.removeChannel(assignmentChannel);
+            } catch (error) {
+                console.error("Error fetching data:", error.message);
+                setLoading(false);
+            }
         };
-    }, []);
+
+        fetchData();
+        
+        // Subscribe to real-time changes in users table
+        const usersSubscription = supabase
+            .channel("users-changes")
+            .on("postgres_changes", 
+                { event: "*", schema: "public", table: "users" },
+                () => fetchData()
+            )
+            .subscribe();
+            
+        // Subscribe to real-time changes in assignments table
+        const assignmentsSubscription = supabase
+            .channel("assignments-changes")
+            .on("postgres_changes", 
+                { event: "*", schema: "public", table: "assignments" },
+                () => fetchData()
+            )
+            .subscribe();
+            
+        return () => {
+            usersSubscription.unsubscribe();
+            assignmentsSubscription.unsubscribe();
+        };
+    }, [supabase]);
 
     // Effect for filtering registrants based on search and user type
     useEffect(() => {
@@ -149,42 +182,6 @@ export default function ApproveDenyPage() {
             }
             
             setCounselorAssignments(assignmentsMap);
-        }
-    };
-
-    const fetchRegistrants = async () => {
-        setLoading(true);
-        try {
-            const { data, error } = await supabase
-                .from("users")
-                .select("user_id, name, credentials, department_assigned, short_biography, user_type, approval_status, profile_image_url")
-                .in("user_type", ["counselor", "secretary", "student"])
-                .not("is_director", "eq", true);
-
-            console.log("Fetched registrants:", data);
-            
-            if (error) {
-                console.error("Fetch registrants error:", error.message, error.details, error.hint);
-                return; // Don't update state on error
-            }
-            
-            if (!data || data.length === 0) {
-                console.log("No registrants found or empty data returned");
-                setRegistrants([]);
-                setFilteredRegistrants([]);
-            } else {
-                console.log("Setting registrants state with length:", data.length);
-                // Create copies of the arrays to ensure new references
-                const registrantsCopy = [...data];
-                setRegistrants(registrantsCopy);
-                setFilteredRegistrants(registrantsCopy);
-                console.log("Set registrants state:", registrantsCopy.length);
-                console.log("Set filteredRegistrants state:", registrantsCopy.length);
-            }
-        } catch (err) {
-            console.error("Unexpected error in fetchRegistrants:", err);
-        } finally {
-            setLoading(false);
         }
     };
 
@@ -401,6 +398,54 @@ export default function ApproveDenyPage() {
 
     // Check if the current user is a counselor
     const isCurrentUserCounselor = currentUser?.user_type === 'counselor';
+
+    // Loading skeleton component with shimmer effect
+    const ApproveDenySkeleton = () => (
+        <div className="flex h-screen bg-gray-100">
+            <div className="w-64 bg-gray-800" /> {/* Sidebar placeholder */}
+            <div className="flex-1 p-6 relative overflow-hidden">
+                {/* Shimmer overlay */}
+                <Box 
+                    sx={{ 
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        background: 'linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.8) 50%, rgba(255,255,255,0) 100%)',
+                        animation: 'shimmer 2s infinite',
+                        '@keyframes shimmer': {
+                            '0%': { transform: 'translateX(-100%)' },
+                            '100%': { transform: 'translateX(100%)' }
+                        },
+                        zIndex: 10
+                    }}
+                />
+                
+                {/* Header */}
+                <div className="mb-6">
+                    <Skeleton variant="text" width={300} height={40} />
+                    <Skeleton variant="text" width={200} height={24} sx={{ mt: 1 }} />
+                </div>
+                
+                {/* Search and filter */}
+                <div className="mb-6 flex">
+                    <Skeleton variant="rectangular" width={250} height={56} sx={{ borderRadius: 1, mr: 2 }} />
+                    <Skeleton variant="rectangular" width={250} height={56} sx={{ borderRadius: 1 }} />
+                </div>
+                
+                {/* Table */}
+                <Skeleton variant="rectangular" width="100%" height={60} sx={{ borderRadius: '4px 4px 0 0' }} />
+                {[...Array(5)].map((_, i) => (
+                    <Skeleton key={i} variant="rectangular" width="100%" height={52} />
+                ))}
+            </div>
+        </div>
+    );
+
+    if (loading) {
+        return <ApproveDenySkeleton />;
+    }
 
     return (
         <div className="flex min-h-screen bg-gray-50">

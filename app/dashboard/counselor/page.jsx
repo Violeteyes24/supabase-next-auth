@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Container, Grid, Box, Paper, Typography, Avatar, Chip } from '@mui/material';
+import { Container, Grid, Box, Paper, Typography, Avatar, Chip, Skeleton } from '@mui/material';
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { useRouter } from "next/navigation";
 
@@ -20,43 +20,26 @@ export default function CounselorPage() {
     const [activeCounselors, setActiveCounselors] = useState(0);
     const [averageMoodScore, setAverageMoodScore] = useState(0);
     const [chartData, setChartData] = useState([]);
+    const [loading, setLoading] = useState(true);
     const router = useRouter();
 
     useEffect(() => {
-        async function getUser() {
+        async function loadData() {
             try {
-                const { data: { user }, error: userError } = await supabase.auth.getUser();
-                
-                if (userError) {
-                    console.error('Error fetching user:', userError);
-                    return;
-                }
-
-                if (user) {
-                    const { data: profile, error: profileError } = await supabase
-                        .from('users')
-                        .select('name, profile_image_url, user_type')
-                        .eq('user_id', user.id)
-                        .single();
-
-                    if (profileError) {
-                        console.error('Error fetching profile:', profileError);
-                        return;
-                    }
-
-                    setUserName(profile?.name || '');
-                    setProfileImageUrl(profile?.profile_image_url || '');
-                    setUserType(profile?.user_type || '');
-                }
+                await Promise.all([
+                    getUser(),
+                    fetchUsers(),
+                    fetchAppointments(),
+                    fetchMoodScores()
+                ]);
+                setLoading(false);
             } catch (err) {
-                console.error('Unexpected error fetching user:', err);
+                console.error('Error loading dashboard data:', err);
+                setLoading(false);
             }
         }
 
-        getUser();
-        fetchUsers();
-        fetchAppointments();
-        fetchMoodScores();
+        loadData();
 
         // Set up realtime subscriptions
         const userChannel = supabase.channel('user-changes')
@@ -83,6 +66,36 @@ export default function CounselorPage() {
             supabase.removeChannel(moodChannel);
         };
     }, []);
+
+    async function getUser() {
+        try {
+            const { data: { user }, error: userError } = await supabase.auth.getUser();
+            
+            if (userError) {
+                console.error('Error fetching user:', userError);
+                return;
+            }
+
+            if (user) {
+                const { data: profile, error: profileError } = await supabase
+                    .from('users')
+                    .select('name, profile_image_url, user_type')
+                    .eq('user_id', user.id)
+                    .single();
+
+                if (profileError) {
+                    console.error('Error fetching profile:', profileError);
+                    return;
+                }
+
+                setUserName(profile?.name || '');
+                setProfileImageUrl(profile?.profile_image_url || '');
+                setUserType(profile?.user_type || '');
+            }
+        } catch (err) {
+            console.error('Unexpected error fetching user:', err);
+        }
+    }
 
     async function fetchUsers() {
         const { data: users, error } = await supabase.from('users').select('*');
@@ -181,6 +194,170 @@ export default function CounselorPage() {
     };
 
     const chipColor = getUserChipColor(userType);
+
+    // Loading skeleton component with shimmer effect
+    const LoadingSkeleton = () => (
+        <Box className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 flex">
+            <Box sx={{ width: 240, bgcolor: '#1E293B' }} /> {/* Sidebar placeholder */}
+            <Box
+                component="main"
+                sx={{
+                    flexGrow: 1,
+                    overflow: 'auto',
+                    px: 3,
+                    pt: 4,
+                    pb: 6,
+                }}
+            >
+                <Container maxWidth="lg">
+                    {/* Header skeleton */}
+                    <Box className="text-center mb-8">
+                        <Skeleton 
+                            variant="text" 
+                            width={300} 
+                            height={60} 
+                            sx={{ 
+                                mx: 'auto',
+                                animation: 'pulse 1.5s ease-in-out 0.5s infinite',
+                                '@keyframes pulse': {
+                                    '0%': { opacity: 0.6 },
+                                    '50%': { opacity: 1 },
+                                    '100%': { opacity: 0.6 }
+                                }
+                            }} 
+                        />
+                        <Skeleton 
+                            variant="text" 
+                            width={220} 
+                            height={30} 
+                            sx={{ mx: 'auto', mt: 1 }} 
+                        />
+                    </Box>
+
+                    {/* KPI Section skeleton */}
+                    <Box className="mb-8">
+                        <Grid container spacing={3}>
+                            {[1, 2, 3, 4].map((item) => (
+                                <Grid item xs={12} md={3} key={item}>
+                                    <Paper 
+                                        elevation={0} 
+                                        sx={{ 
+                                            p: 3, 
+                                            borderRadius: 3,
+                                            boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
+                                            height: 120,
+                                            overflow: 'hidden',
+                                            position: 'relative',
+                                        }}
+                                    >
+                                        <Box 
+                                            sx={{ 
+                                                position: 'absolute',
+                                                top: 0,
+                                                left: 0,
+                                                right: 0,
+                                                bottom: 0,
+                                                background: 'linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.8) 50%, rgba(255,255,255,0) 100%)',
+                                                animation: 'shimmer 2s infinite',
+                                                '@keyframes shimmer': {
+                                                    '0%': { transform: 'translateX(-100%)' },
+                                                    '100%': { transform: 'translateX(100%)' }
+                                                }
+                                            }}
+                                        />
+                                        <Skeleton variant="circular" width={40} height={40} sx={{ mb: 1 }} />
+                                        <Skeleton variant="text" width="60%" height={24} sx={{ mb: 1 }} />
+                                        <Skeleton variant="text" width="40%" height={30} />
+                                    </Paper>
+                                </Grid>
+                            ))}
+                        </Grid>
+                    </Box>
+
+                    {/* Main Content skeletons */}
+                    <Grid container spacing={4}>
+                        <Grid item xs={12} md={6}>
+                            <Paper 
+                                elevation={0} 
+                                sx={{ 
+                                    borderRadius: 3,
+                                    boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
+                                    height: 400,
+                                    overflow: 'hidden',
+                                    position: 'relative',
+                                }}
+                            >
+                                <Box 
+                                    sx={{ 
+                                        position: 'absolute',
+                                        top: 0,
+                                        left: 0,
+                                        right: 0,
+                                        bottom: 0,
+                                        background: 'linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.8) 50%, rgba(255,255,255,0) 100%)',
+                                        animation: 'shimmer 2s infinite',
+                                        '@keyframes shimmer': {
+                                            '0%': { transform: 'translateX(-100%)' },
+                                            '100%': { transform: 'translateX(100%)' }
+                                        }
+                                    }}
+                                />
+                                <Box sx={{ p: 3, backgroundColor: '#f8fafc' }}>
+                                    <Skeleton variant="text" width={200} height={32} />
+                                    <Skeleton variant="text" width={150} height={20} />
+                                </Box>
+                                <Box sx={{ p: 3 }}>
+                                    <Skeleton variant="rectangular" height={150} sx={{ borderRadius: 2, mb: 2 }} />
+                                    <Skeleton variant="text" width="90%" />
+                                    <Skeleton variant="text" width="70%" />
+                                    <Skeleton variant="text" width="40%" />
+                                </Box>
+                            </Paper>
+                        </Grid>
+                        <Grid item xs={12} md={6}>
+                            <Paper 
+                                elevation={0} 
+                                sx={{ 
+                                    borderRadius: 3,
+                                    boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
+                                    height: 400,
+                                    overflow: 'hidden',
+                                    position: 'relative',
+                                }}
+                            >
+                                <Box 
+                                    sx={{ 
+                                        position: 'absolute',
+                                        top: 0,
+                                        left: 0,
+                                        right: 0,
+                                        bottom: 0,
+                                        background: 'linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.8) 50%, rgba(255,255,255,0) 100%)',
+                                        animation: 'shimmer 2s infinite',
+                                        '@keyframes shimmer': {
+                                            '0%': { transform: 'translateX(-100%)' },
+                                            '100%': { transform: 'translateX(100%)' }
+                                        }
+                                    }}
+                                />
+                                <Box sx={{ p: 3, backgroundColor: '#f8fafc' }}>
+                                    <Skeleton variant="text" width={200} height={32} />
+                                    <Skeleton variant="text" width={150} height={20} />
+                                </Box>
+                                <Box sx={{ p: 3 }}>
+                                    <Skeleton variant="rectangular" height={230} sx={{ borderRadius: 2 }} />
+                                </Box>
+                            </Paper>
+                        </Grid>
+                    </Grid>
+                </Container>
+            </Box>
+        </Box>
+    );
+
+    if (loading) {
+        return <LoadingSkeleton />;
+    }
 
     return (
         <Box className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 flex">

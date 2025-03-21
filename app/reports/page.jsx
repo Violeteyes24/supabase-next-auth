@@ -1,7 +1,7 @@
 'use client';
 
-import React from 'react';
-import { Container, Grid, Paper, Button } from '@mui/material';
+import React, { useState, useEffect } from 'react';
+import { Container, Grid, Paper, Button, Skeleton } from '@mui/material';
 import DownloadIcon from '@mui/icons-material/Download';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
@@ -22,6 +22,16 @@ const DepartmentAppointmentChart = dynamic(() => import('../components/report co
 export default function ReportsPage() {
     const router = useRouter();
     const supabase = createClientComponentClient();
+    const [loading, setLoading] = useState(true);
+    
+    useEffect(() => {
+        // Simulate loading time for dynamic components
+        const timer = setTimeout(() => {
+            setLoading(false);
+        }, 1500);
+        
+        return () => clearTimeout(timer);
+    }, []);
     
     const handleLogout = async () => {
         const { error } = await supabase.auth.signOut();
@@ -138,6 +148,114 @@ export default function ReportsPage() {
             color: '#451a03'
         }
     ];
+
+    // Loading skeleton component with shimmer effect
+    const ReportsSkeleton = () => (
+        <main className="min-h-screen flex bg-gradient-to-br from-gray-50 to-gray-100">
+            <div className="w-64 bg-gray-800" /> {/* Sidebar placeholder */}
+            <div className="flex-1 overflow-auto py-8 px-4">
+                <Container maxWidth="xl">
+                    <div className="mb-10 text-center">
+                        <Skeleton 
+                            variant="text" 
+                            width={300} 
+                            height={60} 
+                            sx={{ 
+                                mx: 'auto',
+                                animation: 'pulse 1.5s ease-in-out 0.5s infinite',
+                                '@keyframes pulse': {
+                                    '0%': { opacity: 0.6 },
+                                    '50%': { opacity: 1 },
+                                    '100%': { opacity: 0.6 }
+                                }
+                            }} 
+                        />
+                        <Skeleton variant="text" width={250} height={24} sx={{ mx: 'auto', mt: 1 }} />
+                        <Skeleton 
+                            variant="rectangular" 
+                            width={200} 
+                            height={40} 
+                            sx={{ 
+                                mx: 'auto', 
+                                mt: 3,
+                                borderRadius: 1
+                            }} 
+                        />
+                    </div>
+                
+                    <Grid container spacing={4}>
+                        {[...Array(6)].map((_, index) => (
+                            <Grid item xs={12} md={6} lg={4} key={index}>
+                                <Paper 
+                                    elevation={0}
+                                    sx={{ 
+                                        position: 'relative',
+                                        padding: { xs: '16px', md: '24px' }, 
+                                        borderRadius: '24px',
+                                        height: 300,
+                                        background: cardStyles[index].backgroundColor,
+                                        color: cardStyles[index].color,
+                                        boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05)',
+                                        overflow: 'hidden'
+                                    }}
+                                >
+                                    {/* Shimmer overlay */}
+                                    <div 
+                                        style={{ 
+                                            position: 'absolute',
+                                            top: 0,
+                                            left: 0,
+                                            right: 0,
+                                            bottom: 0,
+                                            background: 'linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.3) 50%, rgba(255,255,255,0) 100%)',
+                                            animation: 'shimmer 2s infinite',
+                                            zIndex: 10
+                                        }}
+                                    />
+
+                                    <div className="flex flex-col h-full">
+                                        <div className="flex-1 flex items-center justify-center">
+                                            <Skeleton 
+                                                variant="rectangular" 
+                                                width="100%" 
+                                                height={160} 
+                                                sx={{ 
+                                                    bgcolor: 'rgba(255,255,255,0.1)', 
+                                                    borderRadius: 2,
+                                                }}
+                                            />
+                                        </div>
+                                        <div className="mt-6">
+                                            <Skeleton 
+                                                variant="text" 
+                                                width="60%" 
+                                                height={32} 
+                                                sx={{ bgcolor: 'rgba(255,255,255,0.1)' }} 
+                                            />
+                                            <Skeleton 
+                                                variant="text" 
+                                                width="80%" 
+                                                height={20} 
+                                                sx={{ bgcolor: 'rgba(255,255,255,0.1)', mt: 1 }} 
+                                            />
+                                        </div>
+                                    </div>
+                                </Paper>
+                            </Grid>
+                        ))}
+                    </Grid>
+                    
+                    <div className="mt-16 text-center text-gray-500 text-sm">
+                        <Skeleton variant="text" width={240} height={16} sx={{ mx: 'auto' }} />
+                    </div>
+                </Container>
+            </div>
+        </main>
+    );
+
+    if (loading) {
+        return <ReportsSkeleton />;
+    }
 
     return (
         <main className="min-h-screen flex bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900">

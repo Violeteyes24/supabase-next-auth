@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import Sidebar from "../components/dashboard components/sidebar";
 import { FaPlus, FaEdit, FaTrash, FaPaperPlane, FaBell, FaRegStickyNote } from 'react-icons/fa';
-import { Switch, Snackbar, Alert, Badge } from '@mui/material';
+import { Switch, Snackbar, Alert, Badge, TextField, Button, Card, Typography, Chip, IconButton, Divider, CardContent, Box, Skeleton } from '@mui/material';
 import { useRouter } from 'next/navigation';
 
 export default function NotificationsPage() {
@@ -25,141 +25,78 @@ export default function NotificationsPage() {
         message: '',
         severity: 'info' // 'error', 'warning', 'info', 'success'
     });
+    const [loading, setLoading] = useState(true);
+    const [isSaving, setIsSaving] = useState(false);
 
     useEffect(() => {
         const fetchNotifications = async () => {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (!session) {
-                console.error("No session found");
-                return;
-            }
+            try {
+                // Get current user
+                const { data: { user } } = await supabase.auth.getUser();
+                if (user) {
+                    // Fetch notifications
+                    const { data: notificationsData, error: notificationsError } = await supabase
+                        .from('notifications')
+                        .select(`
+                            *,
+                            items: notification_receivers!inner(*)
+                        `)
+                        .eq('items.user_id', user.id);
 
-            const userId = session.user.id;
+                    if (notificationsError) throw notificationsError;
 
-            const { data: sentNotifications, error: sentError } = await supabase
-                .from("notifications")
-                .select(`
-                    notification_id,
-                    user_id,
-                    notification_content,
-                    sent_at,
-                    status,
-                    target_group, 
-                    users (name)
-                `)
-                .eq("status", "sent")
-                .eq("user_id", userId)
-                .order("sent_at", { ascending: false });
+                    // Fetch drafts
+                    const { data: draftsData, error: draftsError } = await supabase
+                        .from('notification_drafts')
+                        .select('*')
+                        .eq('created_by', user.id);
 
-            const { data: draftNotifications, error: draftError } = await supabase
-                .from("notifications")
-                .select(`
-                    notification_id,
-                    user_id,
-                    notification_content,
-                    sent_at,
-                    status,
-                    target_group, 
-                    users (name)
-                `)
-                .eq("status", "draft")
-                .eq("user_id", userId);
+                    if (draftsError) throw draftsError;
 
-            if (sentError || draftError) {
-                console.error("Error fetching notifications:", sentError || draftError);
-            } else {
-                setNotifications(groupByMessage(sentNotifications || []));
-                setDrafts(groupByMessage(draftNotifications || []));
+                    // Fetch users for the dropdown
+                    const { data: usersData, error: usersError } = await supabase
+                        .from('users')
+                        .select('id, name');
+
+                    if (usersError) throw usersError;
+
+                    // Set state with fetched data
+                    setNotifications(notificationsData || []);
+                    setDrafts(draftsData || []);
+                    setUsers(usersData || []);
+                    setLoading(false);
+                }
+            } catch (error) {
+                console.error('Error fetching data:', error);
+                setAlert({
+                    show: true,
+                    message: 'Failed to load data: ' + error.message,
+                    type: 'error'
+                });
+                setLoading(false);
             }
         };
 
         fetchNotifications();
-        fetchUsers();
 
-        const notificationSubscription = supabase
-            .channel("realtime-notifications")
+        // Set up real-time subscription for notifications
+        const notificationsSubscription = supabase
+            .channel('notifications-changes')
             .on(
-                "postgres_changes",
-                { event: "INSERT", schema: "public", table: "notifications" },
-                (payload) => {
-                    setNotifications((prevNotifications) => [
-                        { ...payload.new },
-                        ...prevNotifications,
-                    ]);
-                }
+                'postgres_changes',
+                {
+                    event: '*',
+                    schema: 'public',
+                    table: 'notifications'
+                },
+                () => fetchNotifications()
             )
             .subscribe();
 
-        // Modified appointment cancellation subscription
-        let appointmentSubscription;
-        (async () => {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (!session) {
-                console.error("No session found for appointment subscription");
-                return;
-            }
-            const currentUserId = session.user.id;
-            appointmentSubscription = supabase
-                .channel("realtime-appointments")
-                .on(
-                    "postgres_changes",
-                    {
-                        event: "UPDATE",
-                        schema: "public",
-                        table: "appointments",
-                        filter: `status=eq.cancelled`
-                    },
-                    async (payload) => {
-                        if (payload.new.user_id === currentUserId) {
-                            // Get the name of the person who cancelled
-                            const { data: cancellerData, error: cancellerError } = await supabase
-                                .from("users")
-                                .select("name")
-                                .eq("user_id", payload.new.counselor_id)
-                                .single();
-                            console.log("canceller: ", data)
-                            const cancellerName = cancellerError ? "Unknown" : cancellerData.name;
-                            const message = `Your appointment has been cancelled by ${cancellerName}`;
-                            
-                            showAlert(message, "warning");
-                            
-                            // Add a system notification to the list
-                            const systemNotification = {
-                                message: message,
-                                items: [{
-                                    notification_id: "system-" + new Date().getTime(),
-                                    target_group: "system",
-                                    sent_at: new Date().toISOString(),
-                                    sender: "System"
-                                }]
-                            };
-                            
-                            setNotifications(prev => [systemNotification, ...prev]);
-                        }
-                    }
-                )
-                .subscribe();
-        })();
-
         return () => {
-            supabase.removeChannel(notificationSubscription);
-            if (appointmentSubscription) {
-                supabase.removeChannel(appointmentSubscription);
-            }
+            notificationsSubscription.unsubscribe();
         };
-    }, [users]);
-
-    const fetchUsers = async () => {
-        const { data, error } = await supabase
-            .from("users")
-            .select("user_id, name, user_type");
-
-        if (error) {
-            console.error("Error fetching users:", error);
-        } else {
-            setUsers(data || []);
-        }
-    };
+    }, [supabase]);
 
     const showAlert = (message, severity = 'info') => {
         setAlert({
@@ -306,6 +243,73 @@ export default function NotificationsPage() {
         }
         return notification.items[0].users?.name || 'Unknown';
     };
+
+    // Loading skeleton component with shimmer effect
+    const NotificationsSkeleton = () => (
+        <div className="flex h-screen bg-gray-100">
+            {/* Sidebar skeleton */}
+            <div className="w-64 bg-gray-800" />
+            
+            <div className="flex-1 p-6 relative overflow-hidden">
+                {/* Shimmer overlay */}
+                <Box 
+                    sx={{ 
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        background: 'linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.8) 50%, rgba(255,255,255,0) 100%)',
+                        animation: 'shimmer 2s infinite',
+                        '@keyframes shimmer': {
+                            '0%': { transform: 'translateX(-100%)' },
+                            '100%': { transform: 'translateX(100%)' }
+                        },
+                        zIndex: 10
+                    }}
+                />
+                
+                {/* Header */}
+                <div className="mb-6">
+                    <Skeleton variant="text" width={300} height={40} />
+                    <Skeleton variant="text" width={200} height={24} sx={{ mt: 1 }} />
+                </div>
+                
+                {/* Form area */}
+                <div className="mb-8">
+                    <Skeleton variant="rectangular" width="100%" height={60} sx={{ borderRadius: 1, mb: 2 }} />
+                    <Skeleton variant="rectangular" width="100%" height={150} sx={{ borderRadius: 1, mb: 2 }} />
+                    <div className="flex justify-between">
+                        <Skeleton variant="rectangular" width={120} height={40} sx={{ borderRadius: 20 }} />
+                        <Skeleton variant="rectangular" width={120} height={40} sx={{ borderRadius: 20 }} />
+                    </div>
+                </div>
+                
+                {/* Tabs */}
+                <div className="flex mb-4">
+                    <Skeleton variant="rectangular" width={140} height={36} sx={{ borderRadius: 20, mr: 2 }} />
+                    <Skeleton variant="rectangular" width={140} height={36} sx={{ borderRadius: 20 }} />
+                </div>
+                
+                {/* Notification cards */}
+                <div className="space-y-4">
+                    {[...Array(3)].map((_, i) => (
+                        <Skeleton 
+                            key={i}
+                            variant="rectangular" 
+                            width="100%" 
+                            height={150} 
+                            sx={{ borderRadius: 2 }} 
+                        />
+                    ))}
+                </div>
+            </div>
+        </div>
+    );
+
+    if (loading) {
+        return <NotificationsSkeleton />;
+    }
 
     return (
         <div className="flex h-screen bg-gray-50">
