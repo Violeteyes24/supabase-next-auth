@@ -91,7 +91,7 @@ export default function AppointmentPage() {
         // Identify expired appointments
         const expiredAppointments = appointments.filter(apt => {
           if (!apt.availability_schedules) return false;
-          
+          if (apt.status === 'cancelled') return false; // skip cancelled appointments
           const aptDate = apt.availability_schedules.date;
           const endTime = apt.availability_schedules.end_time;
           
@@ -138,7 +138,7 @@ export default function AppointmentPage() {
         // Identify expired group appointments
         const expiredGroupAppointments = groupAppointments.filter(apt => {
           if (!apt.availability_schedules) return false;
-          
+          if (apt.status === 'cancelled') return false; // skip cancelled group appointments
           const aptDate = apt.availability_schedules.date;
           const endTime = apt.availability_schedules.end_time;
           
