@@ -37,41 +37,44 @@ export default function NotificationsPage() {
                     // Fetch notifications
                     const { data: notificationsData, error: notificationsError } = await supabase
                         .from('notifications')
-                        .select(`
-                            *,
-                            items: notification_receivers!inner(*)
-                        `)
-                        .eq('items.user_id', user.id);
+                        .select('*')
+                        .eq('status', 'sent')
+                        .order('sent_at', { ascending: false });
 
                     if (notificationsError) throw notificationsError;
 
                     // Fetch drafts
                     const { data: draftsData, error: draftsError } = await supabase
-                        .from('notification_drafts')
+                        .from('notifications')
                         .select('*')
-                        .eq('created_by', user.id);
+                        .eq('status', 'draft')
+                        .eq('user_id', user.id)
+                        .order('sent_at', { ascending: false });
 
                     if (draftsError) throw draftsError;
 
                     // Fetch users for the dropdown
                     const { data: usersData, error: usersError } = await supabase
                         .from('users')
-                        .select('id, name');
+                        .select('user_id, name, user_type');
 
                     if (usersError) throw usersError;
 
+                    // Process notifications to group by message
+                    const processedNotifications = groupByMessage(notificationsData || []);
+                    
                     // Set state with fetched data
-                    setNotifications(notificationsData || []);
-                    setDrafts(draftsData || []);
+                    setNotifications(processedNotifications || []);
+                    setDrafts(groupByMessage(draftsData || []));
                     setUsers(usersData || []);
                     setLoading(false);
                 }
             } catch (error) {
                 console.error('Error fetching data:', error);
                 setAlert({
-                    show: true,
+                    open: true,
                     message: 'Failed to load data: ' + error.message,
-                    type: 'error'
+                    severity: 'error'
                 });
                 setLoading(false);
             }
@@ -116,22 +119,28 @@ export default function NotificationsPage() {
             return;
         }
 
-        let targetUsers = [];
-        switch (targetGroup) {
-            case 'all': targetUsers = users; break;
-            case 'counselors': targetUsers = users.filter(user => user.user_type === 'counselor'); break;
-            case 'secretaries': targetUsers = users.filter(user => user.user_type === 'secretary'); break;
-            case 'counselors_and_secretaries': targetUsers = users.filter(user => user.user_type === 'counselor' || user.user_type === 'secretary'); break;
-            case 'students': targetUsers = users.filter(user => user.user_type === 'student'); break;
-            default: targetUsers = [];
-        }
-
-        if (targetUsers.length === 0) {
-            showAlert(`No ${targetGroup} found to send notification to`, 'warning');
-            return;
-        }
-
         try {
+            // Get current user
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error("User not authenticated");
+
+            // Filter target users based on targetGroup
+            let targetUsers = [];
+            switch (targetGroup) {
+                case 'all': targetUsers = users; break;
+                case 'counselors': targetUsers = users.filter(user => user.user_type === 'counselor'); break;
+                case 'secretaries': targetUsers = users.filter(user => user.user_type === 'secretary'); break;
+                case 'counselors_and_secretaries': targetUsers = users.filter(user => user.user_type === 'counselor' || user.user_type === 'secretary'); break;
+                case 'students': targetUsers = users.filter(user => user.user_type === 'student'); break;
+                default: targetUsers = [];
+            }
+
+            if (targetUsers.length === 0) {
+                showAlert(`No ${targetGroup} found to send notification to`, 'warning');
+                return;
+            }
+
+            // Create notifications for each target user
             const notificationsToInsert = targetUsers.map(user => ({
                 user_id: user.user_id,
                 notification_content: notificationContent,

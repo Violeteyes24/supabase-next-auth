@@ -15,6 +15,7 @@ import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
+import { FaBell } from 'react-icons/fa';
 
 export default function AppointmentPage() {
     const router = useRouter();
@@ -43,6 +44,8 @@ export default function AppointmentPage() {
     const [completedLoading, setCompletedLoading] = useState(false);
     const [completedPage, setCompletedPage] = useState(1);
     const [completedRowsPerPage] = useState(5);
+    const [cancelledAppointments, setCancelledAppointments] = useState([]);
+    const [showNotifications, setShowNotifications] = useState(false);
     
     // Get current time in local timezone
     const getCurrentTime = () => {
@@ -82,7 +85,7 @@ export default function AppointmentPage() {
           .eq('counselor_id', userId)
           .neq('status', 'completed')
           .order('availability_schedule_id');
-          debugger;
+        //   debugger;
         if (aptError) {
           console.error('Error fetching appointments:', aptError);
           return;
@@ -128,7 +131,7 @@ export default function AppointmentPage() {
           .neq('status', 'completed')
           .order('availability_schedule_id');
           
-          debugger;
+        //   debugger;
           
         if (groupAptError) {
           console.error('Error fetching group appointments:', groupAptError);
@@ -723,6 +726,131 @@ export default function AppointmentPage() {
         setCompletedPage(value);
     };
 
+    // Add this effect to fetch cancelled appointments
+    useEffect(() => {
+        const fetchCancelledAppointments = async () => {
+            if (!session) return;
+            
+            try {
+                // Fetch cancelled appointments where this user is the counselor
+                const { data, error } = await supabase
+                    .from('appointments')
+                    .select(`
+                        appointment_id,
+                        user_id,
+                        reason,
+                        status,
+                        appointment_type,
+                        availability_schedules (
+                            date,
+                            start_time,
+                            end_time
+                        ),
+                        users!appointments_user_id_fkey (
+                            name
+                        )
+                    `)
+                    .eq('status', 'cancelled')
+                    .eq('counselor_id', session.user.id)
+                    .order('availability_schedules(date)', { ascending: false })
+                    .limit(5);
+
+                if (error) {
+                    console.error("Error fetching cancelled appointments:", error);
+                } else {
+                    setCancelledAppointments(data || []);
+                }
+            } catch (error) {
+                console.error("Error in fetchCancelledAppointments:", error);
+            }
+        };
+
+        if (session) {
+            fetchCancelledAppointments();
+            
+            // Set up real-time subscription for appointment cancellations
+            const appointmentChannel = supabase.channel('appointment-cancellations')
+                .on('postgres_changes', 
+                    { 
+                        event: 'UPDATE', 
+                        schema: 'public', 
+                        table: 'appointments',
+                        filter: `counselor_id=eq.${session.user.id} AND status=eq.cancelled`
+                    }, 
+                    () => {
+                        fetchCancelledAppointments();
+                    }
+                )
+                .subscribe();
+
+            return () => {
+                supabase.removeChannel(appointmentChannel);
+            };
+        }
+    }, [session, supabase]);
+
+    // Replace the CounselorNotifications function with a render function
+    const renderCancelledAppointmentsNotifications = () => {
+        if (cancelledAppointments.length === 0) {
+            return null; // Don't show anything if there are no cancelled appointments
+        }
+
+        return (
+            <div className="bg-white rounded-lg shadow-md overflow-hidden mb-6">
+                <div className="bg-red-50 p-4 border-b border-red-100 flex justify-between items-center">
+                    <div className="flex items-center">
+                        <FaBell className="text-red-500 mr-2" />
+                        <h3 className="font-bold text-gray-800">Recent Appointment Cancellations</h3>
+                    </div>
+                    <button 
+                        onClick={() => setShowNotifications(!showNotifications)}
+                        className="text-sm text-blue-600 hover:underline"
+                    >
+                        {showNotifications ? 'Hide' : 'Show'}
+                    </button>
+                </div>
+                
+                {showNotifications && (
+                    <div className="p-4">
+                        <div className="space-y-4">
+                            {cancelledAppointments.map((appointment) => (
+                                <div 
+                                    key={appointment.appointment_id} 
+                                    className="border-l-4 border-red-500 pl-3 py-2"
+                                >
+                                    <div className="flex justify-between">
+                                        <div className="font-medium">{appointment.users.name}</div>
+                                        <div className="text-sm text-gray-500">
+                                            {appointment.availability_schedules?.date ? 
+                                                dayjs(appointment.availability_schedules.date).format('MMM D, YYYY') : 
+                                                'No date'
+                                            }
+                                        </div>
+                                    </div>
+                                    <div className="text-sm">
+                                        <span className="text-gray-600">Appointment Type:</span> {appointment.appointment_type || "Consultation"}
+                                    </div>
+                                    <div className="text-sm">
+                                        <span className="text-gray-600">Scheduled for:</span> {appointment.availability_schedules?.date ? 
+                                            `${dayjs(appointment.availability_schedules.date).format('MMM D, YYYY')} at 
+                                            ${formatTime(appointment.availability_schedules.start_time)} - 
+                                            ${formatTime(appointment.availability_schedules.end_time)}` : 
+                                            'Not scheduled'}
+                                    </div>
+                                    {/* {appointment.reason && (
+                                        <div className="text-sm mt-1">
+                                            <span className="text-gray-600">Reason:</span> {appointment.reason}
+                                        </div>
+                                    )} */}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+            </div>
+        );
+    };
+
     if (loading) {
         return <AppointmentSkeleton />;
     }
@@ -738,6 +866,11 @@ export default function AppointmentPage() {
                     {/* Header */}
                     <div className="bg-white shadow-sm px-6 py-4 sticky top-0 z-10">
                         <h1 className="text-2xl font-bold text-emerald-700">Appointment Management</h1>
+                    </div>
+
+                    {/* Add the cancelled appointments notifications here */}
+                    <div className="px-6 mt-4">
+                        {renderCancelledAppointmentsNotifications()}
                     </div>
 
                     {/* Calendar UI */}

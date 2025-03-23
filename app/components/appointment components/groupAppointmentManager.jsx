@@ -355,12 +355,54 @@ export default function GroupAppointmentsManager() {
 
   const handleConfirmCancel = async () => {
     try {
+      // Get current session
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        showSnackbar("You must be logged in to cancel a group appointment", "error");
+        return;
+      }
+      
+      // Update appointment status to cancelled
       const { error } = await supabase
         .from("appointments")
         .update({ status: "cancelled" })
         .eq("appointment_id", selectedGroupAppointment.appointment_id);
 
       if (error) throw error;
+
+      // Get information about the appointment for notification
+      const participantCount = selectedGroupAppointment.groupappointments?.length || 0;
+      const sessionCategory = selectedGroupAppointment.category || selectedGroupAppointment.reason || "Group session";
+      
+      // Format appointment date and time for notification
+      let appointmentDate = "Not scheduled";
+      let startTime = "Not scheduled";
+      let endTime = "Not scheduled";
+      
+      if (selectedGroupAppointment.availability_schedules) {
+        appointmentDate = dayjs(selectedGroupAppointment.availability_schedules.date).format("MMMM D, YYYY");
+        startTime = dayjs(selectedGroupAppointment.availability_schedules.start_time, 'HH:mm').format('hh:mm A');
+        endTime = dayjs(selectedGroupAppointment.availability_schedules.end_time, 'HH:mm').format('hh:mm A');
+      }
+      
+      // Create notification content
+      const notificationContent = `Group session "${sessionCategory}" with ${participantCount} participant${participantCount !== 1 ? 's' : ''} scheduled for ${appointmentDate} at ${startTime} - ${endTime} has been cancelled.`;
+      
+      // Create notification for the counselor
+      const { error: notificationError } = await supabase
+        .from("notifications")
+        .insert({
+          user_id: session.user.id, // counselor's ID
+          notification_content: notificationContent,
+          sent_at: new Date().toISOString(),
+          status: "sent",
+          target_group: "system"
+        });
+        
+      if (notificationError) {
+        console.error("Error creating notification:", notificationError);
+        // Continue with the cancellation process even if notification fails
+      }
 
       setOpenCancelModal(false);
       fetchGroupAppointments();

@@ -150,24 +150,70 @@ export default function AppointmentCard() {
 
   const handleConfirmCancel = async () => {
     try {
-      // Instead of deleting the appointment record, update the availability schedule to mark it as unavailable.
-      const { data, error } = await supabase
+      // Get current session to identify who is cancelling the appointment
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        setError("You must be logged in to cancel an appointment.");
+        return;
+      }
+
+      // Update the appointment status to cancelled
+      const { error: appointmentError } = await supabase
+        .from("appointments")
+        .update({ 
+          status: "cancelled", 
+          reason: "Cancelled by user"
+        })
+        .eq("appointment_id", selectedAppointment.appointment_id);
+
+      if (appointmentError) {
+        console.error("Error updating appointment status:", appointmentError);
+        setError("An error occurred while canceling the appointment.");
+        return;
+      }
+
+      // Update the availability schedule to mark it as unavailable
+      const { error: scheduleError } = await supabase
         .from("availability_schedules")
         .update({ is_available: false })
         .eq("availability_schedule_id", selectedAppointment.availability_schedule_id);
 
-      if (error) {
+      if (scheduleError) {
         console.error(
-          "Error canceling appointment:",
-          error.message,
-          error.details,
-          error.hint
+          "Error updating availability schedule:",
+          scheduleError.message,
+          scheduleError.details,
+          scheduleError.hint
         );
         setError("An error occurred while canceling the appointment.");
         return;
       }
 
-      console.log("Appointment canceled:", data);
+      // Create notification for the counselor
+      const studentName = selectedAppointment.users.name;
+      const appointmentDate = dayjs(selectedAppointment.availability_schedules.date).format("MMMM D, YYYY");
+      const startTime = formatTime(selectedAppointment.availability_schedules.start_time);
+      const endTime = formatTime(selectedAppointment.availability_schedules.end_time);
+      const appointmentType = selectedAppointment.appointment_type || "Consultation";
+      const notificationContent = `${studentName} has cancelled their ${appointmentType} appointment scheduled for ${appointmentDate} at ${startTime} - ${endTime}.`;
+      
+      // Insert the notification
+      const { error: notificationError } = await supabase
+        .from("notifications")
+        .insert({
+          user_id: selectedAppointment.counselor_id,
+          notification_content: notificationContent,
+          sent_at: new Date().toISOString(),
+          status: "sent",
+          target_group: "system"
+        });
+
+      if (notificationError) {
+        console.error("Error creating notification:", notificationError);
+        // Continue with the cancellation process even if notification fails
+      }
+
+      console.log("Appointment canceled successfully");
       setSuccessMessage("Appointment canceled successfully.");
       setError(null);
 
