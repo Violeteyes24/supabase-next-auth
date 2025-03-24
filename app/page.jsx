@@ -1,6 +1,6 @@
 import { createServerComponentClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/headers'
-import Link from 'next/link';
+import LoadingButton from './components/loading_button';
 
 export default async function Home() {
   const cookieStore = await cookies();
@@ -37,12 +37,12 @@ export default async function Home() {
         <div className="bg-white/10 p-8 rounded-lg backdrop-blur-lg shadow-xl max-w-md w-full" style={contentStyle}>
           <h1 className="text-3xl font-bold text-white mb-4 text-center">Welcome to Mental Help</h1>
           <p className="text-green-100 mb-6 text-center">Your journey to mental wellness begins here</p>
-          <Link 
+          <LoadingButton 
             href="/login" 
             className="w-full inline-block bg-green-500 hover:bg-green-600 text-white font-semibold py-3 px-6 rounded-lg transition-colors duration-200 text-center shadow-lg"
           >
             Sign In to Continue
-          </Link>
+          </LoadingButton>
         </div>
       </main>
     )
@@ -55,24 +55,24 @@ export default async function Home() {
         <h1 className="text-3xl font-bold text-white mb-2">Welcome Back!</h1>
         <p className="text-green-100 mb-6">Your mental wellness journey continues</p>
         <div className="space-y-4">
-          <Link 
+          <LoadingButton 
             href="/dashboard/counselor" 
             className="w-full inline-block bg-green-500 hover:bg-green-600 text-white font-semibold py-3 px-8 rounded-lg transition-colors duration-200 shadow-lg"
           >
             Go to Dashboard
-          </Link>
-          <Link 
+          </LoadingButton>
+          <LoadingButton 
             href="/journal" 
             className="w-full inline-block bg-green-400/80 hover:bg-green-500/80 text-white font-semibold py-3 px-8 rounded-lg transition-colors duration-200 shadow-lg"
           >
             My Journal
-          </Link>
-          <Link 
+          </LoadingButton>
+          <LoadingButton 
             href="/resources" 
             className="w-full inline-block bg-green-300/60 hover:bg-green-400/60 text-green-900 font-semibold py-3 px-8 rounded-lg transition-colors duration-200 shadow-lg"
           >
             Wellness Resources
-          </Link>
+          </LoadingButton>
         </div>
       </div>
     </main>

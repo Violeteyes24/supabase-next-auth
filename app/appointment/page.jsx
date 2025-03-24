@@ -4,7 +4,7 @@ import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import React, { useState, useEffect } from 'react';
 import Sidebar from "../components/dashboard components/sidebar";
 import AppointmentCard from "../components/appointment components/appointment_card";
-import { Modal, Box, Button, TextField, IconButton, Switch, FormControlLabel } from '@mui/material';
+import { Modal, Box, Button, TextField, IconButton, Switch, FormControlLabel, Skeleton, Paper, Typography, Grid, Divider, Pagination } from '@mui/material';
 import { DatePicker, TimePicker, LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs from 'dayjs';
@@ -15,6 +15,7 @@ import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
+import { FaBell } from 'react-icons/fa';
 
 export default function AppointmentPage() {
     const router = useRouter();
@@ -39,6 +40,12 @@ export default function AppointmentPage() {
     const [session, setSession] = useState(null);
     const [completedAppointments, setCompletedAppointments] = useState([]);
     const [showGroupCompleted, setShowGroupCompleted] = useState(false);
+    const [loading, setLoading] = useState(true);
+    const [completedLoading, setCompletedLoading] = useState(false);
+    const [completedPage, setCompletedPage] = useState(1);
+    const [completedRowsPerPage] = useState(5);
+    const [cancelledAppointments, setCancelledAppointments] = useState([]);
+    const [showNotifications, setShowNotifications] = useState(false);
     
     // Get current time in local timezone
     const getCurrentTime = () => {
@@ -78,7 +85,7 @@ export default function AppointmentPage() {
           .eq('counselor_id', userId)
           .neq('status', 'completed')
           .order('availability_schedule_id');
-          
+        //   debugger;
         if (aptError) {
           console.error('Error fetching appointments:', aptError);
           return;
@@ -87,7 +94,7 @@ export default function AppointmentPage() {
         // Identify expired appointments
         const expiredAppointments = appointments.filter(apt => {
           if (!apt.availability_schedules) return false;
-          
+          if (apt.status === 'cancelled') return false; // skip cancelled appointments
           const aptDate = apt.availability_schedules.date;
           const endTime = apt.availability_schedules.end_time;
           
@@ -124,6 +131,8 @@ export default function AppointmentPage() {
           .neq('status', 'completed')
           .order('availability_schedule_id');
           
+        //   debugger;
+          
         if (groupAptError) {
           console.error('Error fetching group appointments:', groupAptError);
           return;
@@ -132,7 +141,7 @@ export default function AppointmentPage() {
         // Identify expired group appointments
         const expiredGroupAppointments = groupAppointments.filter(apt => {
           if (!apt.availability_schedules) return false;
-          
+          if (apt.status === 'cancelled') return false; // skip cancelled group appointments
           const aptDate = apt.availability_schedules.date;
           const endTime = apt.availability_schedules.end_time;
           
@@ -166,6 +175,7 @@ export default function AppointmentPage() {
 
     useEffect(() => {
       const getSession = async () => {
+        setLoading(true);
         const {
           data: { session },
         } = await supabase.auth.getSession();
@@ -174,9 +184,10 @@ export default function AppointmentPage() {
         // If user is logged in, check and complete expired appointments
         if (session?.user) {
           const userId = session.user.id;
-          checkAndCompleteAppointments(userId);
-          fetchCompletedAppointments(userId);
+          await checkAndCompleteAppointments(userId);
+          await fetchCompletedAppointments(userId);
         }
+        setLoading(false);
       };
       getSession();
     }, []);
@@ -459,6 +470,8 @@ export default function AppointmentPage() {
     // New function to fetch completed appointments
     const fetchCompletedAppointments = async (userId) => {
       try {
+        setCompletedLoading(true);
+        
         // First, check if user is a counselor
         const { data: userData, error: userError } = await supabase
           .from('users')
@@ -467,6 +480,7 @@ export default function AppointmentPage() {
           .single();
           
         if (userError || userData?.user_type !== 'counselor') {
+          setCompletedLoading(false);
           return;
         }
         
@@ -482,6 +496,7 @@ export default function AppointmentPage() {
             
           if (error) {
             console.error('Error fetching completed appointments:', error);
+            setCompletedLoading(false);
             return;
           }
           
@@ -503,13 +518,16 @@ export default function AppointmentPage() {
             
           if (groupError) {
             console.error('Error fetching completed group appointments:', groupError);
+            setCompletedLoading(false);
             return;
           }
           
           setCompletedAppointments(groupData || []);
         }
+        setCompletedLoading(false);
       } catch (error) {
         console.error('Error fetching completed appointments:', error);
+        setCompletedLoading(false);
       }
     };
 
@@ -534,8 +552,308 @@ export default function AppointmentPage() {
 
     // Toggle between completed individual and group appointments
     const handleToggleCompleted = () => {
+        setCompletedLoading(true);
         setShowGroupCompleted(!showGroupCompleted);
+        setCompletedPage(1); // Reset pagination to first page when toggling
+        fetchCompletedAppointments(session.user.id, !showGroupCompleted);
     };
+
+    // CompletedAppointmentsSkeleton component
+    const CompletedAppointmentsSkeleton = () => (
+        <div className="space-y-4">
+            {[...Array(3)].map((_, index) => (
+                <div key={index} className="flex justify-between items-center p-4 rounded-lg bg-gray-50 border border-gray-200 shadow-sm animate-pulse">
+                    <div className="flex flex-col space-y-2 w-3/4">
+                        <div className="h-5 bg-gray-200 rounded w-1/3"></div>
+                        <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+                        <div className="h-4 bg-gray-200 rounded w-2/3"></div>
+                    </div>
+                    <div className="h-6 bg-gray-200 rounded-full w-24"></div>
+                </div>
+            ))}
+        </div>
+    );
+
+    // Loading skeleton component with shimmer effect
+    const AppointmentSkeleton = () => (
+        <div className="bg-gray-100 min-h-screen flex">
+            <Box sx={{ width: 240, bgcolor: '#1E293B' }} /> {/* Sidebar placeholder */}
+            <div className="flex-1 p-6">
+                {/* Calendar navigation skeleton */}
+                <Paper 
+                    elevation={0} 
+                    sx={{ 
+                        p: 3, 
+                        mb: 4, 
+                        borderRadius: 2,
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
+                        position: 'relative',
+                        overflow: 'hidden'
+                    }}
+                >
+                    {/* Shimmer overlay */}
+                    <Box 
+                        sx={{ 
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            background: 'linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.8) 50%, rgba(255,255,255,0) 100%)',
+                            animation: 'shimmer 2s infinite',
+                            '@keyframes shimmer': {
+                                '0%': { transform: 'translateX(-100%)' },
+                                '100%': { transform: 'translateX(100%)' }
+                            },
+                            zIndex: 1
+                        }}
+                    />
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                        <Skeleton variant="text" width={200} height={40} />
+                        <Skeleton variant="rectangular" width={120} height={40} sx={{ borderRadius: 1 }} />
+                    </Box>
+                    <Box sx={{ display: 'flex', gap: 2, overflowX: 'auto', py: 2 }}>
+                        {[...Array(6)].map((_, i) => (
+                            <Skeleton 
+                                key={i} 
+                                variant="rectangular" 
+                                width={80} 
+                                height={90} 
+                                sx={{ borderRadius: 2, flexShrink: 0 }} 
+                            />
+                        ))}
+                    </Box>
+                </Paper>
+
+                {/* Appointments section skeleton */}
+                <Paper 
+                    elevation={0} 
+                    sx={{ 
+                        p: 3, 
+                        mb: 4, 
+                        borderRadius: 2,
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
+                        position: 'relative',
+                        overflow: 'hidden'
+                    }}
+                >
+                    {/* Shimmer overlay */}
+                    <Box 
+                        sx={{ 
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            background: 'linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.8) 50%, rgba(255,255,255,0) 100%)',
+                            animation: 'shimmer 2s infinite',
+                            '@keyframes shimmer': {
+                                '0%': { transform: 'translateX(-100%)' },
+                                '100%': { transform: 'translateX(100%)' }
+                            },
+                            zIndex: 1
+                        }}
+                    />
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                        <Skeleton variant="text" width={250} height={32} />
+                        <Skeleton variant="rectangular" width={150} height={40} sx={{ borderRadius: 1 }} />
+                    </Box>
+
+                    <Divider sx={{ my: 2 }} />
+
+                    {/* Time slots skeleton */}
+                    <Grid container spacing={3}>
+                        {[...Array(4)].map((_, index) => (
+                            <Grid item xs={12} md={6} lg={3} key={index}>
+                                <Skeleton 
+                                    variant="rectangular" 
+                                    height={140} 
+                                    sx={{ 
+                                        borderRadius: 2,
+                                        mb: 1
+                                    }} 
+                                />
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
+                                    <Skeleton variant="rectangular" width={70} height={30} sx={{ borderRadius: 1 }} />
+                                    <Skeleton variant="rectangular" width={70} height={30} sx={{ borderRadius: 1 }} />
+                                </Box>
+                            </Grid>
+                        ))}
+                    </Grid>
+                </Paper>
+
+                {/* Group appointments section skeleton */}
+                <Paper 
+                    elevation={0} 
+                    sx={{ 
+                        p: 3, 
+                        borderRadius: 2,
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
+                        position: 'relative',
+                        overflow: 'hidden'
+                    }}
+                >
+                    {/* Shimmer overlay */}
+                    <Box 
+                        sx={{ 
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            background: 'linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.8) 50%, rgba(255,255,255,0) 100%)',
+                            animation: 'shimmer 2s infinite',
+                            '@keyframes shimmer': {
+                                '0%': { transform: 'translateX(-100%)' },
+                                '100%': { transform: 'translateX(100%)' }
+                            },
+                            zIndex: 1
+                        }}
+                    />
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                        <Skeleton variant="text" width={230} height={32} />
+                        <Skeleton variant="rectangular" width={170} height={40} sx={{ borderRadius: 1 }} />
+                    </Box>
+
+                    <Skeleton variant="rectangular" height={300} sx={{ borderRadius: 2 }} />
+                </Paper>
+            </div>
+        </div>
+    );
+
+    // Handle completed appointments pagination
+    const handleCompletedPageChange = (event, value) => {
+        setCompletedPage(value);
+    };
+
+    // Add this effect to fetch cancelled appointments
+    useEffect(() => {
+        const fetchCancelledAppointments = async () => {
+            if (!session) return;
+            
+            try {
+                // Fetch cancelled appointments where this user is the counselor
+                const { data, error } = await supabase
+                    .from('appointments')
+                    .select(`
+                        appointment_id,
+                        user_id,
+                        reason,
+                        status,
+                        appointment_type,
+                        availability_schedules (
+                            date,
+                            start_time,
+                            end_time
+                        ),
+                        users!appointments_user_id_fkey (
+                            name
+                        )
+                    `)
+                    .eq('status', 'cancelled')
+                    .eq('counselor_id', session.user.id)
+                    .order('availability_schedules(date)', { ascending: false })
+                    .limit(5);
+
+                if (error) {
+                    console.error("Error fetching cancelled appointments:", error);
+                } else {
+                    setCancelledAppointments(data || []);
+                }
+            } catch (error) {
+                console.error("Error in fetchCancelledAppointments:", error);
+            }
+        };
+
+        if (session) {
+            fetchCancelledAppointments();
+            
+            // Set up real-time subscription for appointment cancellations
+            const appointmentChannel = supabase.channel('appointment-cancellations')
+                .on('postgres_changes', 
+                    { 
+                        event: 'UPDATE', 
+                        schema: 'public', 
+                        table: 'appointments',
+                        filter: `counselor_id=eq.${session.user.id} AND status=eq.cancelled`
+                    }, 
+                    () => {
+                        fetchCancelledAppointments();
+                    }
+                )
+                .subscribe();
+
+            return () => {
+                supabase.removeChannel(appointmentChannel);
+            };
+        }
+    }, [session, supabase]);
+
+    // Replace the CounselorNotifications function with a render function
+    const renderCancelledAppointmentsNotifications = () => {
+        if (cancelledAppointments.length === 0) {
+            return null; // Don't show anything if there are no cancelled appointments
+        }
+
+        return (
+            <div className="bg-white rounded-lg shadow-md overflow-hidden mb-6">
+                <div className="bg-red-50 p-4 border-b border-red-100 flex justify-between items-center">
+                    <div className="flex items-center">
+                        <FaBell className="text-red-500 mr-2" />
+                        <h3 className="font-bold text-gray-800">Recent Appointment Cancellations</h3>
+                    </div>
+                    <button 
+                        onClick={() => setShowNotifications(!showNotifications)}
+                        className="text-sm text-blue-600 hover:underline"
+                    >
+                        {showNotifications ? 'Hide' : 'Show'}
+                    </button>
+                </div>
+                
+                {showNotifications && (
+                    <div className="p-4">
+                        <div className="space-y-4">
+                            {cancelledAppointments.map((appointment) => (
+                                <div 
+                                    key={appointment.appointment_id} 
+                                    className="border-l-4 border-red-500 pl-3 py-2"
+                                >
+                                    <div className="flex justify-between">
+                                        <div className="font-medium">{appointment.users.name}</div>
+                                        <div className="text-sm text-gray-500">
+                                            {appointment.availability_schedules?.date ? 
+                                                dayjs(appointment.availability_schedules.date).format('MMM D, YYYY') : 
+                                                'No date'
+                                            }
+                                        </div>
+                                    </div>
+                                    <div className="text-sm">
+                                        <span className="text-gray-600">Appointment Type:</span> {appointment.appointment_type || "Consultation"}
+                                    </div>
+                                    <div className="text-sm">
+                                        <span className="text-gray-600">Scheduled for:</span> {appointment.availability_schedules?.date ? 
+                                            `${dayjs(appointment.availability_schedules.date).format('MMM D, YYYY')} at 
+                                            ${formatTime(appointment.availability_schedules.start_time)} - 
+                                            ${formatTime(appointment.availability_schedules.end_time)}` : 
+                                            'Not scheduled'}
+                                    </div>
+                                    {/* {appointment.reason && (
+                                        <div className="text-sm mt-1">
+                                            <span className="text-gray-600">Reason:</span> {appointment.reason}
+                                        </div>
+                                    )} */}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+            </div>
+        );
+    };
+
+    if (loading) {
+        return <AppointmentSkeleton />;
+    }
 
     return (
         <LocalizationProvider dateAdapter={AdapterDayjs}>
@@ -548,6 +866,11 @@ export default function AppointmentPage() {
                     {/* Header */}
                     <div className="bg-white shadow-sm px-6 py-4 sticky top-0 z-10">
                         <h1 className="text-2xl font-bold text-emerald-700">Appointment Management</h1>
+                    </div>
+
+                    {/* Add the cancelled appointments notifications here */}
+                    <div className="px-6 mt-4">
+                        {renderCancelledAppointmentsNotifications()}
                     </div>
 
                     {/* Calendar UI */}
@@ -683,65 +1006,105 @@ export default function AppointmentPage() {
                                             checked={showGroupCompleted}
                                             onChange={handleToggleCompleted}
                                             color="primary"
+                                            disabled={completedLoading}
                                         />
                                     }
-                                    label={showGroupCompleted ? "Group Appointments" : "Individual Appointments"}
+                                    label={
+                                        <div className="flex items-center">
+                                            {completedLoading && (
+                                                <span className="w-4 h-4 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin mr-2"></span>
+                                            )}
+                                            {showGroupCompleted ? "Group Appointments" : "Individual Appointments"}
+                                        </div>
+                                    }
                                 />
                             </div>
 
-                            {completedAppointments.length === 0 ? (
+                            {completedLoading ? (
+                                <CompletedAppointmentsSkeleton />
+                            ) : completedAppointments.length === 0 ? (
                                 <div className="text-center py-10 text-gray-500">
                                     <p className="text-lg font-medium">No completed {showGroupCompleted ? 'group' : 'individual'} appointments found</p>
                                 </div>
                             ) : (
-                                <div className="space-y-4">
-                                    {completedAppointments.map((appointment) => (
-                                        <div
-                                            key={appointment.appointment_id}
-                                            className="flex justify-between items-center p-4 rounded-lg bg-gray-50 border border-gray-200 shadow-sm"
-                                        >
-                                            <div className="flex flex-col">
-                                                {!showGroupCompleted && appointment.users && (
-                                                    <p className="font-medium text-emerald-700">
-                                                        {appointment.users.first_name} {appointment.users.last_name}
-                                                    </p>
-                                                )}
-                                                {showGroupCompleted && (
-                                                    <>
-                                                        <p className="font-medium text-emerald-700">
-                                                            Group Session ({appointment.groupappointments?.length || 0} participants)
-                                                        </p>
-                                                        <div className="mt-1">
-                                                            {appointment.groupappointments && appointment.groupappointments.length > 0 ? (
-                                                                <div className="grid grid-cols-1 gap-1">
-                                                                    {appointment.groupappointments.map((participant, index) => (
-                                                                        <p key={participant.g_appointment_id} className="text-sm text-gray-600">
-                                                                            {participant.users?.first_name} {participant.users?.last_name}
-                                                                        </p>
-                                                                    ))}
+                                <>
+                                    <div className="space-y-4">
+                                        {completedAppointments
+                                            .slice((completedPage - 1) * completedRowsPerPage, 
+                                                   completedPage * completedRowsPerPage)
+                                            .map((appointment) => (
+                                                <div
+                                                    key={appointment.appointment_id}
+                                                    className="flex justify-between items-center p-4 rounded-lg bg-gray-50 border border-gray-200 shadow-sm"
+                                                >
+                                                    <div className="flex flex-col">
+                                                        {!showGroupCompleted && appointment.users && (
+                                                            <p className="font-medium text-emerald-700">
+                                                                {appointment.users.name}
+                                                            </p>
+                                                        )}
+                                                        {showGroupCompleted && (
+                                                            <>
+                                                                <p className="font-medium text-emerald-700">
+                                                                    Group Session ({appointment.groupappointments?.length || 0} participants)
+                                                                </p>
+                                                                <div className="mt-1">
+                                                                    {appointment.groupappointments && appointment.groupappointments.length > 0 ? (
+                                                                        <div className="grid grid-cols-1 gap-1">
+                                                                            {appointment.groupappointments.map((participant, index) => (
+                                                                                <p key={participant.g_appointment_id} className="text-sm text-gray-600">
+                                                                                    {participant.users?.name}
+                                                                                </p>
+                                                                            ))}
+                                                                        </div>
+                                                                    ) : (
+                                                                        <p className="text-sm text-gray-500 italic">No participants data available</p>
+                                                                    )}
                                                                 </div>
-                                                            ) : (
-                                                                <p className="text-sm text-gray-500 italic">No participants data available</p>
-                                                            )}
-                                                        </div>
-                                                    </>
-                                                )}
-                                                <p className="text-gray-600">
-                                                    {appointment.availability_schedules && 
-                                                        `${dayjs(appointment.availability_schedules.date).format('MMM DD, YYYY')} • 
-                                                        ${formatTime(appointment.availability_schedules.start_time)} - 
-                                                        ${formatTime(appointment.availability_schedules.end_time)}`}
-                                                </p>
-                                                <p className="text-gray-500 text-sm mt-1">
-                                                    {appointment.reason ? appointment.reason : (showGroupCompleted ? 'Group counseling' : 'Individual counseling')}
-                                                </p>
-                                            </div>
-                                            <span className="px-3 py-1 rounded-full text-sm font-medium bg-gray-200 text-gray-800">
-                                                Completed
-                                            </span>
+                                                            </>
+                                                        )}
+                                                        <p className="text-gray-600">
+                                                            {appointment.availability_schedules && 
+                                                                `${dayjs(appointment.availability_schedules.date).format('MMM DD, YYYY')} • 
+                                                                ${formatTime(appointment.availability_schedules.start_time)} - 
+                                                                ${formatTime(appointment.availability_schedules.end_time)}`}
+                                                        </p>
+                                                        <p className="text-gray-500 text-sm mt-1">
+                                                            {appointment.reason ? appointment.reason : (showGroupCompleted ? 'Group counseling' : 'Individual counseling')}
+                                                        </p>
+                                                    </div>
+                                                    <span className="px-3 py-1 rounded-full text-sm font-medium bg-gray-200 text-gray-800">
+                                                        Completed
+                                                    </span>
+                                                </div>
+                                            ))}
+                                    </div>
+                                    
+                                    {/* Pagination */}
+                                    {completedAppointments.length > completedRowsPerPage && (
+                                        <div className="flex justify-center mt-6">
+                                            <Pagination 
+                                                count={Math.ceil(completedAppointments.length / completedRowsPerPage)}
+                                                page={completedPage}
+                                                onChange={handleCompletedPageChange}
+                                                color="primary"
+                                                shape="rounded"
+                                                sx={{ 
+                                                    '& .MuiPaginationItem-root': { 
+                                                        color: '#4b5563',
+                                                        '&.Mui-selected': {
+                                                            backgroundColor: '#10b981',
+                                                            color: 'white',
+                                                            '&:hover': {
+                                                                backgroundColor: '#059669'
+                                                            }
+                                                        }
+                                                    } 
+                                                }}
+                                            />
                                         </div>
-                                    ))}
-                                </div>
+                                    )}
+                                </>
                             )}
                         </div>
                     </div>

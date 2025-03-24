@@ -18,7 +18,8 @@ import {
     Avatar,
     IconButton,
     Stack,
-    Tooltip
+    Tooltip,
+    Skeleton
 } from '@mui/material';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
@@ -50,7 +51,7 @@ export default function ProfilePage() {
         short_biography: '',
         credentials: ''
     });
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         fetchUserData();
@@ -170,6 +171,91 @@ export default function ProfilePage() {
         }
         router.push('/login');
     };
+
+    // Loading skeleton component with shimmer effect
+    const ProfileSkeleton = () => (
+        <div className="flex h-screen bg-gray-100">
+            <Box sx={{ width: 240, bgcolor: '#1E293B' }} /> {/* Sidebar placeholder */}
+            <Container maxWidth="md" sx={{ py: 4 }}>
+                <Paper 
+                    elevation={3} 
+                    sx={{ 
+                        p: 4, 
+                        borderRadius: 2,
+                        boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+                        position: 'relative',
+                        overflow: 'hidden'
+                    }}
+                >
+                    {/* Shimmer overlay */}
+                    <Box 
+                        sx={{ 
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            background: 'linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.8) 50%, rgba(255,255,255,0) 100%)',
+                            animation: 'shimmer 2s infinite',
+                            '@keyframes shimmer': {
+                                '0%': { transform: 'translateX(-100%)' },
+                                '100%': { transform: 'translateX(100%)' }
+                            },
+                            zIndex: 1
+                        }}
+                    />
+                    
+                    {/* Header skeleton */}
+                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 4, position: 'relative' }}>
+                        <Skeleton variant="text" width={200} height={50} sx={{ flexGrow: 1 }} />
+                    </Box>
+                    
+                    <Divider sx={{ mb: 4 }} />
+                    
+                    {/* Avatar skeleton */}
+                    <Box sx={{ mb: 5, textAlign: 'center', position: 'relative' }}>
+                        <Skeleton 
+                            variant="circular" 
+                            width={150} 
+                            height={150} 
+                            sx={{ margin: '0 auto' }}
+                        />
+                        <Skeleton 
+                            variant="circular" 
+                            width={40} 
+                            height={40} 
+                            sx={{ 
+                                position: 'absolute',
+                                bottom: 0,
+                                right: '50%',
+                                transform: 'translateX(50px)'
+                            }}
+                        />
+                    </Box>
+                    
+                    {/* Form skeleton */}
+                    <Skeleton variant="text" width={200} height={32} sx={{ mb: 2 }} />
+                    <Grid container spacing={3}>
+                        {[...Array(8)].map((_, index) => (
+                            <Grid item xs={12} sm={6} key={index}>
+                                <Skeleton variant="rectangular" height={56} sx={{ borderRadius: 1 }} />
+                            </Grid>
+                        ))}
+                        <Grid item xs={12}>
+                            <Skeleton variant="rectangular" height={100} sx={{ borderRadius: 1 }} />
+                        </Grid>
+                        <Grid item xs={12}>
+                            <Skeleton variant="rectangular" height={56} width={120} sx={{ borderRadius: 1, ml: 'auto' }} />
+                        </Grid>
+                    </Grid>
+                </Paper>
+            </Container>
+        </div>
+    );
+
+    if (loading) {
+        return <ProfileSkeleton />;
+    }
 
     return (
         <div className="flex h-screen bg-gray-100">

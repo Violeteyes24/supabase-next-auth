@@ -3,12 +3,15 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import LoadingButton from "../components/loading_button";
+import { Box, Skeleton } from "@mui/material";
 
 export default function Auth() {
   const supabase = createClientComponentClient();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [checkingSession, setCheckingSession] = useState(true);
   const [otp, setOtp] = useState("");
   const [isOtpModalVisible, setOtpModalVisible] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -16,13 +19,85 @@ export default function Auth() {
 
   useEffect(() => {
     const checkSession = async () => {
+      setCheckingSession(true);
       const { data, error } = await supabase.auth.getSession();
       if (data.session) {
         handleNavigation(data.session.user.id);
       }
+      setCheckingSession(false);
     };
     checkSession();
   }, []);
+
+  // Loading skeleton component with shimmer effect
+  const LoginSkeleton = () => (
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-6 relative overflow-hidden">
+      {/* Shimmer overlay */}
+      <Box 
+        sx={{ 
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.8) 50%, rgba(255,255,255,0) 100%)',
+          animation: 'shimmer 2s infinite',
+          '@keyframes shimmer': {
+            '0%': { transform: 'translateX(-100%)' },
+            '100%': { transform: 'translateX(100%)' }
+          },
+          zIndex: 10
+        }}
+      />
+      
+      <div className="w-full max-w-md bg-white rounded-xl shadow-lg p-8">
+        <div className="text-center mb-8">
+          <Skeleton variant="rectangular" width={180} height={50} sx={{ mx: 'auto', borderRadius: 1 }} />
+          <Skeleton variant="text" width={200} height={24} sx={{ mx: 'auto', mt: 2 }} />
+        </div>
+
+        <div className="space-y-5">
+          <div>
+            <Skeleton variant="text" width={80} height={20} />
+            <Skeleton variant="rectangular" height={48} sx={{ borderRadius: 1, mt: 1 }} />
+          </div>
+
+          <div>
+            <Skeleton variant="text" width={100} height={20} />
+            <Skeleton variant="rectangular" height={48} sx={{ borderRadius: 1, mt: 1 }} />
+          </div>
+
+          <div className="pt-2">
+            <Skeleton variant="rectangular" height={48} sx={{ borderRadius: 8 }} />
+          </div>
+
+          <div className="flex items-center my-4">
+            <div className="flex-grow">
+              <Skeleton variant="text" height={10} />
+            </div>
+            <Skeleton variant="text" width={30} sx={{ mx: 4 }} />
+            <div className="flex-grow">
+              <Skeleton variant="text" height={10} />
+            </div>
+          </div>
+
+          <Skeleton variant="rectangular" height={48} sx={{ borderRadius: 8 }} />
+
+          <div className="mt-6 text-center">
+            <Skeleton variant="text" width={250} height={20} sx={{ mx: 'auto' }} />
+            <div className="flex justify-center gap-2 mt-2">
+              <Skeleton variant="text" width={120} height={20} />
+              <Skeleton variant="text" width={120} height={20} />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  if (checkingSession) {
+    return <LoginSkeleton />;
+  }
 
   async function signInWithEmail() {
     setLoading(true);
@@ -223,20 +298,18 @@ export default function Auth() {
           <div className="mt-6 text-center">
             <p className="text-gray-600 text-sm">
               Don't have an account?{" "}
-              <button
-                onClick={() => router.push("/register/counselor")}
-                disabled={loading}
+              <LoadingButton
+                href="/register/counselor"
                 className="text-green-600 hover:text-green-800 font-medium"
               >
                 Sign up as a counselor
-              </button>
-              <button
-                onClick={() => router.push("/register/secretary")}
-                disabled={loading}
+              </LoadingButton>
+              <LoadingButton 
+                href="/register/secretary"
                 className="text-green-600 hover:text-green-800 font-medium"
               >
                 or as a secretary
-              </button>
+              </LoadingButton>
             </p>
           </div>
         </div>
