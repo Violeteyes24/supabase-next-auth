@@ -97,6 +97,8 @@ export default function GroupAppointmentsManager() {
       return;
     }
 
+    const userId = session.user.id;
+    console.log("this is the userId", userId);
     const { data, error } = await supabase
       .from("appointments")
       .select("*")
@@ -154,6 +156,8 @@ export default function GroupAppointmentsManager() {
       `
       )
       .eq("appointment_type", "group")
+      .neq("status", "completed")
+      .neq("status", "cancelled")
       .eq("counselor_id", userId);
 
     if (error) {
@@ -356,12 +360,17 @@ export default function GroupAppointmentsManager() {
   const handleConfirmCancel = async () => {
     try {
       // Get current session
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (!session) {
-        showSnackbar("You must be logged in to cancel a group appointment", "error");
+        showSnackbar(
+          "You must be logged in to cancel a group appointment",
+          "error"
+        );
         return;
       }
-      
+
       // Update appointment status to cancelled
       const { error } = await supabase
         .from("appointments")
@@ -371,23 +380,37 @@ export default function GroupAppointmentsManager() {
       if (error) throw error;
 
       // Get information about the appointment for notification
-      const participantCount = selectedGroupAppointment.groupappointments?.length || 0;
-      const sessionCategory = selectedGroupAppointment.category || selectedGroupAppointment.reason || "Group session";
-      
+      const participantCount =
+        selectedGroupAppointment.groupappointments?.length || 0;
+      const sessionCategory =
+        selectedGroupAppointment.category ||
+        selectedGroupAppointment.reason ||
+        "Group session";
+
       // Format appointment date and time for notification
       let appointmentDate = "Not scheduled";
       let startTime = "Not scheduled";
       let endTime = "Not scheduled";
-      
+
       if (selectedGroupAppointment.availability_schedules) {
-        appointmentDate = dayjs(selectedGroupAppointment.availability_schedules.date).format("MMMM D, YYYY");
-        startTime = dayjs(selectedGroupAppointment.availability_schedules.start_time, 'HH:mm').format('hh:mm A');
-        endTime = dayjs(selectedGroupAppointment.availability_schedules.end_time, 'HH:mm').format('hh:mm A');
+        appointmentDate = dayjs(
+          selectedGroupAppointment.availability_schedules.date
+        ).format("MMMM D, YYYY");
+        startTime = dayjs(
+          selectedGroupAppointment.availability_schedules.start_time,
+          "HH:mm"
+        ).format("hh:mm A");
+        endTime = dayjs(
+          selectedGroupAppointment.availability_schedules.end_time,
+          "HH:mm"
+        ).format("hh:mm A");
       }
-      
+
       // Create notification content
-      const notificationContent = `Group session "${sessionCategory}" with ${participantCount} participant${participantCount !== 1 ? 's' : ''} scheduled for ${appointmentDate} at ${startTime} - ${endTime} has been cancelled.`;
-      
+      const notificationContent = `Group session "${sessionCategory}" with ${participantCount} participant${
+        participantCount !== 1 ? "s" : ""
+      } scheduled for ${appointmentDate} at ${startTime} - ${endTime} has been cancelled.`;
+
       // Create notification for the counselor
       const { error: notificationError } = await supabase
         .from("notifications")
@@ -396,9 +419,9 @@ export default function GroupAppointmentsManager() {
           notification_content: notificationContent,
           sent_at: new Date().toISOString(),
           status: "sent",
-          target_group: "system"
+          target_group: "system",
         });
-        
+
       if (notificationError) {
         console.error("Error creating notification:", notificationError);
         // Continue with the cancellation process even if notification fails
@@ -466,7 +489,7 @@ export default function GroupAppointmentsManager() {
           component="h1"
           sx={{ fontWeight: "bold", color: "#10b981" }}
         >
-          Group Therapy Sessions
+          Upcoming Group Therapy Sessions
         </Typography>
         <Button
           variant="contained"
@@ -540,7 +563,9 @@ export default function GroupAppointmentsManager() {
                                 <Chip
                                   key={index}
                                   avatar={
-                                    <Avatar>{getInitials(ga.users.name)}</Avatar>
+                                    <Avatar>
+                                      {getInitials(ga.users.name)}
+                                    </Avatar>
                                   }
                                   label={ga.users.name}
                                   size="small"
@@ -560,15 +585,21 @@ export default function GroupAppointmentsManager() {
                       </TableCell>
                       <TableCell>
                         {appointment.availability_schedules?.date
-                          ? dayjs(appointment.availability_schedules.date).format(
-                              "MMM D, YYYY"
-                            )
+                          ? dayjs(
+                              appointment.availability_schedules.date
+                            ).format("MMM D, YYYY")
                           : "Not scheduled"}
                       </TableCell>
                       <TableCell>
                         {appointment.availability_schedules?.start_time &&
                         appointment.availability_schedules?.end_time
-                          ? `${dayjs(appointment.availability_schedules.start_time, 'HH:mm').format('hh:mm A')} - ${dayjs(appointment.availability_schedules.end_time, 'HH:mm').format('hh:mm A')}`
+                          ? `${dayjs(
+                              appointment.availability_schedules.start_time,
+                              "HH:mm"
+                            ).format("hh:mm A")} - ${dayjs(
+                              appointment.availability_schedules.end_time,
+                              "HH:mm"
+                            ).format("hh:mm A")}`
                           : "Not scheduled"}
                       </TableCell>
                       <TableCell>
@@ -691,11 +722,12 @@ export default function GroupAppointmentsManager() {
             onRowsPerPageChange={handleChangeRowsPerPage}
             rowsPerPageOptions={[5, 10, 25]}
             sx={{
-              bgcolor: '#f9fafb',
-              borderTop: '1px solid #e5e7eb',
-              '& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows': {
-                color: '#4b5563'
-              }
+              bgcolor: "#f9fafb",
+              borderTop: "1px solid #e5e7eb",
+              "& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows":
+                {
+                  color: "#4b5563",
+                },
             }}
           />
         )}
@@ -1121,15 +1153,15 @@ export default function GroupAppointmentsManager() {
 
           {selectedGroupAppointment && (
             <Box sx={{ my: 2, p: 2, bgcolor: "#f9fafb", borderRadius: 1 }}>
-              <Typography variant="body2" color="text.secondary">
+              <Typography variant="body2" color="#000">
                 Session ID: #
                 {selectedGroupAppointment.appointment_id.toString().slice(0, 8)}
               </Typography>
-              <Typography variant="body2" sx={{ mt: 1 }}>
+              <Typography variant="body2" color="#000" sx={{ mt: 1 }}>
                 <strong>Focus:</strong>{" "}
                 {selectedGroupAppointment.reason || "Not specified"}
               </Typography>
-              <Typography variant="body2" sx={{ mt: 1 }}>
+              <Typography variant="body2" color="#000" sx={{ mt: 1 }}>
                 <strong>Participants:</strong>{" "}
                 {selectedGroupAppointment.groupappointments?.length || 0}
               </Typography>

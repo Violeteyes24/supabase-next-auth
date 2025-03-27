@@ -46,6 +46,9 @@ export default function AppointmentPage() {
     const [completedRowsPerPage] = useState(5);
     const [cancelledAppointments, setCancelledAppointments] = useState([]);
     const [showNotifications, setShowNotifications] = useState(false);
+    const [viewType, setViewType] = useState('completed');
+    const [userRole, setUserRole] = useState(null);
+    const [isRoleLoading, setIsRoleLoading] = useState(true);
     
     // Get current time in local timezone
     const getCurrentTime = () => {
@@ -184,6 +187,21 @@ export default function AppointmentPage() {
         // If user is logged in, check and complete expired appointments
         if (session?.user) {
           const userId = session.user.id;
+          
+          // Fetch user role
+          const { data: userData, error: userError } = await supabase
+            .from('users')
+            .select('user_type')
+            .eq('user_id', userId)
+            .single();
+            
+          if (!userError) {
+            setUserRole(userData?.user_type);
+          } else {
+            console.error('Error fetching user role:', userError);
+          }
+          setIsRoleLoading(false);
+          
           await checkAndCompleteAppointments(userId);
           await fetchCompletedAppointments(userId);
         }
@@ -274,8 +292,33 @@ export default function AppointmentPage() {
     };
 
     const handleAddSchedule = async () => {
+        // Check if user has permission to add schedules
+        if (userRole !== 'counselor') {
+            setErrorMessage('Only counselors can add availability schedules.');
+            setOpenErrorModal(true);
+            return;
+        }
+
+        // Check if selected date is in the past
+        const today = dayjs().startOf('day');
+        if (selectedDate.isBefore(today)) {
+            setErrorMessage('Cannot create availability for past dates.');
+            setOpenErrorModal(true);
+            return;
+        }
+
+        // Check if end time is before start time
         if (endTime.isBefore(startTime)) {
             setErrorMessage('End time must be after start time.');
+            setOpenErrorModal(true);
+            return;
+        }
+
+        // Check for minimum 30 minute interval
+        const startMinutes = startTime.hour() * 60 + startTime.minute();
+        const endMinutes = endTime.hour() * 60 + endTime.minute();
+        if (endMinutes - startMinutes < 30) {
+            setErrorMessage('Time slot must be at least 30 minutes long.');
             setOpenErrorModal(true);
             return;
         }
@@ -309,6 +352,37 @@ export default function AppointmentPage() {
 
     const handleConfirmAddSchedule = async () => {
         try {
+            // Check if user has permission to add schedules
+            if (userRole !== 'counselor') {
+                setErrorMessage('Only counselors can add availability schedules.');
+                setOpenErrorModal(true);
+                return;
+            }
+            
+            // Check if selected date is in the past
+            const today = dayjs().startOf('day');
+            if (selectedDate.isBefore(today)) {
+                setErrorMessage('Cannot create availability for past dates.');
+                setOpenErrorModal(true);
+                return;
+            }
+
+            // Check if end time is before start time
+            if (endTime.isBefore(startTime)) {
+                setErrorMessage('End time must be after start time.');
+                setOpenErrorModal(true);
+                return;
+            }
+
+            // Check for minimum 30 minute interval
+            const startMinutes = startTime.hour() * 60 + startTime.minute();
+            const endMinutes = endTime.hour() * 60 + endTime.minute();
+            if (endMinutes - startMinutes < 30) {
+                setErrorMessage('Time slot must be at least 30 minutes long.');
+                setOpenErrorModal(true);
+                return;
+            }
+
             // Fetch the authenticated user
             const { data: { session }, error: sessionError } = await supabase.auth.getSession();
             
@@ -374,6 +448,13 @@ export default function AppointmentPage() {
     };
 
     const handleReschedule = (schedule) => {
+        // Check if user has permission to reschedule
+        if (userRole !== 'counselor') {
+            setErrorMessage('Only counselors can reschedule availability.');
+            setOpenErrorModal(true);
+            return;
+        }
+        
         setSelectedSchedule(schedule);
         setStartTime(dayjs(schedule.start_time, 'HH:mm'));
         setEndTime(dayjs(schedule.end_time, 'HH:mm'));
@@ -381,8 +462,25 @@ export default function AppointmentPage() {
     };
 
     const handleConfirmReschedule = async () => {
+        // Check if user has permission to reschedule
+        if (userRole !== 'counselor') {
+            setErrorMessage('Only counselors can reschedule availability.');
+            setOpenErrorModal(true);
+            return;
+        }
+        
+        // Check if end time is before start time
         if (endTime.isBefore(startTime)) {
             setErrorMessage('End time must be after start time.');
+            setOpenErrorModal(true);
+            return;
+        }
+
+        // Check for minimum 30 minute interval
+        const startMinutes = startTime.hour() * 60 + startTime.minute();
+        const endMinutes = endTime.hour() * 60 + endTime.minute();
+        if (endMinutes - startMinutes < 30) {
+            setErrorMessage('Time slot must be at least 30 minutes long.');
             setOpenErrorModal(true);
             return;
         }
@@ -414,12 +512,26 @@ export default function AppointmentPage() {
     };
 
     const handleCancel = (schedule) => {
+        // Check if user has permission to cancel schedules
+        if (userRole !== 'counselor') {
+            setErrorMessage('Only counselors can delete availability schedules.');
+            setOpenErrorModal(true);
+            return;
+        }
+        
         setSelectedSchedule(schedule);
         setOpenCancelModal(true);
     };
 
     const handleConfirmCancel = async () => {
         try {
+            // Check if user has permission to cancel schedules
+            if (userRole !== 'counselor') {
+                setErrorMessage('Only counselors can delete availability schedules.');
+                setOpenErrorModal(true);
+                return;
+            }
+            
             const { data, error } = await supabase
                 .from('availability_schedules')
                 // .update({ is_available: true })
@@ -531,6 +643,70 @@ export default function AppointmentPage() {
       }
     };
 
+    // New function to fetch cancelled appointments
+    const fetchCancelledAppointments = async (userId, isGroup = false) => {
+      try {
+        setCompletedLoading(true);
+        
+        // First, check if user is a counselor
+        const { data: userData, error: userError } = await supabase
+          .from('users')
+          .select('user_type')
+          .eq('user_id', userId)
+          .single();
+          
+        if (userError || userData?.user_type !== 'counselor') {
+          setCompletedLoading(false);
+          return;
+        }
+        
+        // Fetch cancelled individual appointments
+        if (!isGroup) {
+          const { data, error } = await supabase
+            .from('appointments')
+            .select('*, availability_schedules(*), users!appointments_user_id_fkey(*)')
+            .eq('counselor_id', userId)
+            .eq('status', 'cancelled')
+            .eq('appointment_type', 'individual')
+            .order('availability_schedules(date)', { ascending: false });
+            
+          if (error) {
+            console.error('Error fetching cancelled appointments:', error);
+            setCompletedLoading(false);
+            return;
+          }
+          
+          setCancelledAppointments(data || []);
+        } 
+        // Fetch cancelled group appointments
+        else {
+          const { data: groupData, error: groupError } = await supabase
+            .from('appointments')
+            .select(`
+              *,
+              availability_schedules(*),
+              groupappointments(*, users(*))
+            `)
+            .eq('counselor_id', userId)
+            .eq('status', 'cancelled')
+            .eq('appointment_type', 'group')
+            .order('availability_schedules(date)', { ascending: false });
+            
+          if (groupError) {
+            console.error('Error fetching cancelled group appointments:', groupError);
+            setCompletedLoading(false);
+            return;
+          }
+          
+          setCancelledAppointments(groupData || []);
+        }
+        setCompletedLoading(false);
+      } catch (error) {
+        console.error('Error fetching cancelled appointments:', error);
+        setCompletedLoading(false);
+      }
+    };
+
     // Add an effect to refetch when toggle changes
     useEffect(() => {
         const fetchData = async () => {
@@ -544,18 +720,27 @@ export default function AppointmentPage() {
             }
             
             const userId = session.user.id;
-            fetchCompletedAppointments(userId);
+            if (viewType === 'completed') {
+                fetchCompletedAppointments(userId);
+            } else {
+                fetchCancelledAppointments(userId, showGroupCompleted);
+            }
         };
         
         fetchData();
-    }, [showGroupCompleted]);
+    }, [showGroupCompleted, viewType]);
 
     // Toggle between completed individual and group appointments
     const handleToggleCompleted = () => {
         setCompletedLoading(true);
         setShowGroupCompleted(!showGroupCompleted);
         setCompletedPage(1); // Reset pagination to first page when toggling
-        fetchCompletedAppointments(session.user.id, !showGroupCompleted);
+    };
+
+    // Toggle between viewing completed and cancelled appointments
+    const handleToggleViewType = (type) => {
+        setViewType(type);
+        setCompletedPage(1); // Reset pagination to first page when toggling
     };
 
     // CompletedAppointmentsSkeleton component
@@ -726,135 +911,7 @@ export default function AppointmentPage() {
         setCompletedPage(value);
     };
 
-    // Add this effect to fetch cancelled appointments
-    useEffect(() => {
-        const fetchCancelledAppointments = async () => {
-            if (!session) return;
-            
-            try {
-                // Fetch cancelled appointments where this user is the counselor
-                const { data, error } = await supabase
-                    .from('appointments')
-                    .select(`
-                        appointment_id,
-                        user_id,
-                        reason,
-                        status,
-                        appointment_type,
-                        availability_schedules (
-                            date,
-                            start_time,
-                            end_time
-                        ),
-                        users!appointments_user_id_fkey (
-                            name
-                        )
-                    `)
-                    .eq('status', 'cancelled')
-                    .eq('counselor_id', session.user.id)
-                    .order('availability_schedules(date)', { ascending: false })
-                    .limit(5);
-
-                if (error) {
-                    console.error("Error fetching cancelled appointments:", error);
-                } else {
-                    setCancelledAppointments(data || []);
-                }
-            } catch (error) {
-                console.error("Error in fetchCancelledAppointments:", error);
-            }
-        };
-
-        if (session) {
-            fetchCancelledAppointments();
-            
-            // Set up real-time subscription for appointment cancellations
-            const appointmentChannel = supabase.channel('appointment-cancellations')
-                .on('postgres_changes', 
-                    { 
-                        event: 'UPDATE', 
-                        schema: 'public', 
-                        table: 'appointments',
-                        filter: `counselor_id=eq.${session.user.id} AND status=eq.cancelled`
-                    }, 
-                    () => {
-                        fetchCancelledAppointments();
-                    }
-                )
-                .subscribe();
-
-            return () => {
-                supabase.removeChannel(appointmentChannel);
-            };
-        }
-    }, [session, supabase]);
-
-    // Replace the CounselorNotifications function with a render function
-    const renderCancelledAppointmentsNotifications = () => {
-        if (cancelledAppointments.length === 0) {
-            return null; // Don't show anything if there are no cancelled appointments
-        }
-
-        return (
-            <div className="bg-white rounded-lg shadow-md overflow-hidden mb-6">
-                <div className="bg-red-50 p-4 border-b border-red-100 flex justify-between items-center">
-                    <div className="flex items-center">
-                        <FaBell className="text-red-500 mr-2" />
-                        <h3 className="font-bold text-gray-800">Recent Appointment Cancellations</h3>
-                    </div>
-                    <button 
-                        onClick={() => setShowNotifications(!showNotifications)}
-                        className="text-sm text-blue-600 hover:underline"
-                    >
-                        {showNotifications ? 'Hide' : 'Show'}
-                    </button>
-                </div>
-                
-                {showNotifications && (
-                    <div className="p-4">
-                        <div className="space-y-4">
-                            {cancelledAppointments.map((appointment) => (
-                                <div 
-                                    key={appointment.appointment_id} 
-                                    className="border-l-4 border-red-500 pl-3 py-2"
-                                >
-                                    <div className="flex justify-between">
-                                        <div className="font-medium">{appointment.users.name}</div>
-                                        <div className="text-sm text-gray-500">
-                                            {appointment.availability_schedules?.date ? 
-                                                dayjs(appointment.availability_schedules.date).format('MMM D, YYYY') : 
-                                                'No date'
-                                            }
-                                        </div>
-                                    </div>
-                                    <div className="text-sm">
-                                        <span className="text-gray-600">Appointment Type:</span> {appointment.appointment_type || "Consultation"}
-                                    </div>
-                                    <div className="text-sm">
-                                        <span className="text-gray-600">Scheduled for:</span> {appointment.availability_schedules?.date ? 
-                                            `${dayjs(appointment.availability_schedules.date).format('MMM D, YYYY')} at 
-                                            ${formatTime(appointment.availability_schedules.start_time)} - 
-                                            ${formatTime(appointment.availability_schedules.end_time)}` : 
-                                            'Not scheduled'}
-                                    </div>
-                                    {/* {appointment.reason && (
-                                        <div className="text-sm mt-1">
-                                            <span className="text-gray-600">Reason:</span> {appointment.reason}
-                                        </div>
-                                    )} */}
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
-            </div>
-        );
-    };
-
-    if (loading) {
-        return <AppointmentSkeleton />;
-    }
-
+    // Replace the Completed Appointments Section with this new version
     return (
         <LocalizationProvider dateAdapter={AdapterDayjs}>
             <div className="h-screen bg-gray-50 flex">
@@ -866,11 +923,6 @@ export default function AppointmentPage() {
                     {/* Header */}
                     <div className="bg-white shadow-sm px-6 py-4 sticky top-0 z-10">
                         <h1 className="text-2xl font-bold text-emerald-700">Appointment Management</h1>
-                    </div>
-
-                    {/* Add the cancelled appointments notifications here */}
-                    <div className="px-6 mt-4">
-                        {renderCancelledAppointmentsNotifications()}
                     </div>
 
                     {/* Calendar UI */}
@@ -918,14 +970,16 @@ export default function AppointmentPage() {
                                     <div className="mb-2"><AccessTimeIcon sx={{ fontSize: 48, color: '#d1d5db' }} /></div>
                                     <p className="text-lg font-medium">No availability set for this day</p>
                                     <p className="mb-4">Add your available time slots to book appointments</p>
-                                    <Button 
-                                        variant="outlined" 
-                                        color="primary"
-                                        onClick={() => setOpenModal(true)}
-                                        startIcon={<AddIcon />}
-                                    >
-                                        Add Availability
-                                    </Button>
+                                    {userRole === 'counselor' && (
+                                        <Button 
+                                            variant="outlined" 
+                                            color="primary"
+                                            onClick={() => setOpenModal(true)}
+                                            startIcon={<AddIcon />}
+                                        >
+                                            Add Availability
+                                        </Button>
+                                    )}
                                 </div>
                             ) : (
                                 <>
@@ -952,33 +1006,39 @@ export default function AppointmentPage() {
                                                 }`}>
                                                     {schedule.is_available ? 'Available' : 'Not Available'}
                                                 </span>
-                                                <IconButton 
-                                                    onClick={() => handleReschedule(schedule)}
-                                                    size="small"
-                                                    sx={{ color: '#4b5563' }}
-                                                >
-                                                    <EditIcon fontSize="small" />
-                                                </IconButton>
-                                                <IconButton 
-                                                    onClick={() => handleCancel(schedule)}
-                                                    size="small"
-                                                    sx={{ color: '#ef4444' }}
-                                                >
-                                                    <DeleteIcon fontSize="small" />
-                                                </IconButton>
+                                                {userRole === 'counselor' && (
+                                                    <>
+                                                        <IconButton 
+                                                            onClick={() => handleReschedule(schedule)}
+                                                            size="small"
+                                                            sx={{ color: '#4b5563' }}
+                                                        >
+                                                            <EditIcon fontSize="small" />
+                                                        </IconButton>
+                                                        <IconButton 
+                                                            onClick={() => handleCancel(schedule)}
+                                                            size="small"
+                                                            sx={{ color: '#ef4444' }}
+                                                        >
+                                                            <DeleteIcon fontSize="small" />
+                                                        </IconButton>
+                                                    </>
+                                                )}
                                             </div>
                                         </div>
                                     ))}
-                                    <div className="flex justify-center pt-4">
-                                        <Button 
-                                            variant="outlined" 
-                                            color="primary"
-                                            onClick={() => setOpenModal(true)}
-                                            startIcon={<AddIcon />}
-                                        >
-                                            Add Availability
-                                        </Button>
-                                    </div>
+                                    {userRole === 'counselor' && (
+                                        <div className="flex justify-center pt-4">
+                                            <Button 
+                                                variant="outlined" 
+                                                color="primary"
+                                                onClick={() => setOpenModal(true)}
+                                                startIcon={<AddIcon />}
+                                            >
+                                                Add Availability
+                                            </Button>
+                                        </div>
+                                    )}
                                 </>
                             )}
                         </div>
@@ -999,7 +1059,31 @@ export default function AppointmentPage() {
                         {/* Completed Appointments Section */}
                         <div className="bg-white p-6 rounded-lg shadow-md">
                             <div className="flex justify-between items-center mb-4">
-                                <h2 className="text-xl font-semibold text-gray-800">Completed Appointments</h2>
+                                <div className="flex items-center space-x-4">
+                                    <h2 className="text-xl font-semibold text-gray-800">Appointments History</h2>
+                                    <div className="flex bg-gray-100 rounded-lg p-1">
+                                        <button 
+                                            onClick={() => handleToggleViewType('completed')}
+                                            className={`px-4 py-2 rounded-lg transition-all ${
+                                                viewType === 'completed' 
+                                                ? 'bg-emerald-500 text-white' 
+                                                : 'bg-transparent text-gray-600 hover:bg-gray-200'
+                                            }`}
+                                        >
+                                            Completed
+                                        </button>
+                                        <button 
+                                            onClick={() => handleToggleViewType('cancelled')}
+                                            className={`px-4 py-2 rounded-lg transition-all ${
+                                                viewType === 'cancelled' 
+                                                ? 'bg-emerald-500 text-white' 
+                                                : 'bg-transparent text-gray-600 hover:bg-gray-200'
+                                            }`}
+                                        >
+                                            Cancelled
+                                        </button>
+                                    </div>
+                                </div>
                                 <FormControlLabel
                                     control={
                                         <Switch
@@ -1022,20 +1106,28 @@ export default function AppointmentPage() {
 
                             {completedLoading ? (
                                 <CompletedAppointmentsSkeleton />
-                            ) : completedAppointments.length === 0 ? (
+                            ) : viewType === 'completed' && completedAppointments.length === 0 ? (
                                 <div className="text-center py-10 text-gray-500">
                                     <p className="text-lg font-medium">No completed {showGroupCompleted ? 'group' : 'individual'} appointments found</p>
+                                </div>
+                            ) : viewType === 'cancelled' && cancelledAppointments.length === 0 ? (
+                                <div className="text-center py-10 text-gray-500">
+                                    <p className="text-lg font-medium">No cancelled {showGroupCompleted ? 'group' : 'individual'} appointments found</p>
                                 </div>
                             ) : (
                                 <>
                                     <div className="space-y-4">
-                                        {completedAppointments
+                                        {(viewType === 'completed' ? completedAppointments : cancelledAppointments)
                                             .slice((completedPage - 1) * completedRowsPerPage, 
                                                    completedPage * completedRowsPerPage)
                                             .map((appointment) => (
                                                 <div
                                                     key={appointment.appointment_id}
-                                                    className="flex justify-between items-center p-4 rounded-lg bg-gray-50 border border-gray-200 shadow-sm"
+                                                    className={`flex justify-between items-center p-4 rounded-lg ${
+                                                        viewType === 'completed' 
+                                                        ? 'bg-gray-50 border border-gray-200' 
+                                                        : 'bg-red-50 border border-red-100'
+                                                    } shadow-sm`}
                                                 >
                                                     <div className="flex flex-col">
                                                         {!showGroupCompleted && appointment.users && (
@@ -1073,18 +1165,22 @@ export default function AppointmentPage() {
                                                             {appointment.reason ? appointment.reason : (showGroupCompleted ? 'Group counseling' : 'Individual counseling')}
                                                         </p>
                                                     </div>
-                                                    <span className="px-3 py-1 rounded-full text-sm font-medium bg-gray-200 text-gray-800">
-                                                        Completed
+                                                    <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                                                        viewType === 'completed' 
+                                                        ? 'bg-gray-200 text-gray-800' 
+                                                        : 'bg-red-200 text-red-800'
+                                                    }`}>
+                                                        {viewType === 'completed' ? 'Completed' : 'Cancelled'}
                                                     </span>
                                                 </div>
                                             ))}
                                     </div>
                                     
                                     {/* Pagination */}
-                                    {completedAppointments.length > completedRowsPerPage && (
+                                    {(viewType === 'completed' ? completedAppointments : cancelledAppointments).length > completedRowsPerPage && (
                                         <div className="flex justify-center mt-6">
                                             <Pagination 
-                                                count={Math.ceil(completedAppointments.length / completedRowsPerPage)}
+                                                count={Math.ceil((viewType === 'completed' ? completedAppointments : cancelledAppointments).length / completedRowsPerPage)}
                                                 page={completedPage}
                                                 onChange={handleCompletedPageChange}
                                                 color="primary"
@@ -1110,22 +1206,24 @@ export default function AppointmentPage() {
                     </div>
 
                     {/* Add Schedule Button */}
-                    <div className="fixed bottom-8 right-8">
-                        <Button
-                            variant="contained"
-                            color="primary"
-                            style={{ 
-                                borderRadius: '50%', 
-                                width: '60px', 
-                                height: '60px', 
-                                backgroundColor: '#10b981',
-                                boxShadow: '0 10px 15px -3px rgba(16, 185, 129, 0.3)' 
-                            }}
-                            onClick={() => setOpenModal(true)}
-                        >
-                            <AddIcon />
-                        </Button>
-                    </div>
+                    {userRole === 'counselor' && (
+                        <div className="fixed bottom-8 right-8">
+                            <Button
+                                variant="contained"
+                                color="primary"
+                                style={{ 
+                                    borderRadius: '50%', 
+                                    width: '60px', 
+                                    height: '60px', 
+                                    backgroundColor: '#10b981',
+                                    boxShadow: '0 10px 15px -3px rgba(16, 185, 129, 0.3)' 
+                                }}
+                                onClick={() => setOpenModal(true)}
+                            >
+                                <AddIcon />
+                            </Button>
+                        </div>
+                    )}
 
                     {/* Success Toast */}
                     <div 
@@ -1301,7 +1399,7 @@ export default function AppointmentPage() {
                                 </svg>
                             </div>
                             <h2 className="mb-4 text-xl font-bold text-gray-800 text-center">Error</h2>
-                            <p className="text-center mb-6">{errorMessage}</p>
+                            <p className="text-center mb-6 text-black">{errorMessage}</p>
                             <div className="flex justify-center">
                                 <Button 
                                     variant="contained" 

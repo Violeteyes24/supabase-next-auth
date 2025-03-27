@@ -571,6 +571,12 @@ const fetchConversations = async () => {
                   type="text"
                   placeholder="Type your message..."
                   className="text-black flex-1 px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all duration-200"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && inputMessage.trim()) {
+                      e.preventDefault();
+                      handleSendMessage();
+                    }
+                  }}
                 />
                 <button 
                   onClick={handleSendMessage}

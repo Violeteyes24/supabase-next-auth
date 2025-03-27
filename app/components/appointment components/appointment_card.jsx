@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { Modal, Box, Button, Typography, TextField, TablePagination } from "@mui/material";
-import { TimePicker, LocalizationProvider } from "@mui/x-date-pickers";
+import { TimePicker, DatePicker, LocalizationProvider } from "@mui/x-date-pickers";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import dayjs from "dayjs";
 
@@ -14,12 +14,15 @@ export default function AppointmentCard() {
   const [selectedAppointment, setSelectedAppointment] = useState(null);
   const [openRescheduleModal, setOpenRescheduleModal] = useState(false);
   const [openCancelModal, setOpenCancelModal] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(dayjs());
   const [startTime, setStartTime] = useState(dayjs());
   const [endTime, setEndTime] = useState(dayjs());
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState(null);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(5);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [openErrorModal, setOpenErrorModal] = useState(false);
 
   useEffect(() => {
     const getSession = async () => {
@@ -103,6 +106,7 @@ export default function AppointmentCard() {
 
   const handleReschedule = (appointment) => {
     setSelectedAppointment(appointment);
+    setSelectedDate(dayjs(appointment.availability_schedules.date));
     setStartTime(dayjs(appointment.availability_schedules.start_time, "HH:mm"));
     setEndTime(dayjs(appointment.availability_schedules.end_time, "HH:mm"));
     setOpenRescheduleModal(true);
@@ -110,9 +114,59 @@ export default function AppointmentCard() {
 
   const handleConfirmReschedule = async () => {
     try {
+      // Validations
+      
+      // Check if selected date is in the past
+      const today = dayjs().startOf('day');
+      if (selectedDate.isBefore(today)) {
+          setErrorMessage('Cannot reschedule to a past date.');
+          setOpenErrorModal(true);
+          return;
+      }
+
+      // Check if end time is before start time
+      if (endTime.isBefore(startTime)) {
+          setErrorMessage('End time must be after start time.');
+          setOpenErrorModal(true);
+          return;
+      }
+
+      // Check for minimum 30 minute interval
+      const startMinutes = startTime.hour() * 60 + startTime.minute();
+      const endMinutes = endTime.hour() * 60 + endTime.minute();
+      if (endMinutes - startMinutes < 30) {
+          setErrorMessage('Time slot must be at least 30 minutes long.');
+          setOpenErrorModal(true);
+          return;
+      }
+
+      // Check for time conflicts with existing schedules
+      const { data: existingSchedules, error: fetchError } = await supabase
+          .from('availability_schedules')
+          .select('*')
+          .eq('date', selectedDate.format('YYYY-MM-DD'))
+          .neq('availability_schedule_id', selectedAppointment.availability_schedule_id) // Exclude current schedule
+          .gte('start_time', startTime.format('HH:mm'))
+          .lt('end_time', endTime.format('HH:mm'));
+
+      if (fetchError) {
+          console.error('Error fetching existing schedules:', fetchError.message);
+          setErrorMessage('An error occurred while checking for schedule conflicts.');
+          setOpenErrorModal(true);
+          return;
+      }
+
+      if (existingSchedules?.length > 0) {
+          setErrorMessage('This time slot conflicts with an existing schedule.');
+          setOpenErrorModal(true);
+          return;
+      }
+
+      // Update availability schedules with new date and times
       const { data, error } = await supabase
         .from("availability_schedules")
         .update({
+          date: selectedDate.format('YYYY-MM-DD'),
           start_time: startTime.format("HH:mm"),
           end_time: endTime.format("HH:mm"),
         })
@@ -130,6 +184,44 @@ export default function AppointmentCard() {
         );
         setError("An error occurred while rescheduling.");
         return;
+      }
+
+      // Update appointment status to rescheduled
+      const { error: appointmentError } = await supabase
+        .from("appointments")
+        .update({ 
+          status: "rescheduled"
+        })
+        .eq("appointment_id", selectedAppointment.appointment_id);
+
+      if (appointmentError) {
+        console.error("Error updating appointment status:", appointmentError);
+        setError("An error occurred while updating the appointment status.");
+        return;
+      }
+
+      // Create notification for the counselor
+      const studentName = selectedAppointment.users.name;
+      const appointmentDate = selectedDate.format("MMMM D, YYYY");
+      const formattedStartTime = formatTime(startTime.format("HH:mm"));
+      const formattedEndTime = formatTime(endTime.format("HH:mm"));
+      const appointmentType = selectedAppointment.appointment_type || "Consultation";
+      const notificationContent = `${studentName} has rescheduled their ${appointmentType} appointment to ${appointmentDate} at ${formattedStartTime} - ${formattedEndTime}.`;
+      
+      // Insert the notification
+      const { error: notificationError } = await supabase
+        .from("notifications")
+        .insert({
+          user_id: selectedAppointment.counselor_id,
+          notification_content: notificationContent,
+          sent_at: new Date().toISOString(),
+          status: "sent",
+          target_group: "system"
+        });
+
+      if (notificationError) {
+        console.error("Error creating notification:", notificationError);
+        // Continue with the rescheduling process even if notification fails
       }
 
       console.log("Appointment rescheduled:", data);
@@ -488,6 +580,16 @@ export default function AppointmentCard() {
             <div className="space-y-4 mb-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Date
+                </label>
+                <DatePicker
+                  value={selectedDate}
+                  onChange={(newValue) => setSelectedDate(newValue)}
+                  sx={{ width: "100%" }}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
                   Start Time
                 </label>
                 <TimePicker
@@ -618,6 +720,39 @@ export default function AppointmentCard() {
                 }}
               >
                 Cancel Appointment
+              </Button>
+            </div>
+          </Box>
+        </Modal>
+
+        {/* Error Modal */}
+        <Modal open={openErrorModal} onClose={() => setOpenErrorModal(false)}>
+          <Box sx={{
+            position: "absolute",
+            top: "50%",
+            left: "50%",
+            transform: "translate(-50%, -50%)",
+            bgcolor: "white",
+            borderRadius: "8px",
+            boxShadow: 24,
+            p: 4,
+            width: 400,
+            maxWidth: "90%",
+          }}>
+            <div className="flex items-center justify-center text-red-500 mb-2">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <h2 className="mb-4 text-xl font-bold text-gray-800 text-center">Error</h2>
+            <p className="text-center mb-6 text-black">{errorMessage}</p>
+            <div className="flex justify-center">
+              <Button 
+                variant="contained" 
+                onClick={() => setOpenErrorModal(false)}
+                style={{ backgroundColor: '#6b7280' }}
+              >
+                Close
               </Button>
             </div>
           </Box>
