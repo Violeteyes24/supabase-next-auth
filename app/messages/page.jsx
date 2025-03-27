@@ -9,7 +9,6 @@ import { format } from "date-fns";
 import { Add } from "@mui/icons-material";
 import { AddConversation } from "../../actions/conversations/conversation";
 import { sendMessage } from "../../actions/conversations/messages/messages";
-import { Skeleton, Box } from "@mui/material";
 
 function MessageContent() {
   const router = useRouter();
@@ -17,7 +16,7 @@ function MessageContent() {
   const [session, setSession] = useState(null);
   const [messages, setMessages] = useState([]);
   const [conversations, setConversations] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [predefinedOptions, setPredefinedOptions] = useState([]);
   const [currentParentId, setCurrentParentId] = useState(13);
   const [users, setUsers] = useState([]);
@@ -68,64 +67,75 @@ function MessageContent() {
       fetchMessages();
 
       // Subscribe to all message changes
-      const messagesSubscription = supabase
-        .channel("messages")
+      const messageChannel = supabase
+        .channel("message-changes")
         .on(
           "postgres_changes",
           {
             event: "*",
             schema: "public",
             table: "messages",
+            filter: `conversation_id=eq.${conversationId}`,
           },
           (payload) => {
-            if (payload.new && payload.new.conversation_id === conversationId) {
-              fetchMessages();
-            }
+            fetchMessages();
+            fetchConversations();
           }
         )
         .subscribe();
 
-      // Subscribe to conversation changes
-      const conversationsSubscription = supabase
-        .channel("conversations")
+      // Subscribe to predefined messages changes
+      const predefinedMessageChannel = supabase
+        .channel("predefined-changes")
         .on(
           "postgres_changes",
           {
             event: "*",
             schema: "public",
-            table: "conversations",
+            table: "predefined_messages",
           },
           () => {
+            fetchPredefinedOptions(currentParentId);
+          }
+        )
+        .subscribe();
+
+      // Subscribe to real-time conversation changes
+      const conversationChannel = supabase
+        .channel("custom-all-channel")
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "conversations" },
+          (payload) => {
+            console.log("Change received!", payload);
             fetchConversations();
           }
         )
         .subscribe();
 
       return () => {
-        supabase.removeChannel(messagesSubscription);
-        supabase.removeChannel(conversationsSubscription);
+        supabase.removeChannel(messageChannel);
+        supabase.removeChannel(predefinedMessageChannel);
+        supabase.removeChannel(conversationChannel);
       };
     }
-  }, [session, conversationId, currentParentId]);
+  }, [session, conversation]);
 
   const fetchMessages = async () => {
-    if (!conversationId) {
-      setMessages([]);
-      setLoading(false);
-      return;
-    }
+    if (!conversationId) return;
 
     const { data, error } = await supabase
       .from("messages")
-      .select("*, users(name, profile_image_url)")
+      .select('*')
       .eq("conversation_id", conversationId)
-      .order("created_at", { ascending: true });
-
+      .order("sent_at", { ascending: true });
+    //   debugger;
+      console.log(data);
     if (error) {
       console.error("Error fetching messages:", error);
     } else {
       setMessages(data || []);
-      setLoading(false);
+      
     }
   };
 
@@ -148,29 +158,67 @@ function MessageContent() {
     }
   };
 
-  const fetchConversations = async () => {
-    if (!session) return;
+const fetchConversations = async () => {
+  setLoading(true);
+  try {
+    const currentUserId = session?.user.id;
+    if (!currentUserId) {
+      console.log("No user ID found");
+      setConversations([]);
+      return;
+    }
 
-    const { data, error } = await supabase.rpc("get_user_conversations", {
-      user_id_param: session.user.id,
-    });
+    let { data, error } = await supabase
+      .from("conversation_list_view")
+      .select("*")
+      .or(`user_id.eq.${currentUserId},created_by.eq.${currentUserId}`)
+      .order("created_at", { ascending: false });
 
     if (error) {
-      console.error("Error fetching conversations:", error);
-    } else {
-      setConversations(data || []);
-      if (!conversationId && data && data.length > 0) {
-        setConversation(data[0]);
-        router.push(`/messages?conversation=${data[0].conversation_id}`);
-      } else if (conversationId && data) {
-        const currentConversation = data.find(
-          (c) => c.conversation_id === parseInt(conversationId)
-        );
-        setConversation(currentConversation);
-      }
-      setLoading(false);
+      console.log("Fetch conversations error:", error);
+      setConversations([]);
+      return;
     }
-  };
+
+    // Format the data and compute friend_id (the other participant)
+    const formattedConversations = data?.map((conv) => {
+      const displayName =
+        conv.user_id === currentUserId ? conv.creator_name : conv.user_name;
+      const profileImage =
+        conv.user_id === currentUserId
+          ? conv.creator_profile_image
+          : conv.user_profile_image;
+      return {
+        ...conv,
+        name: displayName || "Unknown",
+        profile_image: profileImage,
+        friend_id: conv.user_id === currentUserId ? conv.created_by : conv.user_id,
+        sent_at: conv.last_message_sent_at || conv.created_at,
+        message_content:
+          conv.last_message_content || conv.conversation_type || "New conversation",
+      };
+    }) || [];
+
+    // Aggregate conversations by friend (group by displayName)
+    const aggregated = Object.values(
+      formattedConversations.reduce((acc, conv) => {
+        if (
+          !acc[conv.name] ||
+          new Date(conv.sent_at) > new Date(acc[conv.name].sent_at)
+        ) {
+          acc[conv.name] = conv;
+        }
+        return acc;
+      }, {})
+    );
+    setConversations(aggregated);
+  } catch (err) {
+    console.error("Error fetching conversations:", err);
+    setConversations([]);
+  } finally {
+    setLoading(false);
+  }
+};
 
   const fetchUsers = async () => {
     const { data, error } = await supabase
@@ -307,134 +355,6 @@ function MessageContent() {
   const toggleSidebar = () => {
     setShowSidebar(!showSidebar);
   };
-
-  // Loading skeleton component with shimmer effect
-  const MessageSkeleton = () => (
-    <div className="flex h-screen bg-gray-100">
-      <div className="w-64 bg-gray-800" /> {/* Sidebar placeholder */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* Conversations sidebar skeleton */}
-        <div className="w-80 bg-white border-r flex flex-col h-full relative overflow-hidden">
-          {/* Shimmer overlay */}
-          <Box 
-            sx={{ 
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              background: 'linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.8) 50%, rgba(255,255,255,0) 100%)',
-              animation: 'shimmer 2s infinite',
-              '@keyframes shimmer': {
-                '0%': { transform: 'translateX(-100%)' },
-                '100%': { transform: 'translateX(100%)' }
-              },
-              zIndex: 10
-            }}
-          />
-          
-          {/* Header */}
-          <div className="p-4 border-b">
-            <Skeleton variant="text" width={150} height={32} />
-            <div className="mt-3 flex">
-              <Skeleton variant="rectangular" width="100%" height={38} sx={{ borderRadius: 1 }} />
-            </div>
-          </div>
-          
-          {/* Conversation list */}
-          <div className="flex-1 overflow-y-auto p-2">
-            {[...Array(10)].map((_, i) => (
-              <div key={i} className="p-3 border-b flex items-center space-x-3">
-                <Skeleton variant="circular" width={40} height={40} />
-                <div className="flex-1">
-                  <Skeleton variant="text" width="60%" height={20} />
-                  <Skeleton variant="text" width="40%" height={16} />
-                </div>
-                <Skeleton variant="text" width={36} height={16} />
-              </div>
-            ))}
-          </div>
-          
-          {/* New conversation button */}
-          <div className="p-3 border-t">
-            <Skeleton variant="rectangular" width="100%" height={40} sx={{ borderRadius: 20 }} />
-          </div>
-        </div>
-        
-        {/* Message area skeleton */}
-        <div className="flex-1 flex flex-col h-full bg-gray-50 relative overflow-hidden">
-          {/* Shimmer overlay */}
-          <Box 
-            sx={{ 
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              background: 'linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.8) 50%, rgba(255,255,255,0) 100%)',
-              animation: 'shimmer 2s infinite',
-              '@keyframes shimmer': {
-                '0%': { transform: 'translateX(-100%)' },
-                '100%': { transform: 'translateX(100%)' }
-              },
-              zIndex: 10
-            }}
-          />
-          
-          {/* Header */}
-          <div className="p-4 border-b bg-white flex items-center">
-            <Skeleton variant="circular" width={40} height={40} />
-            <Skeleton variant="text" width={120} height={24} sx={{ ml: 2 }} />
-          </div>
-          
-          {/* Messages area */}
-          <div className="flex-1 overflow-y-auto p-4">
-            <div className="space-y-4">
-              {/* Received message */}
-              <div className="flex items-start">
-                <Skeleton variant="circular" width={32} height={32} sx={{ mr: 2, mt: 1 }} />
-                <div className="max-w-md">
-                  <Skeleton variant="rectangular" width={240} height={60} sx={{ borderRadius: '0.5rem' }} />
-                  <Skeleton variant="text" width={100} height={16} sx={{ mt: 1 }} />
-                </div>
-              </div>
-              
-              {/* Sent message */}
-              <div className="flex items-start justify-end">
-                <div className="max-w-md">
-                  <Skeleton variant="rectangular" width={200} height={40} sx={{ borderRadius: '0.5rem' }} />
-                  <div className="flex justify-end">
-                    <Skeleton variant="text" width={100} height={16} sx={{ mt: 1 }} />
-                  </div>
-                </div>
-              </div>
-              
-              {/* Another received message */}
-              <div className="flex items-start">
-                <Skeleton variant="circular" width={32} height={32} sx={{ mr: 2, mt: 1 }} />
-                <div className="max-w-md">
-                  <Skeleton variant="rectangular" width={280} height={80} sx={{ borderRadius: '0.5rem' }} />
-                  <Skeleton variant="text" width={100} height={16} sx={{ mt: 1 }} />
-                </div>
-              </div>
-            </div>
-          </div>
-          
-          {/* Input area */}
-          <div className="p-3 border-t bg-white">
-            <div className="flex items-center">
-              <Skeleton variant="rectangular" width="100%" height={44} sx={{ borderRadius: 2, mr: 2 }} />
-              <Skeleton variant="circular" width={44} height={44} />
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
-  if (loading) {
-    return <MessageSkeleton />;
-  }
 
   return (
     <div className="h-screen flex flex-col md:flex-row bg-gray-50">
@@ -730,7 +650,7 @@ function MessageContent() {
 
 export default function MessagePage() {
   return (
-    <Suspense fallback={<div className="h-screen flex items-center justify-center">Loading...</div>}>
+    <Suspense fallback={<div>Loading...</div>}>
       <MessageContent />
     </Suspense>
   );

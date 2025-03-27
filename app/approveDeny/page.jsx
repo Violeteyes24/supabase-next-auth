@@ -22,6 +22,8 @@ export default function ApproveDenyPage() {
     const [openImageModal, setOpenImageModal] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedUserType, setSelectedUserType] = useState('all');
+    const [selectedDepartment, setSelectedDepartment] = useState('all');
+    const [selectedStatus, setSelectedStatus] = useState('all');
     // New state variables for secretary assignments
     const [openAssignModal, setOpenAssignModal] = useState(false);
     const [availableSecretaries, setAvailableSecretaries] = useState([]);
@@ -34,6 +36,7 @@ export default function ApproveDenyPage() {
     const [snackbarMessage, setSnackbarMessage] = useState('');
     const [snackbarSeverity, setSnackbarSeverity] = useState('success');
     const [currentUser, setCurrentUser] = useState(null);
+    const [counselors, setCounselors] = useState([]);
 
     // Log initial state and after first render
     useEffect(() => {
@@ -54,11 +57,9 @@ export default function ApproveDenyPage() {
                     // Fetch registrants
                     const { data: registrantsData, error: registrantsError } = await supabase
                         .from("users")
-                        .select(`
-                            *,
-                            assignments(counselor_id, status)
-                        `)
-                        .eq("status", "pending");
+                        .select("*")
+                        .neq("is_director", true)
+                        // .eq("status", "pending");
                         
                     if (registrantsError) throw registrantsError;
                         
@@ -74,6 +75,8 @@ export default function ApproveDenyPage() {
                     setFilteredRegistrants(registrantsData || []);
                     setCounselors(counselorsData || []);
                     setLoading(false);
+                    fetchCurrentUser();
+                    fetchSecretaryAssignments();
                 }
             } catch (error) {
                 console.error("Error fetching data:", error.message);
@@ -112,7 +115,9 @@ export default function ApproveDenyPage() {
         console.log("Filter effect running with:", { 
             registrantsLength: registrants.length, 
             searchTerm, 
-            selectedUserType 
+            selectedUserType,
+            selectedDepartment,
+            selectedStatus
         });
         
         if (!registrants.length) {
@@ -126,6 +131,18 @@ export default function ApproveDenyPage() {
         if (selectedUserType !== 'all') {
             filtered = filtered.filter(reg => reg.user_type === selectedUserType);
             console.log("After user type filter:", filtered.length);
+        }
+        
+        // Filter by department if not "all"
+        if (selectedDepartment !== 'all') {
+            filtered = filtered.filter(reg => reg.department_assigned === selectedDepartment);
+            console.log("After department filter:", filtered.length);
+        }
+        
+        // Filter by status if not "all"
+        if (selectedStatus !== 'all') {
+            filtered = filtered.filter(reg => reg.approval_status === selectedStatus);
+            console.log("After status filter:", filtered.length);
         }
         
         // Filter by search term
@@ -142,7 +159,7 @@ export default function ApproveDenyPage() {
         
         setFilteredRegistrants(filtered);
         console.log("Final filtered registrants:", filtered.length);
-    }, [registrants, searchTerm, selectedUserType]);
+    }, [registrants, searchTerm, selectedUserType, selectedDepartment, selectedStatus]);
 
     const fetchCurrentUser = async () => {
         const { data: { user } } = await supabase.auth.getUser();
@@ -163,25 +180,40 @@ export default function ApproveDenyPage() {
     };
 
     const fetchSecretaryAssignments = async () => {
+        console.log("fetchSecretaryAssignments function called");
+        
         // Instead of filtering by current user, get all assignments
-        const { data, error } = await supabase
-            .from('secretary_assignments')
-            .select('*, secretary:secretary_id(user_id, name), counselor:counselor_id(user_id, name)');
+        try {
+            console.log("About to query secretary_assignments table");
+            
+            const { data, error } = await supabase
+                .from('secretary_assignments')
+                .select('*, secretary:secretary_id(user_id, name), counselor:counselor_id(user_id, name)');
                 
-        if (error) {
-            console.error("Error fetching secretary assignments:", error);
-        } else {
-            // Create a map of counselor ID to assigned secretaries
-            const assignmentsMap = {};
+            console.log("Query completed");
+            console.log("Data received:", data);
+            console.log("Error:", error);
             
-            for (const assignment of data || []) {
-                if (!assignmentsMap[assignment.counselor_id]) {
-                    assignmentsMap[assignment.counselor_id] = [];
+            if (error) {
+                console.error("Error fetching secretary assignments:", error);
+            } else {
+                // Create a map of counselor ID to assigned secretaries
+                const assignmentsMap = {};
+                
+                console.log("Processing assignments, count:", data?.length || 0);
+                
+                for (const assignment of data || []) {
+                    if (!assignmentsMap[assignment.counselor_id]) {
+                        assignmentsMap[assignment.counselor_id] = [];
+                    }
+                    assignmentsMap[assignment.counselor_id].push(assignment);
                 }
-                assignmentsMap[assignment.counselor_id].push(assignment);
+                
+                console.log("Final processed assignments map:", assignmentsMap);
+                setCounselorAssignments(assignmentsMap);
             }
-            
-            setCounselorAssignments(assignmentsMap);
+        } catch (e) {
+            console.error("Exception in fetchSecretaryAssignments:", e);
         }
     };
 
@@ -382,6 +414,17 @@ export default function ApproveDenyPage() {
         router.push('/login');
     };
 
+    // Function to get all available departments from registrants
+    const getUniqueDepartments = () => {
+        const departments = registrants
+            .map(reg => reg.department_assigned)
+            .filter(dept => dept) // Remove null/undefined values
+            .filter((dept, index, self) => self.indexOf(dept) === index) // Get unique values
+            .sort(); // Sort alphabetically
+            
+        return departments;
+    };
+
     // Function to get status badge styling
     const getStatusBadgeClass = (status) => {
         switch(status) {
@@ -490,12 +533,38 @@ export default function ApproveDenyPage() {
                                 <option value="student">Students</option>
                             </select>
                         </div>
-                        {(searchTerm || selectedUserType !== 'all') && (
+                        <div>
+                            <select
+                                className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
+                                value={selectedDepartment}
+                                onChange={(e) => setSelectedDepartment(e.target.value)}
+                            >
+                                <option value="all">All Departments</option>
+                                {getUniqueDepartments().map(dept => (
+                                    <option key={dept} value={dept}>{dept}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div>
+                            <select
+                                className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
+                                value={selectedStatus}
+                                onChange={(e) => setSelectedStatus(e.target.value)}
+                            >
+                                <option value="all">All Statuses</option>
+                                <option value="pending">Pending</option>
+                                <option value="approved">Approved</option>
+                                <option value="denied">Denied</option>
+                            </select>
+                        </div>
+                        {(searchTerm || selectedUserType !== 'all' || selectedDepartment !== 'all' || selectedStatus !== 'all') && (
                             <button
                                 className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg transition-colors"
                                 onClick={() => {
                                     setSearchTerm('');
                                     setSelectedUserType('all');
+                                    setSelectedDepartment('all');
+                                    setSelectedStatus('all');
                                 }}
                             >
                                 Clear Filters
@@ -528,7 +597,7 @@ export default function ApproveDenyPage() {
                                     ) : filteredRegistrants.length === 0 ? (
                                         <tr>
                                             <td colSpan="6" className="px-6 py-4 text-center text-sm text-gray-500">
-                                                {searchTerm || selectedUserType !== 'all' 
+                                                {searchTerm || selectedUserType !== 'all' || selectedDepartment !== 'all' || selectedStatus !== 'all'
                                                     ? "No matching registrants found" 
                                                     : "No registrants found"}
                                             </td>
