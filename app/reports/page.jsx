@@ -267,7 +267,7 @@ export default function ReportsPage() {
                             Reports Dashboard
                         </h1>
                         <p className="text-center text-gray-600 dark:text-gray-300 mt-2">
-                            Analytics and insights for your organization
+                            Analytics and insights for MentalHelp
                         </p>
                         <div className="flex justify-center mt-4">
                             <Button
@@ -331,7 +331,7 @@ export default function ReportsPage() {
                     </Grid>
                     
                     <footer className="mt-16 text-center text-gray-500 text-sm">
-                        <p>© {new Date().getFullYear()} Your Organization • Dashboard v2.0</p>
+                        <p>© {new Date().getFullYear()} MentalHelp • Reports v2.0</p>
                     </footer>
                 </Container>
             </div>

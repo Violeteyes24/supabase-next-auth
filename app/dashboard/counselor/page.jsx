@@ -34,6 +34,8 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 import SmartToyIcon from '@mui/icons-material/SmartToy';
+import DashboardIcon from '@mui/icons-material/Dashboard';
+
 
 import Sidebar from '../../components/dashboard components/sidebar';
 import KPISection from '../../components/dashboard components/kpi_section';
@@ -577,6 +579,7 @@ export default function CounselorPage() {
                             centered
                         >
                             <Tab 
+                                icon={<DashboardIcon  />}
                                 label="Dashboard Overview" 
                                 sx={{ 
                                     fontWeight: 'bold',
