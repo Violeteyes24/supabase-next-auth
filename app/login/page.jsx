@@ -184,7 +184,7 @@ export default function Auth() {
   async function handleNavigation(userId) {
     const { data, error } = await supabase
       .from("users")
-      .select("user_type, status")
+      .select("user_type, approval_status")
       .eq("user_id", userId)
       .single();
 
@@ -194,9 +194,9 @@ export default function Auth() {
     }
 
     const userType = data?.user_type;
-    const userStatus = data?.status;
+    const userStatus = data?.approval_status;
     
-    if (userStatus === "pending") {
+    if (userStatus === "pending" || userStatus === "denied") {
       setPendingModalVisible(true);
       return;
     }
@@ -373,7 +373,7 @@ export default function Auth() {
               Account Pending Approval
             </h2>
             <p className="text-gray-600 mb-4">
-              Your account is currently pending director approval. You'll receive an email once your account has been approved.
+              Your account is currently pending or denied and needs director approval. You'll receive an email once your account has been approved.
             </p>
 
             <div className="flex justify-end mt-6">
