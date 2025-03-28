@@ -204,7 +204,7 @@ export default function Auth() {
     if (userType === "counselor") {
       router.push("/dashboard/counselor");
     } else if (userType === "secretary") {
-      router.push("/dashboard/secretary");
+      router.push("/dashboard/counselor");
     }
   }
 

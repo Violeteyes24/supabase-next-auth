@@ -925,7 +925,8 @@ export default function AppointmentPage() {
                         <h1 className="text-2xl font-bold text-emerald-700">Appointment Management</h1>
                     </div>
 
-                    {/* Calendar UI */}
+                    {/* Calendar UI - Only show if user is not a secretary */}
+                    {userRole !== 'secretary' && (
                     <div className="bg-white p-6 rounded-lg shadow-md mx-6 my-4">
                         <div className="flex justify-between items-center mb-6">
                             <h2 className="text-xl font-semibold text-gray-800">Your Availability Schedule</h2>
@@ -1043,6 +1044,7 @@ export default function AppointmentPage() {
                             )}
                         </div>
                     </div>
+                    )}
 
                     {/* Appointment Card */}
                     <div className="px-6 pb-20">
