@@ -14,6 +14,7 @@ export default function Auth() {
   const [checkingSession, setCheckingSession] = useState(true);
   const [otp, setOtp] = useState("");
   const [isOtpModalVisible, setOtpModalVisible] = useState(false);
+  const [isPendingModalVisible, setPendingModalVisible] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const router = useRouter();
 
@@ -183,7 +184,7 @@ export default function Auth() {
   async function handleNavigation(userId) {
     const { data, error } = await supabase
       .from("users")
-      .select("user_type")
+      .select("user_type, status")
       .eq("user_id", userId)
       .single();
 
@@ -193,6 +194,13 @@ export default function Auth() {
     }
 
     const userType = data?.user_type;
+    const userStatus = data?.status;
+    
+    if (userStatus === "pending") {
+      setPendingModalVisible(true);
+      return;
+    }
+    
     if (userType === "counselor") {
       router.push("/dashboard/counselor");
     } else if (userType === "secretary") {
@@ -241,9 +249,9 @@ export default function Auth() {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Password"
                 style={{
-                  '-webkit-text-security': showPassword ? 'none' : 'disc',
+                  'WebkitTextSecurity': showPassword ? 'none' : 'disc',
                   'appearance': 'none',
-                  '-webkit-appearance': 'none',
+                  'WebkitAppearance': 'none',
                 }}
               />
               <button
@@ -352,6 +360,28 @@ export default function Auth() {
                 className="bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium py-3 px-4 rounded-lg transition duration-200 sm:flex-1"
               >
                 Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isPendingModalVisible && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+          <div className="bg-white p-6 rounded-xl shadow-xl w-full max-w-md">
+            <h2 className="text-xl font-semibold text-gray-800 mb-4">
+              Account Pending Approval
+            </h2>
+            <p className="text-gray-600 mb-4">
+              Your account is currently pending director approval. You'll receive an email once your account has been approved.
+            </p>
+
+            <div className="flex justify-end mt-6">
+              <button
+                onClick={() => setPendingModalVisible(false)}
+                className="bg-green-500 text-white hover:bg-green-600 font-medium py-3 px-4 rounded-lg transition duration-200"
+              >
+                Close
               </button>
             </div>
           </div>

@@ -238,8 +238,30 @@ export default function ApproveDenyPage() {
                 fetchRegistrants();
             } else {
                 console.log("Registrant approved:", data);
-                // We don't need to refetch as we've already updated the UI and
-                // the realtime subscription should be prevented from causing a refetch
+                
+                // Send approval email
+                try {
+                    // Call the approval email function with just the user ID
+                    const response = await fetch('/api/send-approval-email', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            userId: id
+                        }),
+                    });
+                    
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.error || 'Failed to send approval email');
+                    }
+                    
+                    showSnackbar("User approved and notification email sent", "success");
+                } catch (emailError) {
+                    console.error("Error sending approval email:", emailError);
+                    showSnackbar("User approved but failed to send email", "warning");
+                }
             }
         } catch (err) {
             console.error("Unexpected error in handleApprove:", err);
@@ -268,7 +290,30 @@ export default function ApproveDenyPage() {
                 fetchRegistrants();
             } else {
                 console.log("Registrant denied:", data);
-                // We don't need to refetch as we've already updated the UI
+                
+                // Send denial email
+                try {
+                    // Call the denial email function with just the user ID
+                    const response = await fetch('/api/send-denial-email', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            userId: id
+                        }),
+                    });
+                    
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.error || 'Failed to send denial email');
+                    }
+                    
+                    showSnackbar("User denied and notification email sent", "success");
+                } catch (emailError) {
+                    console.error("Error sending denial email:", emailError);
+                    showSnackbar("User denied but failed to send email", "warning");
+                }
             }
         } catch (err) {
             console.error("Unexpected error in handleDeny:", err);

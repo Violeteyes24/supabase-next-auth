@@ -95,7 +95,7 @@ const Sidebar = ({ handleLogout }) => {
                         {menuItems.map((item, index) => (
                             <ListItem
                                 key={index}
-                                button
+                                button={true}
                                 onClick={item.action}
                                 sx={{
                                     '&:hover': {
