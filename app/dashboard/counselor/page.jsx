@@ -56,6 +56,10 @@ export default function CounselorPage() {
     const [totalUsers, setTotalUsers] = useState(0);
     const [appointmentsThisMonth, setAppointmentsThisMonth] = useState(0);
     const [activeCounselors, setActiveCounselors] = useState(0);
+    const [activeSecretaries, setActiveSecretaries] = useState(0);
+    const [activeStudents, setActiveStudents] = useState(0);
+    const [departmentMostCases, setDepartmentMostCases] = useState('');
+    const [programMostCases, setProgramMostCases] = useState('');
     const [averageMoodScore, setAverageMoodScore] = useState(0);
     const [chartData, setChartData] = useState([]);
     const router = useRouter();
@@ -188,6 +192,50 @@ export default function CounselorPage() {
         setTotalUsers(users.length);
         const activeCounselorsCount = users.filter(user => user.user_type === 'counselor').length;
         setActiveCounselors(activeCounselorsCount);
+        
+        // Count active secretaries
+        const activeSecretariesCount = users.filter(user => user.user_type === 'secretary').length;
+        setActiveSecretaries(activeSecretariesCount);
+        
+        // Count active students
+        const activeStudentsCount = users.filter(user => user.user_type === 'student').length;
+        setActiveStudents(activeStudentsCount);
+        
+        // Find department with most cases
+        const departmentCounts = {};
+        users.forEach(user => {
+            if (user.department) {
+                departmentCounts[user.department] = (departmentCounts[user.department] || 0) + 1;
+            }
+        });
+        
+        let maxDepartment = '';
+        let maxCount = 0;
+        Object.entries(departmentCounts).forEach(([dept, count]) => {
+            if (count > maxCount) {
+                maxCount = count;
+                maxDepartment = dept;
+            }
+        });
+        setDepartmentMostCases(maxDepartment || 'None');
+        
+        // Find program with most cases
+        const programCounts = {};
+        users.forEach(user => {
+            if (user.program) {
+                programCounts[user.program] = (programCounts[user.program] || 0) + 1;
+            }
+        });
+        
+        let maxProgram = '';
+        maxCount = 0;
+        Object.entries(programCounts).forEach(([prog, count]) => {
+            if (count > maxCount) {
+                maxCount = count;
+                maxProgram = prog;
+            }
+        });
+        setProgramMostCases(maxProgram || 'None');
     }
 
     async function fetchAppointments() {
@@ -241,9 +289,13 @@ export default function CounselorPage() {
 
     const kpiData = [
         { title: 'Total Users', value: totalUsers, icon: 'users' },
-        { title: 'Appointments This Month', value: appointmentsThisMonth, icon: 'calendar' },
         { title: 'Active Counselors', value: activeCounselors, icon: 'user-md' },
+        { title: 'Active Secretaries', value: activeSecretaries, icon: 'smile' },
+        { title: 'Active Students', value: activeStudents, icon: 'user' },
+        { title: 'Appointments This Month', value: appointmentsThisMonth, icon: 'calendar' },
         { title: 'Average Mood Score', value: averageMoodScore, icon: 'smile' },
+        { title: 'Department most cases', value: departmentMostCases, icon: 'building' },
+        { title: 'Program with most cases', value: programMostCases, icon: 'graduation-cap' },
     ];
 
     // Helper function to get chip color based on user type
