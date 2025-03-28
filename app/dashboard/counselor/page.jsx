@@ -26,7 +26,11 @@ import {
     Snackbar,
     Alert,
     Tab,
-    Tabs
+    Tabs,
+    MenuItem,
+    Select,
+    FormControl,
+    InputLabel
 } from '@mui/material';
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { useRouter } from "next/navigation";
@@ -35,7 +39,8 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 import SmartToyIcon from '@mui/icons-material/SmartToy';
 import DashboardIcon from '@mui/icons-material/Dashboard';
-
+import ChatIcon from '@mui/icons-material/Chat';
+import MessageIcon from '@mui/icons-material/Message';
 
 import Sidebar from '../../components/dashboard components/sidebar';
 import KPISection from '../../components/dashboard components/kpi_section';
@@ -68,6 +73,15 @@ export default function CounselorPage() {
     const [deleteConfirmDialog, setDeleteConfirmDialog] = useState({ open: false, type: '', id: null });
     const [tabValue, setTabValue] = useState(0);
 
+    // State for messages management
+    const [messages, setMessages] = useState([]);
+    const [currentMessage, setCurrentMessage] = useState({ 
+        message_type: '', 
+        message_role: '', 
+        message_content: '' 
+    });
+    const [openMessageDialog, setOpenMessageDialog] = useState(false);
+
     useEffect(() => {
         async function getUser() {
             try {
@@ -95,10 +109,11 @@ export default function CounselorPage() {
                     setUserType(profile?.user_type || '');
                     setIsDirector(profile?.is_director || false);
                     
-                    // Only fetch chatbot data if user is a director
+                    // Only fetch chatbot and messages data if user is a director
                     if (profile?.is_director) {
                         fetchChatbotQuestions();
                         fetchChatbotAnswers();
+                        fetchPredefinedMessages();
                         
                         // Set up realtime subscriptions for chatbot tables
                         const questionsChannel = supabase.channel('chatbot-questions-changes')
@@ -113,9 +128,16 @@ export default function CounselorPage() {
                             })
                             .subscribe();
                             
+                        const messagesChannel = supabase.channel('predefined-messages-changes')
+                            .on('postgres_changes', { event: '*', schema: 'public', table: 'predefined_messages' }, () => {
+                                fetchPredefinedMessages();
+                            })
+                            .subscribe();
+                            
                         return () => {
                             supabase.removeChannel(questionsChannel);
                             supabase.removeChannel(answersChannel);
+                            supabase.removeChannel(messagesChannel);
                         };
                     }
                 }
@@ -287,6 +309,21 @@ export default function CounselorPage() {
         } catch (error) {
             console.error('Error fetching chatbot answers:', error);
             showSnackbar('Failed to load answers', 'error');
+        }
+    }
+
+    // Fetch predefined messages from database
+    async function fetchPredefinedMessages() {
+        try {
+            const { data, error } = await supabase
+                .from('predefined_messages')
+                .select('*');
+                
+            if (error) throw error;
+            setMessages(data || []);
+        } catch (error) {
+            console.error('Error fetching predefined messages:', error);
+            showSnackbar('Failed to load messages', 'error');
         }
     }
 
@@ -481,6 +518,93 @@ export default function CounselorPage() {
         setTabValue(newValue);
     };
 
+    // CRUD operations for messages
+    const addMessage = async () => {
+        try {
+            if (!currentMessage.message_content.trim() || !currentMessage.message_type || !currentMessage.message_role) {
+                showSnackbar('All fields are required', 'error');
+                return;
+            }
+            
+            const { data, error } = await supabase
+                .from('predefined_messages')
+                .insert([{ 
+                    message_type: currentMessage.message_type,
+                    message_role: currentMessage.message_role,
+                    message_content: currentMessage.message_content
+                }]);
+                
+            if (error) throw error;
+            
+            showSnackbar('Message added successfully', 'success');
+            handleCloseMessageDialog();
+        } catch (error) {
+            console.error('Error adding message:', error);
+            showSnackbar('Failed to add message', 'error');
+        }
+    };
+
+    const updateMessage = async () => {
+        try {
+            if (!currentMessage.message_content.trim() || !currentMessage.message_type || !currentMessage.message_role) {
+                showSnackbar('All fields are required', 'error');
+                return;
+            }
+            
+            const { error } = await supabase
+                .from('predefined_messages')
+                .update({ 
+                    message_type: currentMessage.message_type,
+                    message_role: currentMessage.message_role,
+                    message_content: currentMessage.message_content
+                })
+                .eq('message_content_id', currentMessage.message_content_id);
+                
+            if (error) throw error;
+            
+            showSnackbar('Message updated successfully', 'success');
+            handleCloseMessageDialog();
+        } catch (error) {
+            console.error('Error updating message:', error);
+            showSnackbar('Failed to update message', 'error');
+        }
+    };
+
+    const deleteMessage = async (id) => {
+        try {
+            const { error } = await supabase
+                .from('predefined_messages')
+                .delete()
+                .eq('message_content_id', id);
+                
+            if (error) throw error;
+            
+            showSnackbar('Message deleted successfully', 'success');
+            handleCloseDeleteConfirmDialog();
+        } catch (error) {
+            console.error('Error deleting message:', error);
+            showSnackbar('Failed to delete message', 'error');
+        }
+    };
+
+    // Message dialog handlers
+    const handleOpenMessageDialog = (message = null) => {
+        if (message) {
+            setCurrentMessage(message);
+            setIsEditing(true);
+        } else {
+            setCurrentMessage({ message_type: '', message_role: '', message_content: '' });
+            setIsEditing(false);
+        }
+        setOpenMessageDialog(true);
+    };
+
+    const handleCloseMessageDialog = () => {
+        setOpenMessageDialog(false);
+        setCurrentMessage({ message_type: '', message_role: '', message_content: '' });
+        setIsEditing(false);
+    };
+
     return (
         <Box className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 flex">
             <Sidebar handleLogout={handleLogout} />
@@ -579,7 +703,7 @@ export default function CounselorPage() {
                             centered
                         >
                             <Tab 
-                                icon={<DashboardIcon  />}
+                                icon={<DashboardIcon />}
                                 label="Dashboard Overview" 
                                 sx={{ 
                                     fontWeight: 'bold',
@@ -594,10 +718,18 @@ export default function CounselorPage() {
                                     '&.Mui-selected': { color: '#3B82F6' }
                                 }} 
                             />
+                            <Tab 
+                                icon={<MessageIcon />}
+                                label="Messages Management" 
+                                sx={{ 
+                                    fontWeight: 'bold',
+                                    '&.Mui-selected': { color: '#3B82F6' }
+                                }} 
+                            />
                         </Tabs>
                     )}
 
-                    {/* Dashboard Overview */}
+                    {/* Dashboard Overview - Visible to all users */}
                     {(!isDirector || (isDirector && tabValue === 0)) && (
                         <>
                             {/* KPI Section with shadows and hover effects */}
@@ -822,6 +954,86 @@ export default function CounselorPage() {
                             </Paper>
                         </Box>
                     )}
+
+                    {/* Messages Management (Only for directors) */}
+                    {isDirector && tabValue === 2 && (
+                        <Box sx={{ mt: 2 }}>
+                            <Paper 
+                                elevation={0} 
+                                sx={{ 
+                                    p: 3, 
+                                    borderRadius: 2, 
+                                    boxShadow: '0 4px 20px rgba(0,0,0,0.05)', 
+                                    border: '1px solid rgba(229, 231, 235, 0.8)' 
+                                }}
+                            >
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                                    <Typography variant="h6" component="h3" sx={{ fontWeight: 'bold' }}>
+                                        Predefined Messages
+                                    </Typography>
+                                    <Button 
+                                        variant="contained" 
+                                        color="primary" 
+                                        startIcon={<AddIcon />}
+                                        onClick={() => handleOpenMessageDialog()}
+                                        sx={{ borderRadius: 8 }}
+                                    >
+                                        Add Message
+                                    </Button>
+                                </Box>
+                                
+                                <TableContainer>
+                                    <Table sx={{ minWidth: 650 }}>
+                                        <TableHead>
+                                            <TableRow>
+                                                <TableCell sx={{ fontWeight: 'bold' }}>Type</TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold' }}>Role</TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold' }}>Content</TableCell>
+                                                <TableCell align="right" sx={{ fontWeight: 'bold' }}>Actions</TableCell>
+                                            </TableRow>
+                                        </TableHead>
+                                        <TableBody>
+                                            {messages.length > 0 ? (
+                                                messages.map((message) => (
+                                                    <TableRow key={message.message_content_id}>
+                                                        <TableCell>{message.message_type}</TableCell>
+                                                        <TableCell>{message.message_role}</TableCell>
+                                                        <TableCell>
+                                                            {message.message_content.length > 100 
+                                                                ? `${message.message_content.substring(0, 100)}...` 
+                                                                : message.message_content}
+                                                        </TableCell>
+                                                        <TableCell align="right">
+                                                            <IconButton 
+                                                                color="primary" 
+                                                                onClick={() => handleOpenMessageDialog(message)}
+                                                                size="small"
+                                                            >
+                                                                <EditIcon />
+                                                            </IconButton>
+                                                            <IconButton 
+                                                                color="error" 
+                                                                onClick={() => handleOpenDeleteConfirmDialog('message', message.message_content_id)}
+                                                                size="small"
+                                                            >
+                                                                <DeleteIcon />
+                                                            </IconButton>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))
+                                            ) : (
+                                                <TableRow>
+                                                    <TableCell colSpan={4} align="center">
+                                                        {loading ? 'Loading messages...' : 'No messages found'}
+                                                    </TableCell>
+                                                </TableRow>
+                                            )}
+                                        </TableBody>
+                                    </Table>
+                                </TableContainer>
+                            </Paper>
+                        </Box>
+                    )}
                 </Container>
                 
                 {/* Question Dialog */}
@@ -902,6 +1114,66 @@ export default function CounselorPage() {
                     </DialogActions>
                 </Dialog>
                 
+                {/* Message Dialog */}
+                <Dialog open={openMessageDialog} onClose={handleCloseMessageDialog} fullWidth>
+                    <DialogTitle>{isEditing ? 'Edit Message' : 'Add New Message'}</DialogTitle>
+                    <DialogContent>
+                        <Box sx={{ my: 2 }}>
+                            <FormControl fullWidth sx={{ mb: 2 }}>
+                                <InputLabel id="message-type-label">Message Type</InputLabel>
+                                <Select
+                                    labelId="message-type-label"
+                                    id="message-type"
+                                    value={currentMessage.message_type}
+                                    label="Message Type"
+                                    onChange={(e) => setCurrentMessage({ ...currentMessage, message_type: e.target.value })}
+                                >
+                                    <MenuItem value="greeting">options</MenuItem>
+                                    <MenuItem value="farewell">response</MenuItem>
+                                </Select>
+                            </FormControl>
+                            
+                            <FormControl fullWidth sx={{ mb: 2 }}>
+                                <InputLabel id="message-role-label">Message Role</InputLabel>
+                                <Select
+                                    labelId="message-role-label"
+                                    id="message-role"
+                                    value={currentMessage.message_role}
+                                    label="Message Role"
+                                    onChange={(e) => setCurrentMessage({ ...currentMessage, message_role: e.target.value })}
+                                >
+                                    <MenuItem value="system">Counselor</MenuItem>
+                                    <MenuItem value="counselor">Secretary</MenuItem>
+                                    <MenuItem value="user">Student</MenuItem>
+                                    <MenuItem value="assistant">Director</MenuItem>
+                                </Select>
+                            </FormControl>
+                        </Box>
+                        <TextField
+                            margin="dense"
+                            id="message"
+                            label="Message Content"
+                            type="text"
+                            fullWidth
+                            multiline
+                            rows={4}
+                            variant="outlined"
+                            value={currentMessage.message_content}
+                            onChange={(e) => setCurrentMessage({ ...currentMessage, message_content: e.target.value })}
+                        />
+                    </DialogContent>
+                    <DialogActions>
+                        <Button onClick={handleCloseMessageDialog}>Cancel</Button>
+                        <Button 
+                            onClick={isEditing ? updateMessage : addMessage} 
+                            variant="contained" 
+                            color="primary"
+                        >
+                            {isEditing ? 'Update' : 'Add'}
+                        </Button>
+                    </DialogActions>
+                </Dialog>
+                
                 {/* Delete Confirmation Dialog */}
                 <Dialog open={deleteConfirmDialog.open} onClose={handleCloseDeleteConfirmDialog}>
                     <DialogTitle>Confirm Delete</DialogTitle>
@@ -916,8 +1188,10 @@ export default function CounselorPage() {
                             onClick={() => {
                                 if (deleteConfirmDialog.type === 'question') {
                                     deleteQuestion(deleteConfirmDialog.id);
-                                } else {
+                                } else if (deleteConfirmDialog.type === 'answer') {
                                     deleteAnswer(deleteConfirmDialog.id);
+                                } else if (deleteConfirmDialog.type === 'message') {
+                                    deleteMessage(deleteConfirmDialog.id);
                                 }
                             }} 
                             variant="contained" 
