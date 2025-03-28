@@ -306,19 +306,48 @@ const fetchConversations = async () => {
       setShowSidebar(false);
     }
 
-    // Fetch all conversation ids for the selected friend
+    // Fetch all conversation ids for the selected friend using two separate queries
     const friendId = conversation.friend_id;
-    const { data: convs, error: convError } = await supabase
-      .from("conversations")
-      .select("conversation_id")
-      .or(
-        `(user_id.eq.${friendId} and created_by.eq.${session.user.id}),(user_id.eq.${session.user.id} and created_by.eq.${friendId})`
-      );
-    if (convError) {
-      console.error("Error fetching conversations for friend:", convError);
+    
+    if (!friendId || !session?.user?.id) {
+      console.error("Missing user IDs for conversation query");
       return;
     }
-    const conversationIds = convs?.map((c) => c.conversation_id) || [];
+    
+    // First query: user_id is friendId and created_by is current user
+    const { data: convsQuery1, error: convError1 } = await supabase
+      .from("conversations")
+      .select("conversation_id")
+      .eq("user_id", friendId)
+      .eq("created_by", session.user.id);
+      
+    if (convError1) {
+      console.error("Error in first conversation query:", convError1);
+      return;
+    }
+    
+    // Second query: user_id is current user and created_by is friendId
+    const { data: convsQuery2, error: convError2 } = await supabase
+      .from("conversations")
+      .select("conversation_id")
+      .eq("user_id", session.user.id)
+      .eq("created_by", friendId);
+    
+    if (convError2) {
+      console.error("Error in second conversation query:", convError2);
+      return;
+    }
+    
+    // Combine results
+    const allConvs = [...(convsQuery1 || []), ...(convsQuery2 || [])];
+    
+    // If no conversations were found, just clear messages
+    if (allConvs.length === 0) {
+      setMessages([]);
+      return;
+    }
+    
+    const conversationIds = allConvs.map(c => c.conversation_id);
 
     // Now fetch messages from all relevant conversations
     const { data, error } = await supabase
