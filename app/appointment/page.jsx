@@ -60,7 +60,11 @@ export default function AppointmentPage() {
     const timeToDate = (timeStr, dateStr) => {
       const [hours, minutes] = timeStr.split(':');
       const [year, month, day] = dateStr.split('-');
-      return new Date(year, month - 1, day, hours, minutes);
+      // Create date in UTC
+      const date = new Date(Date.UTC(year, month - 1, day, hours, minutes));
+      // Convert to Manila time (UTC+8)
+      date.setHours(date.getHours() + 8);
+      return date;
     };
     
     // Function to check and complete expired appointments
@@ -74,12 +78,24 @@ export default function AppointmentPage() {
           .single();
           
         if (userError || userData?.user_type !== 'counselor') {
+          console.log('User is not a counselor or error fetching user data:', userError);
           return;
         }
         
-        // Get current date in YYYY-MM-DD format
+        // Get current date and time in Manila timezone (UTC+8)
         const now = new Date();
-        const currentDate = now.toISOString().split('T')[0];
+        // Log timezone info for debugging
+        console.log('Browser timezone:', Intl.DateTimeFormat().resolvedOptions().timeZone);
+        console.log('Browser local time:', now.toLocaleString());
+        
+        // Create date in Manila timezone for comparison
+        const manilaOffset = 8 * 60; // Manila is UTC+8 (8 hours * 60 minutes)
+        const localOffset = now.getTimezoneOffset();
+        const totalOffset = manilaOffset + localOffset;
+        const manilaNow = new Date(now.getTime() + totalOffset * 60000);
+        
+        console.log('Manila time (UTC+8):', manilaNow.toLocaleString());
+        console.log('Current date in Manila for DB query:', manilaNow.toISOString().split('T')[0]);
         
         // Get all incomplete appointments for this counselor
         const { data: appointments, error: aptError } = await supabase
@@ -88,11 +104,13 @@ export default function AppointmentPage() {
           .eq('counselor_id', userId)
           .neq('status', 'completed')
           .order('availability_schedule_id');
-        //   debugger;
+        
         if (aptError) {
           console.error('Error fetching appointments:', aptError);
           return;
         }
+        
+        console.log(`Found ${appointments.length} incomplete appointments to check`);
         
         // Identify expired appointments
         const expiredAppointments = appointments.filter(apt => {
@@ -101,25 +119,43 @@ export default function AppointmentPage() {
           const aptDate = apt.availability_schedules.date;
           const endTime = apt.availability_schedules.end_time;
           
-          // Compare date and time with current time
+          // Compare date and time with Manila time
           const appointmentEndTime = timeToDate(endTime, aptDate);
-          return appointmentEndTime <= now;
+          
+          console.log(`Appointment ${apt.appointment_id} ends at:`, appointmentEndTime.toLocaleString());
+          console.log(`Is appointment expired? ${appointmentEndTime <= manilaNow}`);
+          
+          return appointmentEndTime <= manilaNow;
         });
+        
+        console.log(`Found ${expiredAppointments.length} expired appointments to complete`);
         
         // Update status to completed for expired appointments
         if (expiredAppointments.length > 0) {
           // Update appointment status
           for (const apt of expiredAppointments) {
-            await supabase
+            console.log(`Completing appointment ${apt.appointment_id}, schedule ${apt.availability_schedule_id}`);
+            
+            const { error: updateAptError } = await supabase
               .from('appointments')
               .update({ status: 'completed' })
               .eq('appointment_id', apt.appointment_id);
+            
+            if (updateAptError) {
+              console.error(`Error updating appointment ${apt.appointment_id}:`, updateAptError);
+            }
               
             // Update availability schedule
-            await supabase
+            const { error: updateSchedError } = await supabase
               .from('availability_schedules')
               .update({ is_available: false })
               .eq('availability_schedule_id', apt.availability_schedule_id);
+            
+            if (updateSchedError) {
+              console.error(`Error updating schedule ${apt.availability_schedule_id}:`, updateSchedError);
+            } else {
+              console.log(`Successfully marked schedule ${apt.availability_schedule_id} as unavailable`);
+            }
           }
           
           console.log(`${expiredAppointments.length} appointments automatically completed`);
@@ -134,12 +170,12 @@ export default function AppointmentPage() {
           .neq('status', 'completed')
           .order('availability_schedule_id');
           
-        //   debugger;
-          
         if (groupAptError) {
           console.error('Error fetching group appointments:', groupAptError);
           return;
         }
+        
+        console.log(`Found ${groupAppointments.length} incomplete group appointments to check`);
         
         // Identify expired group appointments
         const expiredGroupAppointments = groupAppointments.filter(apt => {
@@ -148,25 +184,43 @@ export default function AppointmentPage() {
           const aptDate = apt.availability_schedules.date;
           const endTime = apt.availability_schedules.end_time;
           
-          // Compare date and time with current time
+          // Compare date and time with Manila time
           const appointmentEndTime = timeToDate(endTime, aptDate);
-          return appointmentEndTime <= now;
+          
+          console.log(`Group appointment ${apt.appointment_id} ends at:`, appointmentEndTime.toLocaleString());
+          console.log(`Is group appointment expired? ${appointmentEndTime <= manilaNow}`);
+          
+          return appointmentEndTime <= manilaNow;
         });
+        
+        console.log(`Found ${expiredGroupAppointments.length} expired group appointments to complete`);
         
         // Update status to completed for expired group appointments
         if (expiredGroupAppointments.length > 0) {
           // Update appointment status
           for (const apt of expiredGroupAppointments) {
-            await supabase
+            console.log(`Completing group appointment ${apt.appointment_id}, schedule ${apt.availability_schedule_id}`);
+            
+            const { error: updateGroupAptError } = await supabase
               .from('appointments')
               .update({ status: 'completed' })
               .eq('appointment_id', apt.appointment_id);
+            
+            if (updateGroupAptError) {
+              console.error(`Error updating group appointment ${apt.appointment_id}:`, updateGroupAptError);
+            }
               
             // Update availability schedule
-            await supabase
+            const { error: updateGroupSchedError } = await supabase
               .from('availability_schedules')
               .update({ is_available: false })
               .eq('availability_schedule_id', apt.availability_schedule_id);
+            
+            if (updateGroupSchedError) {
+              console.error(`Error updating schedule for group ${apt.availability_schedule_id}:`, updateGroupSchedError);
+            } else {
+              console.log(`Successfully marked schedule for group ${apt.availability_schedule_id} as unavailable`);
+            }
           }
           
           console.log(`${expiredGroupAppointments.length} group appointments automatically completed`);
