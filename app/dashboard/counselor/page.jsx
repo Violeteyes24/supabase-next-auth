@@ -288,7 +288,7 @@ export default function CounselorPage() {
     };
 
     const kpiData = [
-        { title: 'Total Users', value: totalUsers, icon: 'users' },
+        { title: 'Total Users + Director', value: totalUsers, icon: 'users' },
         { title: 'Active Counselors', value: activeCounselors, icon: 'user-md' },
         { title: 'Active Secretaries', value: activeSecretaries, icon: 'smile' },
         { title: 'Active Students', value: activeStudents, icon: 'user' },

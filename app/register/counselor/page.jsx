@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import SignUpButton from "../../components/login components/sign_up_button";
-import { Box, Skeleton } from "@mui/material";
 
 export default function CounselorRegister() {
     const [email, setEmail] = useState('')
@@ -362,64 +361,13 @@ export default function CounselorRegister() {
         }
     };
 
-    // Loading skeleton component with shimmer effect
-    const RegisterSkeleton = () => (
-        <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-cyan-50 flex items-center justify-center p-4 relative overflow-hidden">
-            {/* Shimmer overlay */}
-            <Box 
-                sx={{ 
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    background: 'linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.8) 50%, rgba(255,255,255,0) 100%)',
-                    animation: 'shimmer 2s infinite',
-                    '@keyframes shimmer': {
-                        '0%': { transform: 'translateX(-100%)' },
-                        '100%': { transform: 'translateX(100%)' }
-                    },
-                    zIndex: 10
-                }}
-            />
-            
-            <div className="bg-white rounded-xl shadow-lg p-8 max-w-4xl w-full mx-auto">
-                <div className="mb-6">
-                    <Skeleton variant="text" width={200} height={40} />
-                    <Skeleton variant="text" width={300} height={24} sx={{ mt: 1 }} />
-                </div>
-                
-                {/* Progress bar skeleton */}
-                <div className="mb-8">
-                    <div className="flex justify-between mb-2">
-                        {[...Array(3)].map((_, i) => (
-                            <Skeleton key={i} variant="circular" width={30} height={30} />
-                        ))}
-                    </div>
-                    <Skeleton variant="rectangular" height={8} sx={{ borderRadius: 4 }} />
-                </div>
-                
-                {/* Form fields skeleton */}
-                <div className="space-y-6">
-                    {[...Array(4)].map((_, i) => (
-                        <div key={i} className="space-y-2">
-                            <Skeleton variant="text" width={120} height={20} />
-                            <Skeleton variant="rectangular" height={48} sx={{ borderRadius: 1 }} />
-                        </div>
-                    ))}
-                    
-                    <div className="pt-4 flex justify-between">
-                        <Skeleton variant="rectangular" width={100} height={40} sx={{ borderRadius: 20 }} />
-                        <Skeleton variant="rectangular" width={100} height={40} sx={{ borderRadius: 20 }} />
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-
-    // If loading, show skeleton
     if (loading) {
-        return <RegisterSkeleton />;
+        return (
+            <div className="h-screen flex flex-col justify-center items-center bg-emerald-100">
+                <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-emerald-600"></div>
+                <p className="mt-4 text-emerald-800 font-medium">Loading...</p>
+            </div>
+        );
     }
 
     if (user) {

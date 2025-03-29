@@ -16,7 +16,7 @@ const ConfirmationContent = () => {
 
     useEffect(() => {
         if (code && email) {
-            setStatus('success');
+            // setStatus('success');
             setMessage(`Your email (${decodeURIComponent(email)}) has been confirmed!`);
             
             // Redirect after successful confirmation

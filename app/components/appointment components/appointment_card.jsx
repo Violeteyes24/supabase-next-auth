@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { Modal, Box, Button, Typography, TextField, TablePagination } from "@mui/material";
 import { TimePicker, DatePicker, LocalizationProvider } from "@mui/x-date-pickers";
@@ -23,18 +23,132 @@ export default function AppointmentCard() {
   const [rowsPerPage, setRowsPerPage] = useState(5);
   const [errorMessage, setErrorMessage] = useState('');
   const [openErrorModal, setOpenErrorModal] = useState(false);
+  const [userType, setUserType] = useState("");
 
+  // Add an effect to monitor appointments state changes
   useEffect(() => {
-    const getSession = async () => {
+    console.log("Debug - Appointments state updated:", appointments);
+  }, [appointments]);
+
+  // Modify the fetchAppointments function to use async/await properly
+  const fetchAppointments = useCallback(async () => {
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session) {
+        console.error("No session found");
+        return;
+      }
+
+      const userId = session.user.id;
+      const currentDate = dayjs().format("YYYY-MM-DD");
+
+      console.log("Debug - Current Date:", currentDate);
+      console.log("Debug - User ID:", userId);
+
+      const { data: userData, error: userError } = await supabase
+        .from("users")
+        .select("user_type")
+        .eq("user_id", userId)
+        .single();
+
+      if (userError) {
+        console.error("Debug - User Type Error:", userError.message);
+        return;
+      }
+
+      const userType = userData.user_type;
+      setUserType(userType);
+
+      if (userType === "secretary") {
+        console.log("Debug - Fetching as secretary");
+        
+        const { data: secretaryAppointments, error: secretaryError } = await supabase
+          .from("secretary_appointments_view")
+          .select("*")
+          .eq("secretary_id", userId)
+          .neq("status", "cancelled")
+          .neq("status", "rescheduled")
+          .neq("status", "completed")
+          // .gte("availability_schedules.date", currentDate);
+
+        if (secretaryError) {
+          console.error("Debug - Secretary Appointments Error:", secretaryError);
+          return;
+        }
+
+        console.log("Debug - Raw Secretary Appointments:", secretaryAppointments);
+        
+        if (secretaryAppointments?.length > 0) {
+          console.log("Debug - First Appointment:", secretaryAppointments[0]);
+          console.log("Debug - Total Appointments:", secretaryAppointments.length);
+          // Directly update the state
+          setAppointments(secretaryAppointments);
+        } else {
+          console.log("Debug - No appointments found for secretary");
+          setAppointments([]);
+        }
+      } else {
+        console.log("Debug - Fetching as counselor");
+        const { data, error } = await supabase
+          .from("appointments")
+          .select(`
+            appointment_id,
+            user_id,
+            counselor_id,
+            availability_schedule_id,
+            form_id,
+            response_id,
+            status,
+            appointment_type,
+            reason,
+            availability_schedules (
+                date,
+                start_time,
+                end_time
+            ),
+            users!appointments_user_id_fkey (
+                name
+            )
+          `)
+          .eq("status", "pending")
+          .eq("counselor_id", userId)
+          .gte("availability_schedules.date", currentDate);
+
+        if (error) {
+          console.error("Debug - Counselor Appointments Error:", error);
+          return;
+        }
+
+        console.log("Debug - Raw Counselor Appointments:", data);
+        
+        if (data?.length > 0) {
+          console.log("Debug - First Counselor Appointment:", data[0]);
+          setAppointments(data);
+        } else {
+          console.log("Debug - No appointments found for counselor");
+          setAppointments([]);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching appointments:", error);
+      setError("Failed to fetch appointments");
+    }
+  }, [supabase]);
+
+  // Modify the useEffect for initial load
+  useEffect(() => {
+    const initializeComponent = async () => {
       const {
         data: { session },
       } = await supabase.auth.getSession();
       setSession(session);
+      await fetchAppointments();
     };
-    getSession();
-    fetchAppointments();
 
-    // Add real-time subscription
+    initializeComponent();
+
     const appointmentChannel = supabase.channel('appointments-changes')
       .on('postgres_changes', 
         { 
@@ -49,74 +163,21 @@ export default function AppointmentCard() {
       )
       .subscribe();
 
-    // Cleanup subscription
     return () => {
       supabase.removeChannel(appointmentChannel);
     };
-  }, []);
-
-  const fetchAppointments = async () => {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    if (!session) {
-      console.error("No session found");
-      return;
-    }
-
-    const userId = session.user.id;
-    const currentDate = dayjs().format("YYYY-MM-DD");
-
-    console.log("Fetching appointments for user ID:", userId);
-
-    const { data, error } = await supabase
-      .from("appointments")
-      .select(
-        `
-                appointment_id,
-                user_id,
-                counselor_id,
-                availability_schedule_id,
-                form_id,
-                response_id,
-                status,
-                appointment_type,
-                availability_schedules (
-                    date,
-                    start_time,
-                    end_time
-                ),
-                users!appointments_user_id_fkey (
-                    name
-                )
-            `
-      )
-      .eq("status", "pending")
-      .eq("counselor_id", userId)
-      .gte("availability_schedules.date", currentDate);
-
-    if (error) {
-      console.error("Error fetching appointments:", error.message);
-      return;
-    }
-
-    console.log("Fetched appointments:", data);
-    setAppointments(data);
-  };
+  }, [fetchAppointments]);
 
   const handleReschedule = (appointment) => {
     setSelectedAppointment(appointment);
-    setSelectedDate(dayjs(appointment.availability_schedules.date));
-    setStartTime(dayjs(appointment.availability_schedules.start_time, "HH:mm"));
-    setEndTime(dayjs(appointment.availability_schedules.end_time, "HH:mm"));
+    setSelectedDate(dayjs(appointment.date));
+    setStartTime(dayjs(appointment.start_time, "HH:mm"));
+    setEndTime(dayjs(appointment.end_time, "HH:mm"));
     setOpenRescheduleModal(true);
   };
 
   const handleConfirmReschedule = async () => {
     try {
-      // Validations
-      
-      // Check if selected date is in the past
       const today = dayjs().startOf('day');
       if (selectedDate.isBefore(today)) {
           setErrorMessage('Cannot reschedule to a past date.');
@@ -124,14 +185,12 @@ export default function AppointmentCard() {
           return;
       }
 
-      // Check if end time is before start time
       if (endTime.isBefore(startTime)) {
           setErrorMessage('End time must be after start time.');
           setOpenErrorModal(true);
           return;
       }
 
-      // Check for minimum 30 minute interval
       const startMinutes = startTime.hour() * 60 + startTime.minute();
       const endMinutes = endTime.hour() * 60 + endTime.minute();
       if (endMinutes - startMinutes < 30) {
@@ -140,12 +199,11 @@ export default function AppointmentCard() {
           return;
       }
 
-      // Check for time conflicts with existing schedules
       const { data: existingSchedules, error: fetchError } = await supabase
           .from('availability_schedules')
           .select('*')
           .eq('date', selectedDate.format('YYYY-MM-DD'))
-          .neq('availability_schedule_id', selectedAppointment.availability_schedule_id) // Exclude current schedule
+          .neq('availability_schedule_id', selectedAppointment.availability_schedule_id)
           .gte('start_time', startTime.format('HH:mm'))
           .lt('end_time', endTime.format('HH:mm'));
 
@@ -162,7 +220,6 @@ export default function AppointmentCard() {
           return;
       }
 
-      // Update availability schedules with new date and times
       const { data, error } = await supabase
         .from("availability_schedules")
         .update({
@@ -186,7 +243,6 @@ export default function AppointmentCard() {
         return;
       }
 
-      // Update appointment status to rescheduled
       const { error: appointmentError } = await supabase
         .from("appointments")
         .update({ 
@@ -200,7 +256,6 @@ export default function AppointmentCard() {
         return;
       }
 
-      // Create notification for the counselor
       const studentName = selectedAppointment.users.name;
       const appointmentDate = selectedDate.format("MMMM D, YYYY");
       const formattedStartTime = formatTime(startTime.format("HH:mm"));
@@ -208,7 +263,6 @@ export default function AppointmentCard() {
       const appointmentType = selectedAppointment.appointment_type || "Consultation";
       const notificationContent = `${studentName} has rescheduled their ${appointmentType} appointment to ${appointmentDate} at ${formattedStartTime} - ${formattedEndTime}.`;
       
-      // Insert the notification
       const { error: notificationError } = await supabase
         .from("notifications")
         .insert({
@@ -221,7 +275,6 @@ export default function AppointmentCard() {
 
       if (notificationError) {
         console.error("Error creating notification:", notificationError);
-        // Continue with the rescheduling process even if notification fails
       }
 
       console.log("Appointment rescheduled:", data);
@@ -242,14 +295,12 @@ export default function AppointmentCard() {
 
   const handleConfirmCancel = async () => {
     try {
-      // Get current session to identify who is cancelling the appointment
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         setError("You must be logged in to cancel an appointment.");
         return;
       }
 
-      // Update the appointment status to cancelled
       const { error: appointmentError } = await supabase
         .from("appointments")
         .update({ 
@@ -264,7 +315,6 @@ export default function AppointmentCard() {
         return;
       }
 
-      // Update the availability schedule to mark it as unavailable
       const { error: scheduleError } = await supabase
         .from("availability_schedules")
         .update({ is_available: false })
@@ -281,15 +331,13 @@ export default function AppointmentCard() {
         return;
       }
 
-      // Create notification for the counselor
       const studentName = selectedAppointment.users.name;
-      const appointmentDate = dayjs(selectedAppointment.availability_schedules.date).format("MMMM D, YYYY");
-      const startTime = formatTime(selectedAppointment.availability_schedules.start_time);
-      const endTime = formatTime(selectedAppointment.availability_schedules.end_time);
+      const appointmentDate = dayjs(selectedAppointment.date).format("MMMM D, YYYY");
+      const startTime = formatTime(selectedAppointment.start_time);
+      const endTime = formatTime(selectedAppointment.end_time);
       const appointmentType = selectedAppointment.appointment_type || "Consultation";
       const notificationContent = `${studentName} has cancelled their ${appointmentType} appointment scheduled for ${appointmentDate} at ${startTime} - ${endTime}.`;
       
-      // Insert the notification
       const { error: notificationError } = await supabase
         .from("notifications")
         .insert({
@@ -302,14 +350,12 @@ export default function AppointmentCard() {
 
       if (notificationError) {
         console.error("Error creating notification:", notificationError);
-        // Continue with the cancellation process even if notification fails
       }
 
       console.log("Appointment canceled successfully");
       setSuccessMessage("Appointment canceled successfully.");
       setError(null);
 
-      // Add a delay before closing the modal then refresh appointments
       setTimeout(() => {
         setOpenCancelModal(false);
         fetchAppointments();
@@ -336,7 +382,6 @@ export default function AppointmentCard() {
   return (
     <LocalizationProvider dateAdapter={AdapterDayjs}>
       <div className="border rounded-lg shadow-xl p-6 bg-white">
-        {/* Notification Messages */}
         {successMessage && (
           <div className="mb-4 p-3 bg-green-100 border-l-4 border-green-500 text-green-700 rounded">
             <p>{successMessage}</p>
@@ -361,7 +406,6 @@ export default function AppointmentCard() {
           </div>
         )}
 
-        {/* Header Section */}
         <div className="flex justify-between items-center mb-6 border-b pb-4">
           <Typography
             variant="h5"
@@ -375,7 +419,6 @@ export default function AppointmentCard() {
           </div>
         </div>
 
-        {/* Table Section */}
         {appointments.length > 0 ? (
           <div className="rounded-lg border border-gray-200">
             <div className="overflow-auto max-h-96">
@@ -398,10 +441,6 @@ export default function AppointmentCard() {
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {appointments
-                    .filter(
-                      (appointment) =>
-                        appointment.users && appointment.availability_schedules
-                    )
                     .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
                     .map((appointment, index) => (
                       <tr
@@ -419,11 +458,16 @@ export default function AppointmentCard() {
                             </div>
                             <div className="ml-4">
                               <div className="text-sm font-medium text-gray-900">
-                                {appointment.users.name}
+                                {appointment.client_name}
                               </div>
                               <div className="text-sm text-gray-500">
-                                Client #{appointment.user_id.slice(0, 8)}
+                                Client #{appointment.user_id?.slice(0, 8) || "N/A"}
                               </div>
+                              {userType === "secretary" && (
+                                <div className="text-xs text-emerald-600">
+                                  Counselor: {appointment.counselor_name}
+                                </div>
+                              )}
                             </div>
                           </div>
                         </td>
@@ -434,22 +478,24 @@ export default function AppointmentCard() {
                           <div className="text-sm text-gray-500">
                             {appointment.reason || "General session"}
                           </div>
+                          {appointment.category && (
+                            <div className="text-xs text-emerald-600">
+                              Category: {appointment.category}
+                            </div>
+                          )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm text-gray-900">
-                            {dayjs(
-                              appointment.availability_schedules.date
-                            ).format("MMMM D, YYYY")}
+                            {dayjs(appointment.date).format("MMMM D, YYYY")}
                           </div>
                           <div className="text-sm text-gray-500">
-                            {formatTime(
-                              appointment.availability_schedules.start_time
-                            )}{" "}
-                            -{" "}
-                            {formatTime(
-                              appointment.availability_schedules.end_time
-                            )}
+                            {`${formatTime(appointment.start_time)} - ${formatTime(appointment.end_time)}`}
                           </div>
+                          {appointment.is_group_eligible && (
+                            <div className="text-xs text-blue-600">
+                              Group Session Eligible
+                            </div>
+                          )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
                           <button
@@ -472,9 +518,7 @@ export default function AppointmentCard() {
             </div>
             <TablePagination
               component="div"
-              count={appointments.filter(
-                appointment => appointment.users && appointment.availability_schedules
-              ).length}
+              count={appointments.length}
               page={page}
               onPageChange={handleChangePage}
               rowsPerPage={rowsPerPage}
@@ -514,11 +558,9 @@ export default function AppointmentCard() {
           </div>
         )}
 
-        {/* Footer Section */}
         {appointments.length > 0 && (
           <div className="flex justify-between items-center mt-6 pt-4 border-t">
             <div className="text-sm text-gray-500">
-              {/* Showing {appointments.length} appointment{appointments.length !== 1 ? 's' : ''} */}
               Best of luck Counselor!
             </div>
             <div className="space-x-2">
@@ -532,7 +574,6 @@ export default function AppointmentCard() {
           </div>
         )}
 
-        {/* Reschedule Modal */}
         <Modal
           open={openRescheduleModal}
           onClose={() => setOpenRescheduleModal(false)}
@@ -561,20 +602,17 @@ export default function AppointmentCard() {
             {selectedAppointment && (
               <div className="mb-4 p-3 bg-gray-50 rounded-lg">
                 <p className="text-sm text-gray-500">
-                  Current schedule:{" "}
-                  {dayjs(
-                    selectedAppointment.availability_schedules.date
-                  ).format("MMMM D, YYYY")}
+                  Current schedule: {" "}
+                  {dayjs(selectedAppointment.date).format("MMMM D, YYYY")}
                 </p>
                 <p className="text-sm font-medium text-gray-700">
-                  {formatTime(
-                    selectedAppointment.availability_schedules.start_time
-                  )}{" "}
-                  -{" "}
-                  {formatTime(
-                    selectedAppointment.availability_schedules.end_time
-                  )}
+                  {formatTime(selectedAppointment.start_time)} - {formatTime(selectedAppointment.end_time)}
                 </p>
+                {userType === "secretary" && (
+                  <p className="text-sm text-emerald-600">
+                    Counselor: {selectedAppointment.counselor_name}
+                  </p>
+                )}
               </div>
             )}
             <div className="space-y-4 mb-6">
@@ -640,7 +678,6 @@ export default function AppointmentCard() {
           </Box>
         </Modal>
 
-        {/* Cancel Modal */}
         <Modal
           open={openCancelModal}
           onClose={() => setOpenCancelModal(false)}
@@ -676,17 +713,11 @@ export default function AppointmentCard() {
                     {selectedAppointment.users.name}
                   </p>
                   <p className="text-sm text-gray-700">
-                    {dayjs(
-                      selectedAppointment.availability_schedules.date
-                    ).format("MMMM D, YYYY")}{" "}
+                    {dayjs(selectedAppointment.date).format("MMMM D, YYYY")}{" "}
                     |{" "}
-                    {formatTime(
-                      selectedAppointment.availability_schedules.start_time
-                    )}{" "}
+                    {formatTime(selectedAppointment.start_time)}{" "}
                     -{" "}
-                    {formatTime(
-                      selectedAppointment.availability_schedules.end_time
-                    )}
+                    {formatTime(selectedAppointment.end_time)}
                   </p>
                   <p className="text-sm text-gray-500 mt-1">
                     {selectedAppointment.appointment_type || "Consultation"}
@@ -725,7 +756,6 @@ export default function AppointmentCard() {
           </Box>
         </Modal>
 
-        {/* Error Modal */}
         <Modal open={openErrorModal} onClose={() => setOpenErrorModal(false)}>
           <Box sx={{
             position: "absolute",
