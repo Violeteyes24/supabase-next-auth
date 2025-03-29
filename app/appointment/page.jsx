@@ -584,58 +584,83 @@ export default function AppointmentPage() {
       try {
         setCompletedLoading(true);
         
-        // First, check if user is a counselor
+        // First, check if user is a counselor or secretary
         const { data: userData, error: userError } = await supabase
-          .from('users')
-          .select('user_type')
-          .eq('user_id', userId)
+          .from("users")
+          .select("user_type")
+          .eq("user_id", userId)
           .single();
           
-        if (userError || userData?.user_type !== 'counselor') {
+        if (userError) {
+          console.error('Error fetching user type:', userError);
           setCompletedLoading(false);
           return;
         }
+
+        console.log("Fetching completed appointments for user type:", userData.user_type);
         
-        // Fetch completed individual appointments
-        if (!showGroupCompleted) {
+        // Fetch completed individual or group appointments based on user type
+        if (userData.user_type === 'secretary') {
+          // Secretary: use the view and filter by secretary_id
           const { data, error } = await supabase
-            .from('appointments')
-            .select('*, availability_schedules(*), users!appointments_user_id_fkey(*)')
-            .eq('counselor_id', userId)
+            .from('secretary_appointments_view')
+            .select('*')
+            .eq('secretary_id', userId)
             .eq('status', 'completed')
-            .eq('appointment_type', 'individual')
-            .order('availability_schedules(date)', { ascending: false });
-            
+            .eq('appointment_type', showGroupCompleted ? 'group' : 'individual')
+            .order('date', { ascending: false });
+          
           if (error) {
-            console.error('Error fetching completed appointments:', error);
+            console.error('Error fetching completed appointments for secretary:', error);
             setCompletedLoading(false);
             return;
           }
           
+          console.log('Fetched completed appointments for secretary:', data);
           setCompletedAppointments(data || []);
-        } 
-        // Fetch completed group appointments
-        else {
-          const { data: groupData, error: groupError } = await supabase
-            .from('appointments')
-            .select(`
-              *,
-              availability_schedules(*),
-              groupappointments(*, users(*))
-            `)
-            .eq('counselor_id', userId)
-            .eq('status', 'completed')
-            .eq('appointment_type', 'group')
-            .order('availability_schedules(date)', { ascending: false });
+        } else if (userData.user_type === 'counselor') {
+          // Counselor: use the original query
+          if (!showGroupCompleted) {
+            const { data, error } = await supabase
+              .from('appointments')
+              .select('*, availability_schedules(*), users!appointments_user_id_fkey(*)')
+              .eq('counselor_id', userId)
+              .eq('status', 'completed')
+              .eq('appointment_type', 'individual')
+              .order('availability_schedules(date)', { ascending: false });
             
-          if (groupError) {
-            console.error('Error fetching completed group appointments:', groupError);
-            setCompletedLoading(false);
-            return;
+            if (error) {
+              console.error('Error fetching completed appointments:', error);
+              setCompletedLoading(false);
+              return;
+            }
+            
+            setCompletedAppointments(data || []);
+          } 
+          // Fetch completed group appointments
+          else {
+            const { data: groupData, error: groupError } = await supabase
+              .from('appointments')
+              .select(`
+                *,
+                availability_schedules(*),
+                groupappointments(*, users(*))
+              `)
+              .eq('counselor_id', userId)
+              .eq('status', 'completed')
+              .eq('appointment_type', 'group')
+              .order('availability_schedules(date)', { ascending: false });
+            
+            if (groupError) {
+              console.error('Error fetching completed group appointments:', groupError);
+              setCompletedLoading(false);
+              return;
+            }
+            
+            setCompletedAppointments(groupData || []);
           }
-          
-          setCompletedAppointments(groupData || []);
         }
+        
         setCompletedLoading(false);
       } catch (error) {
         console.error('Error fetching completed appointments:', error);
@@ -648,58 +673,83 @@ export default function AppointmentPage() {
       try {
         setCompletedLoading(true);
         
-        // First, check if user is a counselor
+        // First, check if user is a counselor or secretary
         const { data: userData, error: userError } = await supabase
-          .from('users')
-          .select('user_type')
-          .eq('user_id', userId)
+          .from("users")
+          .select("user_type")
+          .eq("user_id", userId)
           .single();
           
-        if (userError || userData?.user_type !== 'counselor') {
+        if (userError) {
+          console.error('Error fetching user type:', userError);
           setCompletedLoading(false);
           return;
         }
+
+        console.log("Fetching cancelled appointments for user type:", userData.user_type);
         
-        // Fetch cancelled individual appointments
-        if (!isGroup) {
+        // Fetch cancelled appointments based on user type
+        if (userData.user_type === 'secretary') {
+          // Secretary: use the view and filter by secretary_id
           const { data, error } = await supabase
-            .from('appointments')
-            .select('*, availability_schedules(*), users!appointments_user_id_fkey(*)')
-            .eq('counselor_id', userId)
+            .from('secretary_appointments_view')
+            .select('*')
+            .eq('secretary_id', userId)
             .eq('status', 'cancelled')
-            .eq('appointment_type', 'individual')
-            .order('availability_schedules(date)', { ascending: false });
-            
+            .eq('appointment_type', isGroup ? 'group' : 'individual')
+            .order('date', { ascending: false });
+          
           if (error) {
-            console.error('Error fetching cancelled appointments:', error);
+            console.error('Error fetching cancelled appointments for secretary:', error);
             setCompletedLoading(false);
             return;
           }
           
+          console.log('Fetched cancelled appointments for secretary:', data);
           setCancelledAppointments(data || []);
-        } 
-        // Fetch cancelled group appointments
-        else {
-          const { data: groupData, error: groupError } = await supabase
-            .from('appointments')
-            .select(`
-              *,
-              availability_schedules(*),
-              groupappointments(*, users(*))
-            `)
-            .eq('counselor_id', userId)
-            .eq('status', 'cancelled')
-            .eq('appointment_type', 'group')
-            .order('availability_schedules(date)', { ascending: false });
+        } else if (userData.user_type === 'counselor') {
+          // Counselor: use the original query
+          if (!isGroup) {
+            const { data, error } = await supabase
+              .from('appointments')
+              .select('*, availability_schedules(*), users!appointments_user_id_fkey(*)')
+              .eq('counselor_id', userId)
+              .eq('status', 'cancelled')
+              .eq('appointment_type', 'individual')
+              .order('availability_schedules(date)', { ascending: false });
             
-          if (groupError) {
-            console.error('Error fetching cancelled group appointments:', groupError);
-            setCompletedLoading(false);
-            return;
+            if (error) {
+              console.error('Error fetching cancelled appointments:', error);
+              setCompletedLoading(false);
+              return;
+            }
+            
+            setCancelledAppointments(data || []);
+          } 
+          // Fetch cancelled group appointments
+          else {
+            const { data: groupData, error: groupError } = await supabase
+              .from('appointments')
+              .select(`
+                *,
+                availability_schedules(*),
+                groupappointments(*, users(*))
+              `)
+              .eq('counselor_id', userId)
+              .eq('status', 'cancelled')
+              .eq('appointment_type', 'group')
+              .order('availability_schedules(date)', { ascending: false });
+            
+            if (groupError) {
+              console.error('Error fetching cancelled group appointments:', groupError);
+              setCompletedLoading(false);
+              return;
+            }
+            
+            setCancelledAppointments(groupData || []);
           }
-          
-          setCancelledAppointments(groupData || []);
         }
+        
         setCompletedLoading(false);
       } catch (error) {
         console.error('Error fetching cancelled appointments:', error);
@@ -909,6 +959,87 @@ export default function AppointmentPage() {
     // Handle completed appointments pagination
     const handleCompletedPageChange = (event, value) => {
         setCompletedPage(value);
+    };
+
+    // Add some additional useEffect logic after the userRole is set
+    useEffect(() => {
+      if (session && userRole === 'secretary') {
+        fetchSecretaryAppointments();
+      }
+    }, [session, userRole]);
+
+    // Add a new function to fetch secretary appointments from the view
+    const fetchSecretaryAppointments = async () => {
+      try {
+        setLoading(true);
+        
+        // First, check if the user is actually a secretary
+        if (userRole !== 'secretary') {
+          console.log("User is not a secretary");
+          setLoading(false);
+          return;
+        }
+        
+        const userId = session.user.id;
+        
+        // Fetch assigned counselors for this secretary
+        const { data: assignmentData, error: assignmentError } = await supabase
+          .from("secretary_assignments")
+          .select("counselor_id")
+          .eq("secretary_id", userId);
+        
+        if (assignmentError) {
+          console.error("Error fetching assigned counselors:", assignmentError);
+          setLoading(false);
+          return;
+        }
+        
+        if (!assignmentData || assignmentData.length === 0) {
+          console.log("No counselors assigned to this secretary");
+          setLoading(false);
+          return;
+        }
+        
+        const counselorIds = assignmentData.map(assignment => assignment.counselor_id);
+        console.log("Fetching appointments for counselors:", counselorIds);
+        
+        // Test query to verify the view exists
+        console.log("Attempting to query secretary_appointments_view...");
+        const { data: viewTest, error: viewTestError } = await supabase
+          .from("secretary_appointments_view")
+          .select("*")
+          .limit(5);
+        
+        if (viewTestError) {
+          console.error("Error testing secretary_appointments_view:", viewTestError);
+        } else {
+          console.log("Secretary appointments view test results:", viewTest);
+        }
+        
+        // Fetch appointments from the view
+        const { data: appointmentsData, error: appointmentsError } = await supabase
+          .from("secretary_appointments_view")
+          .select("*")
+          .in("counselor_id", counselorIds)
+          .neq("status", "completed")
+          .neq("status", "cancelled");
+        
+        if (appointmentsError) {
+          console.error("Error fetching appointments from view:", appointmentsError);
+          setLoading(false);
+          return;
+        }
+        
+        console.log("Secretary appointments from view:", appointmentsData);
+        
+        // Process individual appointments specifically for the secretary view
+        // You can add more processing here if needed
+        
+        setLoading(false);
+      } catch (error) {
+        console.error("Unexpected error fetching secretary appointments:", error);
+        setLoading(false);
+      }
     };
 
     // Replace the Completed Appointments Section with this new version
@@ -1122,60 +1253,85 @@ export default function AppointmentPage() {
                                         {(viewType === 'completed' ? completedAppointments : cancelledAppointments)
                                             .slice((completedPage - 1) * completedRowsPerPage, 
                                                    completedPage * completedRowsPerPage)
-                                            .map((appointment) => (
-                                                <div
-                                                    key={appointment.appointment_id}
-                                                    className={`flex justify-between items-center p-4 rounded-lg ${
-                                                        viewType === 'completed' 
-                                                        ? 'bg-gray-50 border border-gray-200' 
-                                                        : 'bg-red-50 border border-red-100'
-                                                    } shadow-sm`}
-                                                >
-                                                    <div className="flex flex-col">
-                                                        {!showGroupCompleted && appointment.users && (
-                                                            <p className="font-medium text-emerald-700">
-                                                                {appointment.users.name}
-                                                            </p>
-                                                        )}
-                                                        {showGroupCompleted && (
-                                                            <>
+                                            .map((appointment) => {
+                                                // Determine if we're using the flattened secretary view or nested counselor view
+                                                const isSecretaryView = userRole === 'secretary';
+                                                
+                                                return (
+                                                    <div
+                                                        key={appointment.appointment_id}
+                                                        className={`flex justify-between items-center p-4 rounded-lg ${
+                                                            viewType === 'completed' 
+                                                            ? 'bg-gray-50 border border-gray-200' 
+                                                            : 'bg-red-50 border border-red-100'
+                                                        } shadow-sm`}
+                                                    >
+                                                        <div className="flex flex-col">
+                                                            {!showGroupCompleted && (
                                                                 <p className="font-medium text-emerald-700">
-                                                                    Group Session ({appointment.groupappointments?.length || 0} participants)
+                                                                    {isSecretaryView 
+                                                                        ? appointment.client_name || "Unknown Client"
+                                                                        : appointment.users?.name || "Unknown Client"}
                                                                 </p>
-                                                                <div className="mt-1">
-                                                                    {appointment.groupappointments && appointment.groupappointments.length > 0 ? (
-                                                                        <div className="grid grid-cols-1 gap-1">
-                                                                            {appointment.groupappointments.map((participant, index) => (
-                                                                                <p key={participant.g_appointment_id} className="text-sm text-gray-600">
-                                                                                    {participant.users?.name}
-                                                                                </p>
-                                                                            ))}
-                                                                        </div>
-                                                                    ) : (
-                                                                        <p className="text-sm text-gray-500 italic">No participants data available</p>
-                                                                    )}
-                                                                </div>
-                                                            </>
-                                                        )}
-                                                        <p className="text-gray-600">
-                                                            {appointment.availability_schedules && 
-                                                                `${dayjs(appointment.availability_schedules.date).format('MMM DD, YYYY')} • 
-                                                                ${formatTime(appointment.availability_schedules.start_time)} - 
-                                                                ${formatTime(appointment.availability_schedules.end_time)}`}
-                                                        </p>
-                                                        <p className="text-gray-500 text-sm mt-1">
-                                                            {appointment.reason ? appointment.reason : (showGroupCompleted ? 'Group counseling' : 'Individual counseling')}
-                                                        </p>
+                                                            )}
+                                                            
+                                                            {isSecretaryView && (
+                                                                <p className="text-sm text-indigo-600">
+                                                                    Counselor: {appointment.counselor_name || "Unknown Counselor"}
+                                                                </p>
+                                                            )}
+                                                            
+                                                            {showGroupCompleted && (
+                                                                <>
+                                                                    <p className="font-medium text-emerald-700">
+                                                                        Group Session ({isSecretaryView 
+                                                                            ? "Group session"
+                                                                            : `${appointment.groupappointments?.length || 0} participants`})
+                                                                    </p>
+                                                                    <div className="mt-1">
+                                                                        {!isSecretaryView && appointment.groupappointments && appointment.groupappointments.length > 0 ? (
+                                                                            <div className="grid grid-cols-1 gap-1">
+                                                                                {appointment.groupappointments.map((participant, index) => (
+                                                                                    <p key={participant.g_appointment_id} className="text-sm text-gray-600">
+                                                                                        {participant.users?.name || "Unknown Participant"}
+                                                                                    </p>
+                                                                                ))}
+                                                                            </div>
+                                                                        ) : (
+                                                                            <p className="text-sm text-gray-500 italic">
+                                                                                {appointment.category || "No category specified"}
+                                                                            </p>
+                                                                        )}
+                                                                    </div>
+                                                                </>
+                                                            )}
+                                                            
+                                                            <p className="text-gray-600">
+                                                                {isSecretaryView 
+                                                                    ? (appointment.date && `${dayjs(appointment.date).format('MMM DD, YYYY')} • 
+                                                                      ${formatTime(appointment.start_time)} - 
+                                                                      ${formatTime(appointment.end_time)}`)
+                                                                    : (appointment.availability_schedules && 
+                                                                      `${dayjs(appointment.availability_schedules.date).format('MMM DD, YYYY')} • 
+                                                                      ${formatTime(appointment.availability_schedules.start_time)} - 
+                                                                      ${formatTime(appointment.availability_schedules.end_time)}`)
+                                                                }
+                                                            </p>
+                                                            
+                                                            <p className="text-gray-500 text-sm mt-1">
+                                                                {appointment.reason ? appointment.reason : (showGroupCompleted ? 'Group counseling' : 'Individual counseling')}
+                                                            </p>
+                                                        </div>
+                                                        <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                                                            viewType === 'completed' 
+                                                            ? 'bg-gray-200 text-gray-800' 
+                                                            : 'bg-red-200 text-red-800'
+                                                        }`}>
+                                                            {viewType === 'completed' ? 'Completed' : 'Cancelled'}
+                                                        </span>
                                                     </div>
-                                                    <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                                                        viewType === 'completed' 
-                                                        ? 'bg-gray-200 text-gray-800' 
-                                                        : 'bg-red-200 text-red-800'
-                                                    }`}>
-                                                        {viewType === 'completed' ? 'Completed' : 'Cancelled'}
-                                                    </span>
-                                                </div>
-                                            ))}
+                                                );
+                                            })}
                                     </div>
                                     
                                     {/* Pagination */}

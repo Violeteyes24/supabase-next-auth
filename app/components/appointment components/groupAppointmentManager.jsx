@@ -70,6 +70,8 @@ export default function GroupAppointmentsManager() {
   const [groupEndTime, setGroupEndTime] = useState(null);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(5);
+  const [userRole, setUserRole] = useState(null);
+  const [assignedCounselors, setAssignedCounselors] = useState([]);
 
   useEffect(() => {
     const getSession = async () => {
@@ -77,15 +79,33 @@ export default function GroupAppointmentsManager() {
         data: { session },
       } = await supabase.auth.getSession();
       setSession(session);
+      
+      if (session) {
+        // Fetch user role
+        await getUserRole(session.user.id);
+      }
     };
     getSession();
   }, []);
 
   useEffect(() => {
-    fetchIndividualAppointments();
-    fetchEligibleUsers();
-    fetchGroupAppointments();
-  }, []);
+    if (session && userRole) {
+      if (userRole === 'secretary') {
+        fetchAssignedCounselors();
+      } else {
+        fetchIndividualAppointments();
+        fetchEligibleUsers();
+        fetchGroupAppointments();
+      }
+    }
+  }, [session, userRole]);
+
+  useEffect(() => {
+    if (userRole === 'secretary' && assignedCounselors.length > 0) {
+      fetchEligibleUsers();
+      fetchGroupAppointmentsForSecretary();
+    }
+  }, [assignedCounselors]);
 
   const fetchIndividualAppointments = async () => {
     const {
@@ -165,6 +185,154 @@ export default function GroupAppointmentsManager() {
     } else {
       console.log("Fetched group appointments:", data);
       setGroupAppointments(data || []);
+    }
+  };
+
+  const getUserRole = async (userId) => {
+    try {
+      const { data, error } = await supabase
+        .from("users")
+        .select("user_type")
+        .eq("user_id", userId)
+        .single();
+        
+      if (error) {
+        console.error("Error fetching user role:", error);
+        return;
+      }
+      
+      setUserRole(data.user_type);
+    } catch (error) {
+      console.error("Unexpected error fetching user role:", error);
+    }
+  };
+
+  const fetchAssignedCounselors = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("secretary_assignments")
+        .select("counselor_id")
+        .eq("secretary_id", session.user.id);
+        
+      if (error) {
+        console.error("Error fetching assigned counselors:", error);
+        return;
+      }
+      
+      if (!data || data.length === 0) {
+        console.log("No counselors assigned to this secretary");
+        setAssignedCounselors([]);
+        return;
+      }
+      
+      const counselorIds = data.map(assignment => assignment.counselor_id);
+      console.log("Assigned counselor IDs:", counselorIds);
+      setAssignedCounselors(counselorIds);
+    } catch (error) {
+      console.error("Unexpected error fetching assigned counselors:", error);
+    }
+  };
+
+  const fetchGroupAppointmentsForSecretary = async () => {
+    try {
+      console.log("Fetching group appointments for secretary with counselors:", assignedCounselors);
+      
+      // Test query to verify the view exists
+      console.log("Attempting to query secretary_appointments_view...");
+      const { data: viewTest, error: viewTestError } = await supabase
+        .from("secretary_appointments_view")
+        .select("*")
+        .eq("secretary_id", session.user.id)
+        .eq("appointment_type", "group")
+        .limit(5);
+      
+      if (viewTestError) {
+        console.error("Error testing secretary_appointments_view:", viewTestError);
+      } else {
+        console.log("Secretary appointments view test results:", viewTest);
+      }
+      
+      // Fetch from the view for group appointments
+      const { data, error } = await supabase
+        .from("secretary_appointments_view")
+        .select("*")
+        .eq("secretary_id", session.user.id)
+        .eq("appointment_type", "group")
+        .neq("status", "completed")
+        .neq("status", "cancelled");
+      
+      if (error) {
+        console.error("Error fetching group appointments for secretary:", error);
+        return;
+      }
+      
+      console.log("Group appointments from view:", data);
+      
+      // If no data, set empty array and return
+      if (!data || data.length === 0) {
+        console.log("No group appointments found for secretary's counselors");
+        setGroupAppointments([]);
+        return;
+      }
+
+      // Transform data to match the expected structure
+      const processedAppointments = data.map(appointment => {
+        // Create a base object with all the flat fields
+        return {
+          appointment_id: appointment.appointment_id,
+          user_id: appointment.user_id,
+          counselor_id: appointment.counselor_id,
+          availability_schedule_id: appointment.availability_schedule_id,
+          appointment_type: appointment.appointment_type,
+          status: appointment.status,
+          reason: appointment.reason,
+          category: appointment.category,
+          
+          // Add the availability schedules data
+          availability_schedules: {
+            date: appointment.date,
+            start_time: appointment.start_time,
+            end_time: appointment.end_time,
+            is_available: appointment.is_available
+          },
+          
+          // Add group appointments data (this will be populated later if needed)
+          groupappointments: [],
+          
+          // Add counselor and client names
+          counselor_name: appointment.counselor_name,
+          client_name: appointment.client_name,
+          secretary_name: appointment.secretary_name
+        };
+      });
+      
+      // Now fetch group participants for these appointments
+      for (const appointment of processedAppointments) {
+        const { data: participants, error: participantsError } = await supabase
+          .from("groupappointments")
+          .select(`
+            g_appointment_id,
+            user_id,
+            appointment_id,
+            problem,
+            users (
+              user_id,
+              name
+            )
+          `)
+          .eq("appointment_id", appointment.appointment_id);
+          
+        if (participantsError) {
+          console.error(`Error fetching participants for group appointment ${appointment.appointment_id}:`, participantsError);
+        } else if (participants) {
+          appointment.groupappointments = participants;
+        }
+      }
+      
+      console.log("Processed group appointments:", processedAppointments);
+      setGroupAppointments(processedAppointments);
+    } catch (error) {
+      console.error("Unexpected error fetching group appointments:", error);
     }
   };
 
@@ -515,6 +683,11 @@ export default function GroupAppointmentsManager() {
                 <TableCell sx={{ bgcolor: "#f9fafb", fontWeight: "bold" }}>
                   Group ID
                 </TableCell>
+                {userRole === "secretary" && (
+                  <TableCell sx={{ bgcolor: "#f9fafb", fontWeight: "bold" }}>
+                    Counselor
+                  </TableCell>
+                )}
                 <TableCell sx={{ bgcolor: "#f9fafb", fontWeight: "bold" }}>
                   Participants
                 </TableCell>
@@ -555,23 +728,36 @@ export default function GroupAppointmentsManager() {
                           #{appointment.appointment_id.toString().slice(0, 8)}
                         </Typography>
                       </TableCell>
+                      {userRole === "secretary" && (
+                        <TableCell>
+                          <Typography variant="body2" className="font-medium">
+                            {appointment.counselor_name || "Unknown Counselor"}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            ID: #{appointment.counselor_id.toString().slice(0, 8)}
+                          </Typography>
+                        </TableCell>
+                      )}
                       <TableCell>
                         <div className="flex flex-wrap gap-1 max-w-xs">
-                          {appointment.groupappointments?.map(
-                            (ga, index) =>
-                              ga.users?.name && (
-                                <Chip
-                                  key={index}
-                                  avatar={
-                                    <Avatar>
-                                      {getInitials(ga.users.name)}
-                                    </Avatar>
-                                  }
-                                  label={ga.users.name}
-                                  size="small"
-                                  sx={{ margin: "2px" }}
-                                />
-                              )
+                          {appointment.groupappointments?.length > 0 ? (
+                            appointment.groupappointments.map((ga, index) => (
+                              <Chip
+                                key={index}
+                                avatar={
+                                  <Avatar>
+                                    {getInitials(ga.users?.name || "")}
+                                  </Avatar>
+                                }
+                                label={ga.users?.name || "Unknown User"}
+                                size="small"
+                                sx={{ margin: "2px" }}
+                              />
+                            ))
+                          ) : (
+                            <Typography variant="caption" color="text.secondary">
+                              No participants data available
+                            </Typography>
                           )}
                         </div>
                         <Typography
@@ -677,7 +863,7 @@ export default function GroupAppointmentsManager() {
                   ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
+                  <TableCell colSpan={userRole === "secretary" ? 9 : 8} align="center" sx={{ py: 4 }}>
                     <Box sx={{ textAlign: "center", py: 3 }}>
                       <svg
                         width="64"
@@ -1057,9 +1243,26 @@ export default function GroupAppointmentsManager() {
                 <strong>Focus:</strong>{" "}
                 {selectedGroupAppointment.reason || "Not specified"}
               </Typography>
+              {userRole === "secretary" && (
+                <Typography variant="body2" sx={{ mt: 1 }}>
+                  <strong>Counselor:</strong>{" "}
+                  {selectedGroupAppointment.counselor_name || "Unknown"}
+                </Typography>
+              )}
               <Typography variant="body2" sx={{ mt: 1 }}>
                 <strong>Participants:</strong>{" "}
                 {selectedGroupAppointment.groupappointments?.length || 0}
+              </Typography>
+              <Typography variant="body2" sx={{ mt: 1 }}>
+                <strong>Current Schedule:</strong>{" "}
+                {selectedGroupAppointment.availability_schedules?.date
+                  ? dayjs(selectedGroupAppointment.availability_schedules.date).format("MMM D, YYYY")
+                  : "Not scheduled"}
+                {selectedGroupAppointment.availability_schedules?.start_time && 
+                 selectedGroupAppointment.availability_schedules?.end_time &&
+                  ` | ${dayjs(selectedGroupAppointment.availability_schedules.start_time, "HH:mm").format("hh:mm A")} - 
+                     ${dayjs(selectedGroupAppointment.availability_schedules.end_time, "HH:mm").format("hh:mm A")}`
+                }
               </Typography>
             </Box>
           )}
@@ -1161,9 +1364,21 @@ export default function GroupAppointmentsManager() {
                 <strong>Focus:</strong>{" "}
                 {selectedGroupAppointment.reason || "Not specified"}
               </Typography>
+              {userRole === "secretary" && (
+                <Typography variant="body2" color="#000" sx={{ mt: 1 }}>
+                  <strong>Counselor:</strong>{" "}
+                  {selectedGroupAppointment.counselor_name || "Unknown"}
+                </Typography>
+              )}
               <Typography variant="body2" color="#000" sx={{ mt: 1 }}>
                 <strong>Participants:</strong>{" "}
                 {selectedGroupAppointment.groupappointments?.length || 0}
+              </Typography>
+              <Typography variant="body2" color="#000" sx={{ mt: 1 }}>
+                <strong>Date:</strong>{" "}
+                {selectedGroupAppointment.availability_schedules?.date
+                  ? dayjs(selectedGroupAppointment.availability_schedules.date).format("MMM D, YYYY")
+                  : "Not scheduled"}
               </Typography>
             </Box>
           )}
