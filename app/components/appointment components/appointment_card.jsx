@@ -112,7 +112,7 @@ export default function AppointmentCard() {
                 name
             )
           `)
-          .eq("status", "pending")
+          .or('status.eq.pending,status.eq.rescheduled')
           .eq("counselor_id", userId)
           .gte("availability_schedules.date", currentDate);
 
@@ -256,12 +256,12 @@ export default function AppointmentCard() {
         return;
       }
 
-      const studentName = selectedAppointment.users.name;
+      const studentName = selectedAppointment.client_name || (selectedAppointment.users && selectedAppointment.users.name) || "Unknown Student";
       const appointmentDate = selectedDate.format("MMMM D, YYYY");
       const formattedStartTime = formatTime(startTime.format("HH:mm"));
       const formattedEndTime = formatTime(endTime.format("HH:mm"));
       const appointmentType = selectedAppointment.appointment_type || "Consultation";
-      const notificationContent = `${studentName} has rescheduled their ${appointmentType} appointment to ${appointmentDate} at ${formattedStartTime} - ${formattedEndTime}.`;
+      const notificationContent = `${studentName}'s ${appointmentType} appointment has been rescheduled to ${appointmentDate} at ${formattedStartTime} - ${formattedEndTime}.`;
       
       const { error: notificationError } = await supabase
         .from("notifications")
@@ -331,7 +331,7 @@ export default function AppointmentCard() {
         return;
       }
 
-      const studentName = selectedAppointment.users.name;
+      const studentName = selectedAppointment.client_name || (selectedAppointment.users && selectedAppointment.users.name) || "Unknown Student";
       const appointmentDate = dayjs(selectedAppointment.date || (selectedAppointment.availability_schedules && selectedAppointment.availability_schedules.date)).format("MMMM D, YYYY");
       const startTime = formatTime(selectedAppointment.start_time || (selectedAppointment.availability_schedules && selectedAppointment.availability_schedules.start_time));
       const endTime = formatTime(selectedAppointment.end_time || (selectedAppointment.availability_schedules && selectedAppointment.availability_schedules.end_time));
@@ -426,7 +426,7 @@ export default function AppointmentCard() {
                 <thead className="bg-gray-800 sticky top-0">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                      Client
+                      Student
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                       Appointment type and Reason{" "}
@@ -458,10 +458,10 @@ export default function AppointmentCard() {
                             </div>
                             <div className="ml-4">
                               <div className="text-sm font-medium text-gray-900">
-                                {appointment.client_name}
+                                {appointment.client_name || (appointment.users && appointment.users.name) || "Unknown Student"}
                               </div>
                               <div className="text-sm text-gray-500">
-                                Client #{appointment.user_id?.slice(0, 8) || "N/A"}
+                                Student #{appointment.user_id?.slice(0, 8) || "N/A"}
                               </div>
                               {userType === "secretary" && (
                                 <div className="text-xs text-emerald-600">
@@ -478,6 +478,11 @@ export default function AppointmentCard() {
                           <div className="text-sm text-gray-500">
                             {appointment.reason || "General session"}
                           </div>
+                          {appointment.status === "rescheduled" && (
+                            <div className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded-full inline-block">
+                              Rescheduled
+                            </div>
+                          )}
                           {appointment.category && (
                             <div className="text-xs text-emerald-600">
                               Category: {appointment.category}
@@ -710,7 +715,7 @@ export default function AppointmentCard() {
                 </p>
                 <div className="p-3 bg-gray-50 rounded-lg">
                   <p className="text-sm font-medium text-gray-900">
-                    {selectedAppointment.users.name}
+                    {selectedAppointment.client_name || (selectedAppointment.users && selectedAppointment.users.name) || "Unknown Student"}
                   </p>
                   <p className="text-sm text-gray-700">
                     {dayjs(selectedAppointment.date || (selectedAppointment.availability_schedules && selectedAppointment.availability_schedules.date)).format("MMMM D, YYYY")}{" "}
