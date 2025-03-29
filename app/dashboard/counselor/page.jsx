@@ -236,6 +236,9 @@ export default function CounselorPage() {
             }
         });
         setProgramMostCases(maxProgram || 'None');
+        
+        // Store data in global object for text reports
+        updateDashboardData();
     }
 
     async function fetchAppointments() {
@@ -250,6 +253,9 @@ export default function CounselorPage() {
         }
         
         setAppointmentsThisMonth(appointments.length);
+        
+        // Store data in global object for text reports
+        updateDashboardData();
     }
 
     async function fetchMoodScores() {
@@ -276,7 +282,27 @@ export default function CounselorPage() {
             return { day, mood: parseFloat(dayAverageMood) };
         });
         setChartData(moodData);
+        
+        // Store data in global object for text reports
+        updateDashboardData();
     }
+    
+    // Helper function to update the global dashboard data
+    const updateDashboardData = () => {
+        if (typeof window !== 'undefined' && window.chartData && window.chartData.dashboardData) {
+            window.chartData.dashboardData = {
+                totalUsers,
+                activeCounselors,
+                activeSecretaries,
+                activeStudents,
+                appointmentsThisMonth,
+                averageMoodScore,
+                departmentMostCases,
+                programMostCases,
+                weeklyMoodData: chartData
+            };
+        }
+    };
 
     const handleLogout = async () => {
         const { error } = await supabase.auth.signOut();

@@ -27,7 +27,19 @@ if (typeof window !== 'undefined') {
         demographics: [],
         feedback: [],
         appointmentTypes: [],
-        departmentAppointments: []
+        departmentAppointments: [],
+        // Dashboard data from counselor page
+        dashboardData: {
+            totalUsers: 0,
+            activeCounselors: 0,
+            activeSecretaries: 0,
+            activeStudents: 0,
+            appointmentsThisMonth: 0,
+            averageMoodScore: 0,
+            departmentMostCases: '',
+            programMostCases: '',
+            weeklyMoodData: []
+        }
     };
 }
 
@@ -42,8 +54,107 @@ export default function ReportsPage() {
             setLoading(false);
         }, 1500);
         
+        // Fetch dashboard data if not already available
+        if (typeof window !== 'undefined' && window.chartData) {
+            const dashboardData = window.chartData.dashboardData;
+            if (!dashboardData || !dashboardData.totalUsers) {
+                fetchDashboardData();
+            }
+        }
+        
         return () => clearTimeout(timer);
     }, []);
+    
+    const fetchDashboardData = async () => {
+        try {
+            // Fetch users
+            const { data: users, error: usersError } = await supabase.from('users').select('*');
+            if (usersError) throw usersError;
+            
+            const totalUsers = users.length;
+            const activeCounselors = users.filter(user => user.user_type === 'counselor').length;
+            const activeSecretaries = users.filter(user => user.user_type === 'secretary').length;
+            const activeStudents = users.filter(user => user.user_type === 'student').length;
+            
+            // Find department with most cases
+            const departmentCounts = {};
+            users.forEach(user => {
+                if (user.department) {
+                    departmentCounts[user.department] = (departmentCounts[user.department] || 0) + 1;
+                }
+            });
+            
+            let maxDepartment = '';
+            let maxCount = 0;
+            Object.entries(departmentCounts).forEach(([dept, count]) => {
+                if (count > maxCount) {
+                    maxCount = count;
+                    maxDepartment = dept;
+                }
+            });
+            
+            // Find program with most cases
+            const programCounts = {};
+            users.forEach(user => {
+                if (user.program) {
+                    programCounts[user.program] = (programCounts[user.program] || 0) + 1;
+                }
+            });
+            
+            let maxProgram = '';
+            maxCount = 0;
+            Object.entries(programCounts).forEach(([prog, count]) => {
+                if (count > maxCount) {
+                    maxCount = count;
+                    maxProgram = prog;
+                }
+            });
+            
+            // Fetch appointments
+            const { data: appointments, error: appointmentsError } = await supabase
+                .from('availability_schedules')
+                .select('*')
+                .eq('is_available', true);
+            if (appointmentsError) throw appointmentsError;
+            
+            // Fetch mood scores
+            const { data: moods, error: moodsError } = await supabase
+                .from('mood_tracker')
+                .select('intensity, tracked_at');
+            if (moodsError) throw moodsError;
+            
+            const totalMoodScore = moods.reduce((sum, mood) => sum + mood.intensity, 0);
+            const averageMood = moods.length ? (totalMoodScore / moods.length).toFixed(1) : 0;
+            
+            const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+            const moodData = daysOfWeek.map(day => {
+                const dayMoods = moods.filter(mood => 
+                    new Date(mood.tracked_at).toLocaleDateString('en-US', { weekday: 'long' }) === day
+                );
+                const dayTotalMood = dayMoods.reduce((sum, mood) => sum + mood.intensity, 0);
+                const dayAverageMood = dayMoods.length ? (dayTotalMood / dayMoods.length).toFixed(1) : 0;
+                return { day, mood: parseFloat(dayAverageMood) };
+            });
+            
+            // Store data in global object
+            if (typeof window !== 'undefined' && window.chartData) {
+                window.chartData.dashboardData = {
+                    totalUsers,
+                    activeCounselors,
+                    activeSecretaries,
+                    activeStudents,
+                    appointmentsThisMonth: appointments.length,
+                    averageMoodScore: averageMood,
+                    departmentMostCases: maxDepartment || 'None',
+                    programMostCases: maxProgram || 'None',
+                    weeklyMoodData: moodData
+                };
+            }
+            
+        } catch (error) {
+            console.error('Error fetching dashboard data:', error);
+        }
+    };
     
     const handleLogout = async () => {
         const { error } = await supabase.auth.signOut();
@@ -92,14 +203,26 @@ export default function ReportsPage() {
             const contentFontSize = 10;
             let yPos = margin;
             
-            // Add title
-            pdf.setFontSize(titleFontSize);
-            pdf.setFont('helvetica', 'bold');
-            const title = "MentalHelp Analytics Reports";
-            pdf.text(title, pageWidth / 2, yPos, { align: 'center' });
-            yPos += 30;
+            // Helper function to create page header with report logo/title
+            const addPageHeader = (pageTitle, pageSubtitle = null) => {
+                pdf.setFontSize(titleFontSize);
+                pdf.setFont('helvetica', 'bold');
+                pdf.text(pageTitle, pageWidth / 2, yPos, { align: 'center' });
+                yPos += 20;
+                
+                if (pageSubtitle) {
+                    pdf.setFontSize(subTitleFontSize - 2);
+                    pdf.setFont('helvetica', 'italic');
+                    pdf.text(pageSubtitle, pageWidth / 2, yPos, { align: 'center' });
+                    yPos += 30;
+                } else {
+                    yPos += 10;
+                }
+            };
             
-            // Add subtitle with date
+            // Add main title and generation date to first page
+            addPageHeader("MentalHelp Analytics Reports");
+            
             pdf.setFontSize(subTitleFontSize);
             pdf.setFont('helvetica', 'normal');
             const today = new Date().toLocaleDateString('en-US', { 
@@ -109,6 +232,12 @@ export default function ReportsPage() {
             });
             pdf.text(`Generated on ${today}`, pageWidth / 2, yPos, { align: 'center' });
             yPos += 30;
+            
+            // Add decorative line
+            pdf.setDrawColor(59, 130, 246); // Blue color (#3B82F6)
+            pdf.setLineWidth(1);
+            pdf.line(margin, yPos, pageWidth - margin, yPos);
+            yPos += 20;
             
             // Helper function to add report section
             const addReportSection = (title, data, formatter) => {
@@ -134,13 +263,41 @@ export default function ReportsPage() {
                 yPos += (splitText.length * 14) + 20;
             };
             
+            // Helper function to force a new page
+            const addNewPage = () => {
+                pdf.addPage();
+                yPos = margin;
+            };
+            
             // Use the global chart data if available, otherwise fall back to DOM extraction
             const globalChartData = window.chartData || {};
+            
+            // Add dashboard data section first if available
+            if (globalChartData.dashboardData) {
+                const dashboardData = globalChartData.dashboardData;
+                
+                addReportSection("MentalHelp Dashboard Overview", dashboardData, (data) => {
+                    return "User Statistics:\n" +
+                           `- Total Users: ${data.totalUsers}\n` +
+                           `- Active Counselors: ${data.activeCounselors}\n` +
+                           `- Active Secretaries: ${data.activeSecretaries}\n` +
+                           `- Active Students: ${data.activeStudents}\n\n` +
+                           "Activity Metrics:\n" +
+                           `- Appointments This Month: ${data.appointmentsThisMonth}\n` +
+                           `- Average Mood Score: ${data.averageMoodScore}\n` +
+                           `- Department with Most Cases: ${data.departmentMostCases}\n` +
+                           `- Program with Most Cases: ${data.programMostCases}\n\n` +
+                           "Weekly Mood Data:\n" +
+                           (data.weeklyMoodData && data.weeklyMoodData.length > 0 
+                              ? data.weeklyMoodData.map(item => `- ${item.day}: ${item.mood}`).join('\n')
+                              : "No weekly mood data available");
+                });
+            }
             
             // 1. Emotional State Chart
             if (globalChartData.emotionalState && globalChartData.emotionalState.length > 0) {
                 const emotionalData = globalChartData.emotionalState;
-                addReportSection("1. Overall Mood State", emotionalData, (data) => {
+                addReportSection("2. Overall Mood State", emotionalData, (data) => {
                     return "Emotional state distribution of users:\n\n" + 
                            data.map(item => `Date: ${item.date}, Emotion Intensity: ${item.emotion}`).join('\n') + 
                            "\n\nInterpretation: This data represents the average emotional state intensity of users tracked over time.";
@@ -154,7 +311,7 @@ export default function ReportsPage() {
                         return dataEl ? dataEl.textContent : '';
                     }).filter(Boolean);
                     
-                    addReportSection("1. Overall Mood State", emotionalStateData, (data) => {
+                    addReportSection("2. Overall Mood State", emotionalStateData, (data) => {
                         return "Emotional state distribution of users:\n\n" + 
                                data.join('\n') + 
                                "\n\nInterpretation: This data represents the average emotional state intensity of users tracked over time.";
@@ -162,9 +319,35 @@ export default function ReportsPage() {
                 }
             }
             
-            // 2. Frequent Topics
+            // Start a new page for frequent topics (Section 3)
+            addNewPage();
+            
+            // Create a special title for the Frequent Topics page
+            addPageHeader("Frequent Topics Analysis", "Detailed report of the most discussed topics by frequency");
+            
+            // Add decorative line
+            pdf.setDrawColor(59, 130, 246); // Blue color (#3B82F6)
+            pdf.setLineWidth(1);
+            pdf.line(margin, yPos, pageWidth - margin, yPos);
+            yPos += 20;
+            
+            // 2. Frequent Topics - Dedicated page 
             if (globalChartData.frequentTopics) {
-                addReportSection("2. Frequent Topics", globalChartData.frequentTopics, (data) => {
+                // Format the frequent topics data with better spacing
+                let formattedTopics = globalChartData.frequentTopics;
+                
+                // If it's a string, we'll add some formatting to make it more readable
+                if (typeof formattedTopics === 'string') {
+                    // Add bullet points for each line if they don't already exist
+                    formattedTopics = formattedTopics
+                        .split('\n')
+                        .map(line => line.trim())
+                        .filter(line => line.length > 0)
+                        .map(line => line.startsWith('-') || line.startsWith('•') ? line : `• ${line}`)
+                        .join('\n\n'); // Double spacing between items
+                }
+                
+                addReportSection("3. Frequent Topics", formattedTopics, (data) => {
                     return "Most discussed topics by frequency:\n\n" + data;
                 });
             } else {
@@ -172,18 +355,42 @@ export default function ReportsPage() {
                 const frequentTopicsCharts = document.querySelectorAll('#chart-1');
                 if (frequentTopicsCharts.length > 0) {
                     const reportTextElements = Array.from(frequentTopicsCharts[0].querySelectorAll('p'));
-                    const reportText = reportTextElements.map(el => el.textContent).join('\n');
+                    let reportText = reportTextElements.map(el => el.textContent).join('\n\n');
                     
-                    addReportSection("2. Frequent Topics", reportText || "No frequent topics data available", (data) => {
+                    // Format the text with bullet points if needed
+                    if (reportText) {
+                        reportText = reportText
+                            .split('\n')
+                            .map(line => line.trim())
+                            .filter(line => line.length > 0)
+                            .map(line => line.startsWith('-') || line.startsWith('•') ? line : `• ${line}`)
+                            .join('\n\n');
+                    } else {
+                        reportText = "No frequent topics data available";
+                    }
+                    
+                    addReportSection("3. Frequent Topics", reportText, (data) => {
                         return "Most discussed topics by frequency:\n\n" + data;
                     });
                 }
             }
             
+            // Start a new page for the remaining sections
+            addNewPage();
+            
+            // Create header for the third page
+            addPageHeader("Additional Analytics Data", "Demographic, feedback and appointment statistics");
+            
+            // Add decorative line
+            pdf.setDrawColor(59, 130, 246); // Blue color (#3B82F6)
+            pdf.setLineWidth(1);
+            pdf.line(margin, yPos, pageWidth - margin, yPos);
+            yPos += 20;
+            
             // 3. Demographics Chart
             if (globalChartData.demographics && globalChartData.demographics.length > 0) {
                 const demographicData = globalChartData.demographics;
-                addReportSection("3. Demographic Report", demographicData, (data) => {
+                addReportSection("4. Demographic Report", demographicData, (data) => {
                     return "User distribution by demographic factors:\n\n" + 
                            data.map(item => `${item.name}: ${item.value}`).join('\n') + 
                            "\n\nThis represents the gender distribution of users in the system.";
@@ -194,7 +401,7 @@ export default function ReportsPage() {
                 if (demographicsCharts.length > 0) {
                     const demographicLabels = Array.from(demographicsCharts[0].querySelectorAll('.recharts-pie-label-text')).map(el => el.textContent);
                     
-                    addReportSection("3. Demographic Report", demographicLabels, (data) => {
+                    addReportSection("4. Demographic Report", demographicLabels, (data) => {
                         return "User distribution by demographic factors:\n\n" + 
                                data.join('\n') + 
                                "\n\nThis represents the gender distribution of users in the system.";
@@ -205,7 +412,7 @@ export default function ReportsPage() {
             // 4. Feedback Chart
             if (globalChartData.feedback && globalChartData.feedback.length > 0) {
                 const feedbackData = globalChartData.feedback;
-                addReportSection("4. Feedback Report", feedbackData, (data) => {
+                addReportSection("5. Feedback Report", feedbackData, (data) => {
                     return "User satisfaction metrics:\n\n" + 
                            data.map(item => `${item.rating}: ${item.count} users`).join('\n') + 
                            "\n\nThis represents the distribution of user ratings for the application.";
@@ -216,7 +423,7 @@ export default function ReportsPage() {
                 if (feedbackCharts.length > 0) {
                     const feedbackLabels = Array.from(feedbackCharts[0].querySelectorAll('.recharts-cartesian-axis-tick-value')).map(el => el.textContent);
                     
-                    addReportSection("4. Feedback Report", feedbackLabels, (data) => {
+                    addReportSection("5. Feedback Report", feedbackLabels, (data) => {
                         return "User satisfaction metrics:\n\n" + 
                                data.join('\n') + 
                                "\n\nThis represents the distribution of user ratings for the application.";
@@ -227,7 +434,7 @@ export default function ReportsPage() {
             // 5. Appointment Types
             if (globalChartData.appointmentTypes && globalChartData.appointmentTypes.length > 0) {
                 const appointmentData = globalChartData.appointmentTypes;
-                addReportSection("5. Appointment Types", appointmentData, (data) => {
+                addReportSection("6. Appointment Types", appointmentData, (data) => {
                     return "Distribution of appointment categories:\n\n" + 
                            data.map(item => `${item.name}: ${item.value} appointments`).join('\n') + 
                            "\n\nThis shows the breakdown of different appointment types in the system.";
@@ -238,7 +445,7 @@ export default function ReportsPage() {
                 if (appointmentCharts.length > 0) {
                     const appointmentLabels = Array.from(appointmentCharts[0].querySelectorAll('.recharts-pie-label-text')).map(el => el.textContent);
                     
-                    addReportSection("5. Appointment Types", appointmentLabels, (data) => {
+                    addReportSection("6. Appointment Types", appointmentLabels, (data) => {
                         return "Distribution of appointment categories:\n\n" + 
                                data.join('\n') + 
                                "\n\nThis shows the breakdown of different appointment types in the system.";
@@ -249,7 +456,7 @@ export default function ReportsPage() {
             // 6. Department Analysis
             if (globalChartData.departmentAppointments && globalChartData.departmentAppointments.length > 0) {
                 const departmentData = globalChartData.departmentAppointments;
-                addReportSection("6. Department Analysis", departmentData, (data) => {
+                addReportSection("7. Department Analysis", departmentData, (data) => {
                     return "Appointments by department:\n\n" + 
                            data.map(item => `${item.name}: ${item.value} appointments`).join('\n') + 
                            "\n\nThis shows the distribution of appointments across different departments.";
@@ -260,7 +467,7 @@ export default function ReportsPage() {
                 if (departmentCharts.length > 0) {
                     const departmentLabels = Array.from(departmentCharts[0].querySelectorAll('.recharts-pie-label-text')).map(el => el.textContent);
                     
-                    addReportSection("6. Department Analysis", departmentLabels, (data) => {
+                    addReportSection("7. Department Analysis", departmentLabels, (data) => {
                         return "Appointments by department:\n\n" + 
                                data.join('\n') + 
                                "\n\nThis shows the distribution of appointments across different departments.";
@@ -448,7 +655,7 @@ export default function ReportsPage() {
                                     fontWeight: 'bold',
                                 }}
                             >
-                                Download Text Reports
+                                Download 3-Page Report
                             </Button>
                         </div>
                     </div>
