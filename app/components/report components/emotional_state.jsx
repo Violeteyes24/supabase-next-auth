@@ -37,6 +37,11 @@ const EmotionalStateChart = () => {
                 }));
 
                 setEmotionalData(formattedData);
+                
+                // Store data in global object for text reports
+                if (typeof window !== 'undefined' && window.chartData) {
+                    window.chartData.emotionalState = formattedData;
+                }
             }
         };
 

@@ -34,6 +34,11 @@ const FrequentTopicText = () => {
         const data = await res.json();
         setReport(data.report);
         setLoading(false);
+        
+        // Store data in global object for text reports
+        if (typeof window !== 'undefined' && window.chartData) {
+          window.chartData.frequentTopics = data.report;
+        }
       } catch (error) {
         console.error('Error fetching report:', error);
         setError(error.message || 'Failed to load report data');

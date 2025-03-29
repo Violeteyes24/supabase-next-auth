@@ -35,6 +35,11 @@ const DemographicsChart = () => {
                 { name: 'Other', value: otherCount }
             ];
             setData(chartData);
+            
+            // Store data in global object for text reports
+            if (typeof window !== 'undefined' && window.chartData) {
+                window.chartData.demographics = chartData;
+            }
         };
 
         fetchData();

@@ -11,13 +11,25 @@ import dynamic from 'next/dynamic';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
 // Dynamically import components with SSR disabled
-const FrequencyChart = dynamic(() => import('../components/report components/frequent_topic'), { ssr: false });
+// const FrequencyChart = dynamic(() => import('../components/report components/frequent_topic'), { ssr: false });
 const FrequentTopicText = dynamic(() => import('../components/report components/frequent_topic_text'), { ssr: false });
 const EmotionalStateChart = dynamic(() => import('../components/report components/emotional_state'), { ssr: false });
 const DemographicChart = dynamic(() => import('../components/report components/demographics'), { ssr: false });
 const FeedbackChart = dynamic(() => import('../components/report components/user_feedback'), { ssr: false });
 const AppointmentTypeChart = dynamic(() => import('../components/report components/appointment_type'), { ssr: false });
 const DepartmentAppointmentChart = dynamic(() => import('../components/report components/department_appointments'), { ssr: false });
+
+// Create a global object to store chart data for text reports
+if (typeof window !== 'undefined') {
+    window.chartData = {
+        emotionalState: [],
+        frequentTopics: null,
+        demographics: [],
+        feedback: [],
+        appointmentTypes: [],
+        departmentAppointments: []
+    };
+}
 
 export default function ReportsPage() {
     const router = useRouter();
@@ -65,59 +77,211 @@ export default function ReportsPage() {
 
     const handleDownloadAllPDF = async () => {
         try {
-            const charts = document.querySelectorAll('[id^="chart-"]');
-            const chartsArray = Array.from(charts);
-            
-            // Create a temporary container with smaller dimensions
-            const container = document.createElement('div');
-            container.style.width = '1200px'; // Reduced from 2480px
-            container.style.position = 'absolute';
-            container.style.left = '-9999px';
-            container.style.top = '-9999px';
-            container.style.display = 'grid';
-            container.style.gridTemplateColumns = 'repeat(2, 1fr)';
-            container.style.gap = '10px'; // Reduced gap
-            container.style.padding = '20px'; // Reduced padding
-            document.body.appendChild(container);
-
-            // Create smaller clones of the charts
-            const clonedCharts = await Promise.all(chartsArray.map(async (chart, index) => {
-                const clone = chart.cloneNode(true);
-                clone.style.width = '550px'; // Reduced from 1150px
-                clone.style.height = '400px'; // Adjusted height
-                clone.style.background = cardStyles[index].backgroundColor;
-                clone.style.padding = '10px'; // Reduced padding
-                clone.style.borderRadius = '8px';
-                container.appendChild(clone);
-                return clone;
-            }));
-
-            await new Promise(resolve => setTimeout(resolve, 1000));
-
-            // Create PDF with smaller dimensions
+            // Create a new PDF document
             const pdf = new jsPDF({
-                orientation: 'landscape',
-                unit: 'px',
-                format: [842, 595] // Standard A4 landscape size
+                orientation: 'portrait',
+                unit: 'pt',
+                format: 'a4'
             });
-
-            // Capture with better scaling
-            const canvas = await html2canvas(container, {
-                scale: 2, // Increased scale for better quality
-                useCORS: true,
-                logging: false,
-                allowTaint: true,
-                backgroundColor: '#ffffff'
+            
+            // PDF settings
+            const pageWidth = pdf.internal.pageSize.getWidth();
+            const margin = 40;
+            const titleFontSize = 16;
+            const subTitleFontSize = 12;
+            const contentFontSize = 10;
+            let yPos = margin;
+            
+            // Add title
+            pdf.setFontSize(titleFontSize);
+            pdf.setFont('helvetica', 'bold');
+            const title = "MentalHelp Analytics Reports";
+            pdf.text(title, pageWidth / 2, yPos, { align: 'center' });
+            yPos += 30;
+            
+            // Add subtitle with date
+            pdf.setFontSize(subTitleFontSize);
+            pdf.setFont('helvetica', 'normal');
+            const today = new Date().toLocaleDateString('en-US', { 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
             });
-
-            // Add to PDF with proper scaling
-            const imgData = canvas.toDataURL('image/jpeg', 0.95);
-            pdf.addImage(imgData, 'JPEG', 0, 0, 842, 595); // Fit to A4 landscape
-
-            document.body.removeChild(container);
-            pdf.save('all_reports_single_page.pdf');
+            pdf.text(`Generated on ${today}`, pageWidth / 2, yPos, { align: 'center' });
+            yPos += 30;
+            
+            // Helper function to add report section
+            const addReportSection = (title, data, formatter) => {
+                if (yPos > pdf.internal.pageSize.getHeight() - 100) {
+                    pdf.addPage();
+                    yPos = margin;
+                }
+                
+                // Add section title
+                pdf.setFontSize(subTitleFontSize);
+                pdf.setFont('helvetica', 'bold');
+                pdf.text(title, margin, yPos);
+                yPos += 20;
+                
+                // Add content
+                pdf.setFontSize(contentFontSize);
+                pdf.setFont('helvetica', 'normal');
+                
+                const content = formatter(data);
+                const splitText = pdf.splitTextToSize(content, pageWidth - (margin * 2));
+                
+                pdf.text(splitText, margin, yPos);
+                yPos += (splitText.length * 14) + 20;
+            };
+            
+            // Use the global chart data if available, otherwise fall back to DOM extraction
+            const globalChartData = window.chartData || {};
+            
+            // 1. Emotional State Chart
+            if (globalChartData.emotionalState && globalChartData.emotionalState.length > 0) {
+                const emotionalData = globalChartData.emotionalState;
+                addReportSection("1. Overall Mood State", emotionalData, (data) => {
+                    return "Emotional state distribution of users:\n\n" + 
+                           data.map(item => `Date: ${item.date}, Emotion Intensity: ${item.emotion}`).join('\n') + 
+                           "\n\nInterpretation: This data represents the average emotional state intensity of users tracked over time.";
+                });
+            } else {
+                // Fallback to DOM extraction
+                const emotionalStateCharts = document.querySelectorAll('#chart-0');
+                if (emotionalStateCharts.length > 0) {
+                    const emotionalStateData = Array.from(emotionalStateCharts[0].querySelectorAll('g.recharts-layer')).map(el => {
+                        const dataEl = el.querySelector('text.recharts-text');
+                        return dataEl ? dataEl.textContent : '';
+                    }).filter(Boolean);
+                    
+                    addReportSection("1. Overall Mood State", emotionalStateData, (data) => {
+                        return "Emotional state distribution of users:\n\n" + 
+                               data.join('\n') + 
+                               "\n\nInterpretation: This data represents the average emotional state intensity of users tracked over time.";
+                    });
+                }
+            }
+            
+            // 2. Frequent Topics
+            if (globalChartData.frequentTopics) {
+                addReportSection("2. Frequent Topics", globalChartData.frequentTopics, (data) => {
+                    return "Most discussed topics by frequency:\n\n" + data;
+                });
+            } else {
+                // Fallback to DOM extraction
+                const frequentTopicsCharts = document.querySelectorAll('#chart-1');
+                if (frequentTopicsCharts.length > 0) {
+                    const reportTextElements = Array.from(frequentTopicsCharts[0].querySelectorAll('p'));
+                    const reportText = reportTextElements.map(el => el.textContent).join('\n');
+                    
+                    addReportSection("2. Frequent Topics", reportText || "No frequent topics data available", (data) => {
+                        return "Most discussed topics by frequency:\n\n" + data;
+                    });
+                }
+            }
+            
+            // 3. Demographics Chart
+            if (globalChartData.demographics && globalChartData.demographics.length > 0) {
+                const demographicData = globalChartData.demographics;
+                addReportSection("3. Demographic Report", demographicData, (data) => {
+                    return "User distribution by demographic factors:\n\n" + 
+                           data.map(item => `${item.name}: ${item.value}`).join('\n') + 
+                           "\n\nThis represents the gender distribution of users in the system.";
+                });
+            } else {
+                // Fallback to DOM extraction
+                const demographicsCharts = document.querySelectorAll('#chart-2');
+                if (demographicsCharts.length > 0) {
+                    const demographicLabels = Array.from(demographicsCharts[0].querySelectorAll('.recharts-pie-label-text')).map(el => el.textContent);
+                    
+                    addReportSection("3. Demographic Report", demographicLabels, (data) => {
+                        return "User distribution by demographic factors:\n\n" + 
+                               data.join('\n') + 
+                               "\n\nThis represents the gender distribution of users in the system.";
+                    });
+                }
+            }
+            
+            // 4. Feedback Chart
+            if (globalChartData.feedback && globalChartData.feedback.length > 0) {
+                const feedbackData = globalChartData.feedback;
+                addReportSection("4. Feedback Report", feedbackData, (data) => {
+                    return "User satisfaction metrics:\n\n" + 
+                           data.map(item => `${item.rating}: ${item.count} users`).join('\n') + 
+                           "\n\nThis represents the distribution of user ratings for the application.";
+                });
+            } else {
+                // Fallback to DOM extraction
+                const feedbackCharts = document.querySelectorAll('#chart-3');
+                if (feedbackCharts.length > 0) {
+                    const feedbackLabels = Array.from(feedbackCharts[0].querySelectorAll('.recharts-cartesian-axis-tick-value')).map(el => el.textContent);
+                    
+                    addReportSection("4. Feedback Report", feedbackLabels, (data) => {
+                        return "User satisfaction metrics:\n\n" + 
+                               data.join('\n') + 
+                               "\n\nThis represents the distribution of user ratings for the application.";
+                    });
+                }
+            }
+            
+            // 5. Appointment Types
+            if (globalChartData.appointmentTypes && globalChartData.appointmentTypes.length > 0) {
+                const appointmentData = globalChartData.appointmentTypes;
+                addReportSection("5. Appointment Types", appointmentData, (data) => {
+                    return "Distribution of appointment categories:\n\n" + 
+                           data.map(item => `${item.name}: ${item.value} appointments`).join('\n') + 
+                           "\n\nThis shows the breakdown of different appointment types in the system.";
+                });
+            } else {
+                // Fallback to DOM extraction
+                const appointmentCharts = document.querySelectorAll('#chart-4');
+                if (appointmentCharts.length > 0) {
+                    const appointmentLabels = Array.from(appointmentCharts[0].querySelectorAll('.recharts-pie-label-text')).map(el => el.textContent);
+                    
+                    addReportSection("5. Appointment Types", appointmentLabels, (data) => {
+                        return "Distribution of appointment categories:\n\n" + 
+                               data.join('\n') + 
+                               "\n\nThis shows the breakdown of different appointment types in the system.";
+                    });
+                }
+            }
+            
+            // 6. Department Analysis
+            if (globalChartData.departmentAppointments && globalChartData.departmentAppointments.length > 0) {
+                const departmentData = globalChartData.departmentAppointments;
+                addReportSection("6. Department Analysis", departmentData, (data) => {
+                    return "Appointments by department:\n\n" + 
+                           data.map(item => `${item.name}: ${item.value} appointments`).join('\n') + 
+                           "\n\nThis shows the distribution of appointments across different departments.";
+                });
+            } else {
+                // Fallback to DOM extraction
+                const departmentCharts = document.querySelectorAll('#chart-5');
+                if (departmentCharts.length > 0) {
+                    const departmentLabels = Array.from(departmentCharts[0].querySelectorAll('.recharts-pie-label-text')).map(el => el.textContent);
+                    
+                    addReportSection("6. Department Analysis", departmentLabels, (data) => {
+                        return "Appointments by department:\n\n" + 
+                               data.join('\n') + 
+                               "\n\nThis shows the distribution of appointments across different departments.";
+                    });
+                }
+            }
+            
+            // Add footer
+            const totalPages = pdf.internal.getNumberOfPages();
+            for (let i = 1; i <= totalPages; i++) {
+                pdf.setPage(i);
+                pdf.setFontSize(8);
+                pdf.setTextColor(100);
+                pdf.text(`Page ${i} of ${totalPages} | © ${new Date().getFullYear()} MentalHelp`, pageWidth / 2, pdf.internal.pageSize.getHeight() - 20, { align: 'center' });
+            }
+            
+            // Save the PDF
+            pdf.save('mental_help_reports.pdf');
+            
         } catch (error) {
-            console.error('Error generating PDF:', error);
+            console.error('Error generating text report PDF:', error);
         }
     };
 
@@ -284,7 +448,7 @@ export default function ReportsPage() {
                                     fontWeight: 'bold',
                                 }}
                             >
-                                Download All Reports
+                                Download Text Reports
                             </Button>
                         </div>
                     </div>

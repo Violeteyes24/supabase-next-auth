@@ -33,6 +33,11 @@ const FeedbackChart = () => {
                     count: item.count,
                 }));
                 setFeedbackData(formattedData);
+                
+                // Store data in global object for text reports
+                if (typeof window !== 'undefined' && window.chartData) {
+                    window.chartData.feedback = formattedData;
+                }
             }
         };
 

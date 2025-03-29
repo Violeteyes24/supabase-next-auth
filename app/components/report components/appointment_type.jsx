@@ -24,6 +24,11 @@ const AppointmentTypeChart = () => {
             }));
 
             setData(chartData);
+            
+            // Store data in global object for text reports
+            if (typeof window !== 'undefined' && window.chartData) {
+                window.chartData.appointmentTypes = chartData;
+            }
         };
 
         fetchData();
