@@ -170,9 +170,9 @@ export default function AppointmentCard() {
 
   const handleReschedule = (appointment) => {
     setSelectedAppointment(appointment);
-    setSelectedDate(dayjs(appointment.date));
-    setStartTime(dayjs(appointment.start_time, "HH:mm"));
-    setEndTime(dayjs(appointment.end_time, "HH:mm"));
+    setSelectedDate(dayjs(appointment.date || (appointment.availability_schedules && appointment.availability_schedules.date)));
+    setStartTime(dayjs(appointment.start_time || (appointment.availability_schedules && appointment.availability_schedules.start_time), "HH:mm"));
+    setEndTime(dayjs(appointment.end_time || (appointment.availability_schedules && appointment.availability_schedules.end_time), "HH:mm"));
     setOpenRescheduleModal(true);
   };
 
@@ -332,9 +332,9 @@ export default function AppointmentCard() {
       }
 
       const studentName = selectedAppointment.users.name;
-      const appointmentDate = dayjs(selectedAppointment.date).format("MMMM D, YYYY");
-      const startTime = formatTime(selectedAppointment.start_time);
-      const endTime = formatTime(selectedAppointment.end_time);
+      const appointmentDate = dayjs(selectedAppointment.date || (selectedAppointment.availability_schedules && selectedAppointment.availability_schedules.date)).format("MMMM D, YYYY");
+      const startTime = formatTime(selectedAppointment.start_time || (selectedAppointment.availability_schedules && selectedAppointment.availability_schedules.start_time));
+      const endTime = formatTime(selectedAppointment.end_time || (selectedAppointment.availability_schedules && selectedAppointment.availability_schedules.end_time));
       const appointmentType = selectedAppointment.appointment_type || "Consultation";
       const notificationContent = `${studentName} has cancelled their ${appointmentType} appointment scheduled for ${appointmentDate} at ${startTime} - ${endTime}.`;
       
@@ -486,10 +486,10 @@ export default function AppointmentCard() {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm text-gray-900">
-                            {dayjs(appointment.date).format("MMMM D, YYYY")}
+                            {dayjs(appointment.date || (appointment.availability_schedules && appointment.availability_schedules.date)).format("MMMM D, YYYY")}
                           </div>
                           <div className="text-sm text-gray-500">
-                            {`${formatTime(appointment.start_time)} - ${formatTime(appointment.end_time)}`}
+                            {`${formatTime(appointment.start_time || (appointment.availability_schedules && appointment.availability_schedules.start_time))} - ${formatTime(appointment.end_time || (appointment.availability_schedules && appointment.availability_schedules.end_time))}`}
                           </div>
                           {appointment.is_group_eligible && (
                             <div className="text-xs text-blue-600">
@@ -603,10 +603,10 @@ export default function AppointmentCard() {
               <div className="mb-4 p-3 bg-gray-50 rounded-lg">
                 <p className="text-sm text-gray-500">
                   Current schedule: {" "}
-                  {dayjs(selectedAppointment.date).format("MMMM D, YYYY")}
+                  {dayjs(selectedAppointment.date || (selectedAppointment.availability_schedules && selectedAppointment.availability_schedules.date)).format("MMMM D, YYYY")}
                 </p>
                 <p className="text-sm font-medium text-gray-700">
-                  {formatTime(selectedAppointment.start_time)} - {formatTime(selectedAppointment.end_time)}
+                  {formatTime(selectedAppointment.start_time || (selectedAppointment.availability_schedules && selectedAppointment.availability_schedules.start_time))} - {formatTime(selectedAppointment.end_time || (selectedAppointment.availability_schedules && selectedAppointment.availability_schedules.end_time))}
                 </p>
                 {userType === "secretary" && (
                   <p className="text-sm text-emerald-600">
@@ -713,11 +713,11 @@ export default function AppointmentCard() {
                     {selectedAppointment.users.name}
                   </p>
                   <p className="text-sm text-gray-700">
-                    {dayjs(selectedAppointment.date).format("MMMM D, YYYY")}{" "}
+                    {dayjs(selectedAppointment.date || (selectedAppointment.availability_schedules && selectedAppointment.availability_schedules.date)).format("MMMM D, YYYY")}{" "}
                     |{" "}
-                    {formatTime(selectedAppointment.start_time)}{" "}
+                    {formatTime(selectedAppointment.start_time || (selectedAppointment.availability_schedules && selectedAppointment.availability_schedules.start_time))}
                     -{" "}
-                    {formatTime(selectedAppointment.end_time)}
+                    {formatTime(selectedAppointment.end_time || (selectedAppointment.availability_schedules && selectedAppointment.availability_schedules.end_time))}
                   </p>
                   <p className="text-sm text-gray-500 mt-1">
                     {selectedAppointment.appointment_type || "Consultation"}
