@@ -67,6 +67,96 @@ export default function AppointmentPage() {
       return date;
     };
     
+    // Function to check and update all expired availability schedules
+    const checkAndUpdateExpiredSchedules = async (userId) => {
+      try {
+        // First, check if user is a counselor
+        const { data: userData, error: userError } = await supabase
+          .from('users')
+          .select('user_type')
+          .eq('user_id', userId)
+          .single();
+          
+        if (userError || userData?.user_type !== 'counselor') {
+          console.log('User is not a counselor or error fetching user data:', userError);
+          return;
+        }
+        
+        // Get current date and time in Manila timezone (UTC+8)
+        const now = new Date();
+        // Log timezone info for debugging
+        console.log('Browser timezone:', Intl.DateTimeFormat().resolvedOptions().timeZone);
+        console.log('Browser local time:', now.toLocaleString());
+        
+        // Create date in Manila timezone for comparison
+        const manilaOffset = 8 * 60; // Manila is UTC+8 (8 hours * 60 minutes)
+        const localOffset = now.getTimezoneOffset();
+        const totalOffset = manilaOffset + localOffset;
+        const manilaNow = new Date(now.getTime() + totalOffset * 60000);
+        
+        console.log('Manila time (UTC+8):', manilaNow.toLocaleString());
+        console.log('Current date in Manila for DB query:', manilaNow.toISOString().split('T')[0]);
+        
+        // Get all available schedules for this counselor
+        const { data: availableSchedules, error: schedError } = await supabase
+          .from('availability_schedules')
+          .select('*')
+          .eq('counselor_id', userId)
+          .eq('is_available', true) // Only check currently available schedules
+          .order('availability_schedule_id');
+        
+        if (schedError) {
+          console.error('Error fetching available schedules:', schedError);
+          return;
+        }
+        
+        console.log(`Found ${availableSchedules.length} available schedules to check`);
+        
+        // Identify expired schedules (where current time > end_time)
+        const expiredSchedules = availableSchedules.filter(sched => {
+          const schedDate = sched.date;
+          const endTime = sched.end_time;
+          
+          // Compare date and time with Manila time
+          const scheduleEndTime = timeToDate(endTime, schedDate);
+          
+          console.log(`Schedule ${sched.availability_schedule_id} ends at:`, scheduleEndTime.toLocaleString());
+          console.log(`Current time:`, manilaNow.toLocaleString());
+          console.log(`Is schedule expired? ${manilaNow >= scheduleEndTime}`);
+          
+          // If current time is greater than or equal to end_time, mark as expired
+          return manilaNow >= scheduleEndTime;
+        });
+        
+        console.log(`Found ${expiredSchedules.length} expired schedules to update`);
+        
+        // Update is_available to false for expired schedules
+        if (expiredSchedules.length > 0) {
+          for (const sched of expiredSchedules) {
+            console.log(`Marking schedule ${sched.availability_schedule_id} as unavailable (expired)`);
+            
+            const { error: updateSchedError } = await supabase
+              .from('availability_schedules')
+              .update({ is_available: false })
+              .eq('availability_schedule_id', sched.availability_schedule_id);
+            
+            if (updateSchedError) {
+              console.error(`Error updating schedule ${sched.availability_schedule_id}:`, updateSchedError);
+            } else {
+              console.log(`Successfully marked schedule ${sched.availability_schedule_id} as unavailable`);
+            }
+          }
+          
+          console.log(`${expiredSchedules.length} schedules automatically marked as unavailable due to expiration`);
+          
+          // Refresh availability schedules display after updating
+          fetchAvailabilitySchedules();
+        }
+      } catch (error) {
+        console.error('Error checking schedules:', error);
+      }
+    };
+    
     // Function to check and complete expired appointments
     const checkAndCompleteAppointments = async (userId) => {
       try {
@@ -256,6 +346,7 @@ export default function AppointmentPage() {
           }
           setIsRoleLoading(false);
           
+          await checkAndUpdateExpiredSchedules(userId);
           await checkAndCompleteAppointments(userId);
           await fetchCompletedAppointments(userId);
         }
