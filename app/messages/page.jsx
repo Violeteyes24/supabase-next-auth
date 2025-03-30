@@ -61,81 +61,106 @@ function MessageContent() {
   }, []);
 
   useEffect(() => {
+    // Clear messages when conversation changes
+    setMessages([]);
+    
+    // Fetch messages for the current conversation
+    if (conversationId && session) {
+      fetchMessages();
+    }
+  }, [conversationId]);
+
+  // Set up real-time subscriptions when session or conversationId changes
+  useEffect(() => {
+    if (!session) return;
+    
+    // Subscribe to all message changes for the current conversation
+    const messageChannel = supabase
+      .channel(`message-changes-${conversationId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "messages",
+          filter: `conversation_id=eq.${conversationId}`,
+        },
+        (payload) => {
+          fetchMessages();
+          fetchConversations();
+        }
+      )
+      .subscribe();
+
+    // Subscribe to predefined messages changes
+    const predefinedMessageChannel = supabase
+      .channel("predefined-changes")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "predefined_messages",
+        },
+        () => {
+          fetchPredefinedOptions(currentParentId);
+        }
+      )
+      .subscribe();
+
+    // Subscribe to real-time conversation changes
+    const conversationChannel = supabase
+      .channel("custom-all-channel")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "conversations" },
+        (payload) => {
+          console.log("Change received!", payload);
+          fetchConversations();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(messageChannel);
+      supabase.removeChannel(predefinedMessageChannel);
+      supabase.removeChannel(conversationChannel);
+    };
+  }, [session, conversationId, currentParentId]);
+
+  useEffect(() => {
     if (session) {
       fetchConversations();
       fetchPredefinedOptions(currentParentId);
-      fetchMessages();
-
-      // Subscribe to all message changes
-      const messageChannel = supabase
-        .channel("message-changes")
-        .on(
-          "postgres_changes",
-          {
-            event: "*",
-            schema: "public",
-            table: "messages",
-            filter: `conversation_id=eq.${conversationId}`,
-          },
-          (payload) => {
-            fetchMessages();
-            fetchConversations();
-          }
-        )
-        .subscribe();
-
-      // Subscribe to predefined messages changes
-      const predefinedMessageChannel = supabase
-        .channel("predefined-changes")
-        .on(
-          "postgres_changes",
-          {
-            event: "*",
-            schema: "public",
-            table: "predefined_messages",
-          },
-          () => {
-            fetchPredefinedOptions(currentParentId);
-          }
-        )
-        .subscribe();
-
-      // Subscribe to real-time conversation changes
-      const conversationChannel = supabase
-        .channel("custom-all-channel")
-        .on(
-          "postgres_changes",
-          { event: "*", schema: "public", table: "conversations" },
-          (payload) => {
-            console.log("Change received!", payload);
-            fetchConversations();
-          }
-        )
-        .subscribe();
-
-      return () => {
-        supabase.removeChannel(messageChannel);
-        supabase.removeChannel(predefinedMessageChannel);
-        supabase.removeChannel(conversationChannel);
-      };
     }
-  }, [session, conversation]);
+  }, [session]);
 
   const fetchMessages = async () => {
     if (!conversationId) return;
 
-    const { data, error } = await supabase
-      .from("messages")
-      .select('*')
-      .eq("conversation_id", conversationId)
-      .order("sent_at", { ascending: true });
-    //   debugger;
-      console.log(data);
-    if (error) {
-      console.error("Error fetching messages:", error);
-    } else {
-      setMessages(data || []);
+    try {
+      const { data, error } = await supabase
+        .from("messages")
+        .select('*')
+        .eq("conversation_id", conversationId)
+        .order("sent_at", { ascending: true });
+        
+      if (error) {
+        console.error("Error fetching messages:", error);
+        return;
+      }
       
+      // Make sure we have an array of messages
+      const messageArray = Array.isArray(data) ? data : [];
+      
+      // Ensure messages are properly sorted by sent_at timestamp
+      const sortedMessages = messageArray.sort((a, b) => {
+        return new Date(a.sent_at) - new Date(b.sent_at);
+      });
+      
+      setMessages(sortedMessages);
+    } catch (err) {
+      console.error("Unexpected error fetching messages:", err);
     }
   };
 
@@ -233,13 +258,6 @@ const fetchConversations = async () => {
     }
   };
 
-  useEffect(() => {
-    if (session) {
-      fetchConversations();
-      fetchPredefinedOptions(currentParentId);
-    }
-  }, [session]);
-
   const handleNewMessage = async (user) => {
     setMessages([]);
     // setConversation(user);
@@ -260,18 +278,45 @@ const fetchConversations = async () => {
 
 
   const handleSendMessage = async () => {
-    const{success} = await sendMessage({
-      sender_id: session.user.id,
-      conversation_id: conversationId,
-      message_content: inputMessage,
-    });
-    if(success){
-        setInputMessage("");
-        fetchMessages();
+    if (!inputMessage.trim() || !conversationId || !session) return;
+    
+    try {
+      // Optimistically add the message to the UI
+      const optimisticMessage = {
+        message_id: `temp-${Date.now()}`,
+        sender_id: session.user.id,
+        conversation_id: conversationId,
+        message_content: inputMessage,
+        sent_at: new Date().toISOString(),
+        is_read: false,
+        is_delivered: false
+      };
+      
+      // Update UI immediately
+      setMessages(prev => [...prev, optimisticMessage]);
+      setInputMessage("");
+      
+      // Send the actual message
+      const { success, data, error } = await sendMessage({
+        sender_id: session.user.id,
+        conversation_id: conversationId,
+        message_content: inputMessage,
+      });
+      
+      if (!success) {
+        console.error("Failed to send message:", error);
+        // Remove the optimistic message on failure
+        setMessages(prev => prev.filter(msg => msg.message_id !== optimisticMessage.message_id));
+        // Restore the input
+        setInputMessage(optimisticMessage.message_content);
+      }
+      
+      // No need to call fetchMessages() as the real-time subscription will handle it
+    } catch (err) {
+      console.error("Error in handleSendMessage:", err);
     }
-    // debugger;
+  };
 
-  }
   const handleOptionClick = async (option) => {
     await sendMessage(option);
 
