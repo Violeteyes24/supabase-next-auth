@@ -317,7 +317,7 @@ export default function AppointmentCard() {
 
       const { error: scheduleError } = await supabase
         .from("availability_schedules")
-        .update({ is_available: false })
+        .update({ is_available: true })
         .eq("availability_schedule_id", selectedAppointment.availability_schedule_id);
 
       if (scheduleError) {

@@ -547,6 +547,21 @@ export default function GroupAppointmentsManager() {
 
       if (error) throw error;
 
+      // Update availability schedule to be available again
+      if (selectedGroupAppointment.availability_schedule_id) {
+        const { error: scheduleError } = await supabase
+          .from("availability_schedules")
+          .update({ is_available: true })
+          .eq("availability_schedule_id", selectedGroupAppointment.availability_schedule_id);
+
+        if (scheduleError) {
+          console.error("Error updating availability schedule:", scheduleError);
+          // Continue with the rest of the function even if this fails
+        } else {
+          console.log("Successfully set availability schedule back to available");
+        }
+      }
+
       // Get information about the appointment for notification
       const participantCount =
         selectedGroupAppointment.groupappointments?.length || 0;
