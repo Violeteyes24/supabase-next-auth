@@ -420,8 +420,18 @@ const fetchConversations = async () => {
   const formatTime = (timestamp) => {
     if (!timestamp) return "";
     try {
-      return format(new Date(timestamp), "h:mm a");
+      // Create a date object using the timestamp
+      const date = new Date(timestamp);
+      
+      // Check if the date is valid
+      if (isNaN(date.getTime())) {
+        return "";
+      }
+      
+      // Format using browser's locale settings for consistency
+      return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
     } catch (e) {
+      console.error("Error formatting time:", e);
       return "";
     }
   };
