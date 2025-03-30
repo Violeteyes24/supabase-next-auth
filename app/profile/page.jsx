@@ -144,13 +144,17 @@ export default function ProfilePage() {
                 imageUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/profile_pictures/${data.path}`;
             }
 
+            // Process form data to handle numeric fields
+            const processedFormData = {
+                ...formData,
+                birthday: formData.birthday ? formData.birthday.format('YYYY-MM-DD') : null,
+                profile_image_url: imageUrl,
+                program_year_level: formData.program_year_level === '' ? null : parseInt(formData.program_year_level)
+            };
+
             const { error } = await supabase
                 .from('users')
-                .update({
-                    ...formData,
-                    birthday: formData.birthday ? formData.birthday.format('YYYY-MM-DD') : null,
-                    profile_image_url: imageUrl
-                })
+                .update(processedFormData)
                 .eq('user_id', user.id);
 
             if (error) throw error;
