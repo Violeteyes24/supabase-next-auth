@@ -174,9 +174,9 @@ export default function ProfilePage() {
 
     // Loading skeleton component with shimmer effect
     const ProfileSkeleton = () => (
-        <div className="flex h-screen bg-gray-100">
+        <div className="flex min-h-screen bg-gray-100">
             <Box sx={{ width: 240, bgcolor: '#1E293B' }} /> {/* Sidebar placeholder */}
-            <Container maxWidth="md" sx={{ py: 4 }}>
+            <Container maxWidth="md" sx={{ py: 4, flexGrow: 1 }}>
                 <Paper 
                     elevation={3} 
                     sx={{ 
@@ -184,7 +184,8 @@ export default function ProfilePage() {
                         borderRadius: 2,
                         boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
                         position: 'relative',
-                        overflow: 'hidden'
+                        overflow: 'hidden',
+                        mb: 4
                     }}
                 >
                     {/* Shimmer overlay */}
@@ -258,15 +259,16 @@ export default function ProfilePage() {
     }
 
     return (
-        <div className="flex h-screen bg-gray-100">
+        <div className="flex min-h-screen bg-gray-100">
             <Sidebar handleLogout={handleLogout} />
-            <Container maxWidth="md" sx={{ py: 4 }}>
+            <Container maxWidth="md" sx={{ py: 4, flexGrow: 1 }}>
                 <Paper 
                     elevation={3} 
                     sx={{ 
                         p: 4, 
                         borderRadius: 2,
-                        boxShadow: '0 4px 20px rgba(0,0,0,0.08)'
+                        boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+                        mb: 4
                     }}
                 >
                     <Box sx={{ display: 'flex', alignItems: 'center', mb: 4 }}>
