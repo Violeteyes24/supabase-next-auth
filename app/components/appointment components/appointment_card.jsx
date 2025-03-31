@@ -412,7 +412,7 @@ export default function AppointmentCard() {
             component="h1"
             sx={{ fontWeight: "bold", color: "#10b981" }}
           >
-            Upcoming Appointments
+            Upcoming Individual Appointments
           </Typography>
           <div className="text-sm text-gray-500">
             {dayjs().format("dddd, MMMM D, YYYY")}

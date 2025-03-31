@@ -136,7 +136,10 @@ export default function GroupAppointmentsManager() {
   const fetchEligibleUsers = async () => {
     const { data, error } = await supabase
       .from("users")
-      .select("user_id, name");
+      .select("user_id, name")
+      .neq("user_type", "secretary")
+      .neq("user_type", "counselor")
+      .neq("user_id", session.user.id);
 
     if (error) {
       console.error("Error fetching users:", error);
@@ -461,6 +464,34 @@ export default function GroupAppointmentsManager() {
   };
 
   const handleConfirmReschedule = async () => {
+    // Validate date and time
+    const now = dayjs();
+    const selectedDate = rescheduleDate.startOf('day');
+    const today = now.startOf('day');
+    
+    // Check if selected date is in the past
+    if (selectedDate.isBefore(today)) {
+      showSnackbar("Cannot reschedule to a past date", "error");
+      return;
+    }
+    
+    // Check if end time is before or equal to start time
+    if (rescheduleEndTime.isSameOrBefore(rescheduleStartTime)) {
+      showSnackbar("End time must be greater than start time", "error");
+      return;
+    }
+    
+    // Calculate duration between start and end time in minutes
+    const startTime = rescheduleStartTime;
+    const endTime = rescheduleEndTime;
+    const durationMinutes = endTime.diff(startTime, 'minute');
+    
+    // Check if duration is less than 30 minutes
+    if (durationMinutes < 30) {
+      showSnackbar("Session duration must be at least 30 minutes", "error");
+      return;
+    }
+
     try {
       // Check if there's an existing availability schedule
       if (selectedGroupAppointment.availability_schedule_id) {
@@ -674,20 +705,22 @@ export default function GroupAppointmentsManager() {
         >
           Upcoming Group Therapy Sessions
         </Typography>
-        <Button
-          variant="contained"
-          onClick={() => setOpenGroupModal(true)}
-          sx={{
-            backgroundColor: "#10b981",
-            "&:hover": { backgroundColor: "#059669" },
-            textTransform: "none",
-            fontWeight: "medium",
-            px: 3,
-            py: 1,
-          }}
-        >
-          Create Group Session
-        </Button>
+        {userRole === 'counselor' && (
+          <Button
+            variant="contained"
+            onClick={() => setOpenGroupModal(true)}
+            sx={{
+              backgroundColor: "#10b981",
+              "&:hover": { backgroundColor: "#059669" },
+              textTransform: "none",
+              fontWeight: "medium",
+              px: 3,
+              py: 1,
+            }}
+          >
+            Create Group Session
+          </Button>
+        )}
       </div>
 
       <Paper sx={{ mb: 4, overflow: "hidden", boxShadow: 2, borderRadius: 2 }}>
@@ -966,7 +999,7 @@ export default function GroupAppointmentsManager() {
           <div className="mt-6">
             <Typography
               variant="subtitle1"
-              sx={{ mb: 2, fontWeight: "medium" }}
+              sx={{ mb: 2, fontWeight: "medium", color: "black" }}
             >
               Session Date and Time (Optional)
             </Typography>
@@ -1010,7 +1043,7 @@ export default function GroupAppointmentsManager() {
           <div>
             <Typography
               variant="subtitle1"
-              sx={{ mb: 2, fontWeight: "medium" }}
+              sx={{ mb: 2, fontWeight: "medium", color: "black" }}
             >
               Session Category
             </Typography>
@@ -1041,7 +1074,7 @@ export default function GroupAppointmentsManager() {
           <div className="mt-6">
             <Typography
               variant="subtitle1"
-              sx={{ mb: 2, fontWeight: "medium" }}
+              sx={{ mb: 2, fontWeight: "medium", color: "black" }}
             >
               Session Focus Area
             </Typography>
@@ -1060,7 +1093,7 @@ export default function GroupAppointmentsManager() {
           {/* User Selection */}
           <div className="mt-6">
             <div className="flex justify-between items-center mb-2">
-              <Typography variant="subtitle1" sx={{ fontWeight: "medium" }}>
+              <Typography variant="subtitle1" sx={{ fontWeight: "medium", color: "black" }}>
                 Select Participants
               </Typography>
               <Badge
@@ -1243,7 +1276,7 @@ export default function GroupAppointmentsManager() {
           <Typography
             variant="h6"
             gutterBottom
-            sx={{ color: "#10b981", fontWeight: "bold" }}
+            sx={{ color: "#10b981", fontWeight: "bold", color: "black" }}
           >
             Reschedule Group Session
           </Typography>
@@ -1254,21 +1287,21 @@ export default function GroupAppointmentsManager() {
                 Session ID: #
                 {selectedGroupAppointment.appointment_id.toString().slice(0, 8)}
               </Typography>
-              <Typography variant="body2" sx={{ mt: 1 }}>
+              <Typography variant="body2" sx={{ mt: 1, color: "black" }}>
                 <strong>Focus:</strong>{" "}
                 {selectedGroupAppointment.reason || "Not specified"}
               </Typography>
               {userRole === "secretary" && (
-                <Typography variant="body2" sx={{ mt: 1 }}>
+                <Typography variant="body2" sx={{ mt: 1, color: "black" }}>
                   <strong>Counselor:</strong>{" "}
                   {selectedGroupAppointment.counselor_name || "Unknown"}
                 </Typography>
               )}
-              <Typography variant="body2" sx={{ mt: 1 }}>
+              <Typography variant="body2" sx={{ mt: 1, color: "black" }}>
                 <strong>Participants:</strong>{" "}
                 {selectedGroupAppointment.groupappointments?.length || 0}
               </Typography>
-              <Typography variant="body2" sx={{ mt: 1 }}>
+              <Typography variant="body2" sx={{ mt: 1, color: "black" }}>
                 <strong>Current Schedule:</strong>{" "}
                 {selectedGroupAppointment.availability_schedules?.date
                   ? dayjs(selectedGroupAppointment.availability_schedules.date).format("MMM D, YYYY")

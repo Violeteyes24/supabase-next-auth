@@ -37,6 +37,9 @@ export default function ApproveDenyPage() {
     const [snackbarSeverity, setSnackbarSeverity] = useState('success');
     const [currentUser, setCurrentUser] = useState(null);
     const [counselors, setCounselors] = useState([]);
+    // New state for status conflict modal
+    const [openStatusModal, setOpenStatusModal] = useState(false);
+    const [statusModalMessage, setStatusModalMessage] = useState('');
 
     // Log initial state and after first render
     useEffect(() => {
@@ -218,6 +221,14 @@ export default function ApproveDenyPage() {
     };
 
     const handleApprove = async (id) => {
+        // Check if already approved first
+        const registrant = registrants.find(reg => reg.user_id === id);
+        if (registrant && registrant.approval_status === 'approved') {
+            setStatusModalMessage("This user is already approved.");
+            setOpenStatusModal(true);
+            return;
+        }
+        
         try {
             // Optimistically update UI first
             setRegistrants(prev => 
@@ -270,6 +281,14 @@ export default function ApproveDenyPage() {
     };
 
     const handleDeny = async (id) => {
+        // Check if already denied first
+        const registrant = registrants.find(reg => reg.user_id === id);
+        if (registrant && registrant.approval_status === 'denied') {
+            setStatusModalMessage("This user is already denied.");
+            setOpenStatusModal(true);
+            return;
+        }
+        
         try {
             // Optimistically update UI first
             setRegistrants(prev => 
@@ -675,14 +694,12 @@ export default function ApproveDenyPage() {
                                                         <button
                                                             className="bg-emerald-500 hover:bg-emerald-600 text-white px-2 py-1 rounded text-xs font-medium transition-colors duration-150 ease-in-out"
                                                             onClick={() => handleApprove(registrant.user_id)}
-                                                            disabled={registrant.approval_status === 'approved'}
                                                         >
                                                             Approve
                                                         </button>
                                                         <button
                                                             className="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-xs font-medium transition-colors duration-150 ease-in-out"
                                                             onClick={() => handleDeny(registrant.user_id)}
-                                                            disabled={registrant.approval_status === 'denied'}
                                                         >
                                                             Deny
                                                         </button>
@@ -1065,6 +1082,50 @@ export default function ApproveDenyPage() {
                     {snackbarMessage}
                 </Alert>
             </Snackbar>
+            
+            {/* Status Conflict Modal */}
+            <Modal
+                open={openStatusModal}
+                onClose={() => setOpenStatusModal(false)}
+                aria-labelledby="status-conflict-modal"
+            >
+                <Box
+                    sx={{
+                        position: 'absolute',
+                        top: '50%',
+                        left: '50%',
+                        transform: 'translate(-50%, -50%)',
+                        bgcolor: 'white',
+                        borderRadius: '8px',
+                        boxShadow: 24,
+                        p: 4,
+                        width: 400,
+                        maxWidth: '90vw'
+                    }}
+                >
+                    <div className="flex items-center space-x-2 mb-3">
+                        <Typography variant="h6" component="h2" sx={{ color: '#4b5563', fontWeight: 'bold' }}>
+                            Status Update
+                        </Typography>
+                    </div>
+                    <Divider sx={{ mb: 3 }} />
+                    <Typography sx={{ mb: 3, color: 'black' }}>
+                        {statusModalMessage}
+                    </Typography>
+                    <div className="flex justify-end">
+                        <Button 
+                            variant="contained" 
+                            onClick={() => setOpenStatusModal(false)}
+                            sx={{
+                                bgcolor: '#6B7280',
+                                '&:hover': { bgcolor: '#4B5563' }
+                            }}
+                        >
+                            OK
+                        </Button>
+                    </div>
+                </Box>
+            </Modal>
         </div>
     );
 }

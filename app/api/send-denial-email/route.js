@@ -61,26 +61,60 @@ export async function POST(request) {
     const resend = new Resend(resendApiKey);
     
     // Email content
-    const emailSubject = 'Your Account Application Status';
     const emailContent = `
-      <h2>Account Application Update</h2>
-      <p>We regret to inform you that your account application has been declined at this time.</p>
-      <p>This decision may be due to one of the following reasons:</p>
-      <ul>
-        <li>Incomplete or incorrect information provided</li>
-        <li>Unable to verify your credentials</li>
-        <li>Your role or department does not match our current requirements</li>
-      </ul>
-      <p>If you believe this is an error or would like to provide additional information, please contact our support team.</p>
-      <p>Thank you for your interest in our platform.</p>
-      <p>Regards,<br>The Mental Health Team</p>
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Account Application Status</title>
+        </head>
+        <body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f7f6; color: #333333;">
+          <table role="presentation" width="100%" style="max-width: 600px; margin: 0 auto; padding: 20px;">
+            <tr>
+              <td style="background-color: #4b5563; padding: 20px; text-align: center; border-radius: 10px 10px 0 0;">
+                <h1 style="color: white; margin: 0; font-size: 24px;">MentalHelp</h1>
+              </td>
+            </tr>
+            <tr>
+              <td style="background-color: white; padding: 30px; border-radius: 0 0 10px 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                <h2 style="color: #4b5563; margin-top: 0; margin-bottom: 20px; font-size: 20px;">Account Application Update</h2>
+                
+                <p style="margin-bottom: 15px; line-height: 1.5;">We regret to inform you that your account application has been declined at this time.</p>
+                
+                <p style="margin-bottom: 15px; line-height: 1.5;">This decision may be due to one of the following reasons:</p>
+                
+                <ul style="margin-bottom: 20px; padding-left: 20px; line-height: 1.6; color: #555555;">
+                  <li style="margin-bottom: 8px;">Incomplete or incorrect information provided</li>
+                  <li style="margin-bottom: 8px;">Unable to verify your credentials</li>
+                  <li style="margin-bottom: 8px;">Your role or department does not match our current requirements</li>
+                </ul>
+                
+                <p style="margin-bottom: 15px; line-height: 1.5;">If you believe this is an error or would like to provide additional information, please contact our support team at <a href="mailto:support@mentalhelp.fun" style="color: #4b5563; text-decoration: underline;">support@mentalhelp.fun</a>.</p>
+                
+                <p style="margin-bottom: 25px; line-height: 1.5;">Thank you for your interest in our platform.</p>
+                
+                <hr style="border: 0; height: 1px; background-color: #eaeaea; margin: 30px 0;">
+                
+                <p style="color: #666666; font-size: 14px; margin-bottom: 5px;">Regards,</p>
+                <p style="color: #666666; font-size: 14px; margin-top: 0;"><strong>The Mental Health Team</strong></p>
+              </td>
+            </tr>
+            <tr>
+              <td style="text-align: center; padding-top: 20px; color: #666666; font-size: 12px;">
+                <p>&copy; ${new Date().getFullYear()} MentalHelp. All rights reserved.</p>
+              </td>
+            </tr>
+          </table>
+        </body>
+      </html>
     `;
     
     // Send email using Resend
     const { data: emailData, error: emailError } = await resend.emails.send({
       from: 'MentalHelp Team <team@mentalhelp.fun>', // Added sender name
       to: userEmail,
-      subject: emailSubject,
+      subject: 'Your Account Application Status',
       html: emailContent,
     });
     

@@ -423,6 +423,7 @@ export default function ProfilePage() {
                         
                         <Divider sx={{ my: 4 }} />
                         
+                        {/* Academic Information section - commented out since users are counselors and secretaries
                         <Typography 
                             variant="h6" 
                             sx={{ mb: 2, color: 'teal', fontWeight: 500 }}
@@ -482,6 +483,7 @@ export default function ProfilePage() {
                         </Grid>
                         
                         <Divider sx={{ my: 4 }} />
+                        */}
                         
                         <Typography 
                             variant="h6" 

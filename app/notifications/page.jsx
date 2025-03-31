@@ -1040,11 +1040,11 @@ export default function NotificationsPage() {
                             <h2 className="text-xl font-bold text-gray-800 mb-6">New Notification</h2>
                             
                             <div className="mb-6">
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                <label className="block text-sm font-medium text-gray-700 mb-2 text-black">
                                     Recipients
                                 </label>
                                 <select 
-                                    className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors" 
+                                    className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors text-black" 
                                     value={targetGroup} 
                                     onChange={(e) => setTargetGroup(e.target.value)}
                                 >
@@ -1061,7 +1061,7 @@ export default function NotificationsPage() {
                                     Notification Content
                                 </label>
                                 <textarea
-                                    className="w-full p-4 border border-gray-300 rounded-md h-64 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors"
+                                    className="w-full p-4 border border-gray-300 rounded-md h-64 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors text-black"
                                     placeholder="Type your notification message here..."
                                     value={notificationContent}
                                     onChange={(e) => setNotificationContent(e.target.value)}

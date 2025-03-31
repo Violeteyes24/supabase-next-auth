@@ -107,11 +107,13 @@ function MessageContent() {
           setSession(data.session);
         } else {
           console.warn("No session after refresh attempt");
+          // If we lose the session entirely during a refresh, redirect to login
+          router.push('/login');
         }
       } catch (err) {
         console.error("Error in refresh interval:", err);
       }
-    }, 4 * 60 * 1000); // Refresh every 4 minutes
+    }, 2 * 60 * 1000); // Refresh every 2 minutes instead of 4
     
     return () => {
       authListener.subscription.unsubscribe();
@@ -391,7 +393,7 @@ const fetchConversations = async () => {
     setMessages([]);
     // setConversation(user);
     setShowUserModal(false);
-    debugger;
+    // debugger;
     if (user) {
       const data = await AddConversation({
         selectedUser: user.user_id,
