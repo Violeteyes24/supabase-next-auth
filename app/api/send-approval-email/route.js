@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
+import { Resend } from 'resend';
 
 export async function POST(request) {
   try {
@@ -12,7 +13,7 @@ export async function POST(request) {
       );
     }
     
-    // Initialize Supabase client with service role key (IMPORTANT: this should only be used server-side)
+    // Initialize Supabase client with service role key
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     
@@ -46,6 +47,19 @@ export async function POST(request) {
     
     const userEmail = userData.user.email;
     
+    // Initialize Resend
+    const resendApiKey = process.env.RESEND_API_KEY;
+    
+    if (!resendApiKey) {
+      console.error('Missing Resend API Key');
+      return NextResponse.json(
+        { error: 'Email service configuration error' },
+        { status: 500 }
+      );
+    }
+    
+    const resend = new Resend(resendApiKey);
+    
     // Email content
     const emailSubject = 'Your Account Has Been Approved';
     const emailContent = `
@@ -57,11 +71,21 @@ export async function POST(request) {
       <p>Thank you,<br>The Mental Health Team</p>
     `;
     
-    // Send email using Supabase Auth API
-    // Note: You must have email configured in your Supabase project
-    // For production, integrate with a dedicated email service like SendGrid, Mailgun, etc.
-    const { error: emailError } = await supabase.auth.admin.updateUserById(userId, {
-      email: userEmail,
+    // Send email using Resend
+    const { data: emailData, error: emailError } = await resend.emails.send({
+      from: 'MentalHelp Team <team@mentalhelp.fun>', // Added sender name
+      to: userEmail,
+      subject: emailSubject,
+      html: emailContent,
+    });
+    
+    if (emailError) {
+      console.error('Error sending email:', emailError);
+      throw emailError;
+    }
+    
+    // Update user metadata in Supabase
+    const { error: updateError } = await supabase.auth.admin.updateUserById(userId, {
       app_metadata: { status: 'approved' },
       user_metadata: { 
         status_notification_sent: true,
@@ -69,9 +93,16 @@ export async function POST(request) {
       }
     });
     
-    if (emailError) throw emailError;
+    if (updateError) {
+      console.error('Error updating user metadata:', updateError);
+      // We still continue since the email was sent
+    }
     
-    return NextResponse.json({ success: true, message: 'Approval email sent' });
+    return NextResponse.json({ 
+      success: true, 
+      message: 'Approval email sent',
+      emailId: emailData?.id 
+    });
   } catch (error) {
     console.error('Error sending approval email:', error);
     return NextResponse.json(
