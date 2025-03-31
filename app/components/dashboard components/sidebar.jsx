@@ -12,37 +12,110 @@ import NotificationsIcon from '@mui/icons-material/Notifications';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ExitToAppIcon from '@mui/icons-material/ExitToApp';
 import PersonIcon from '@mui/icons-material/Person';
+import { useRouter } from 'next/navigation';
 
-const Sidebar = ({ handleLogout }) => {
+const Sidebar = ({ handleLogout, sessionProp }) => {
     const supabase = createClientComponentClient();
+    const router = useRouter();
     const [isOpen, setIsOpen] = useState(false);
     const [user, setUser] = useState(null);
+    const [session, setSession] = useState(sessionProp);
+
+    useEffect(() => {
+        // Update local session if sessionProp changes
+        if (sessionProp) {
+            setSession(sessionProp);
+        }
+    }, [sessionProp]);
 
     useEffect(() => {
         const getUser = async () => {
             try {
-                const { data: { user }, error: userError } = await supabase.auth.getUser();
-                if (userError) {
-                    console.error('Error fetching user:', userError);
-                    return;
-                }
-                if (user) {
+                // First try to use the passed session prop
+                if (session?.user) {
                     const { data, error } = await supabase
                         .from('users')
                         .select('user_type, is_director')
-                        .eq('user_id', user.id)
+                        .eq('user_id', session.user.id)
                         .single();
+                    
                     if (error) {
                         console.error('Error fetching user details:', error);
                         return;
                     }
+                    
+                    setUser(data);
+                    return;
+                }
+                
+                // If no session prop, get user from auth
+                const { data: { session: authSession }, error: sessionError } = await supabase.auth.getSession();
+                
+                if (sessionError) {
+                    console.error('Error fetching session:', sessionError);
+                    return;
+                }
+                
+                if (!authSession) {
+                    console.log('No auth session found in sidebar');
+                    return;
+                }
+                
+                setSession(authSession);
+                
+                const { data: { user: authUser }, error: userError } = await supabase.auth.getUser();
+                
+                if (userError) {
+                    console.error('Error fetching user:', userError);
+                    
+                    // Try to refresh session if we get auth errors
+                    const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+                    
+                    if (refreshError || !refreshData.session) {
+                        console.error('Failed to refresh session in sidebar:', refreshError);
+                        return;
+                    }
+                    
+                    setSession(refreshData.session);
+                    return;
+                }
+                
+                if (authUser) {
+                    const { data, error } = await supabase
+                        .from('users')
+                        .select('user_type, is_director')
+                        .eq('user_id', authUser.id)
+                        .single();
+                        
+                    if (error) {
+                        console.error('Error fetching user details:', error);
+                        return;
+                    }
+                    
                     setUser(data);
                 }
             } catch (err) {
-                console.error('Unexpected error fetching user:', err);
+                console.error('Unexpected error fetching user in sidebar:', err);
             }
         };
+        
         getUser();
+        
+        // Set up periodic session refresh
+        const refreshInterval = setInterval(async () => {
+            try {
+                const { data, error } = await supabase.auth.refreshSession();
+                if (error) {
+                    console.error('Error refreshing session in sidebar:', error);
+                } else if (data.session) {
+                    setSession(data.session);
+                }
+            } catch (err) {
+                console.error('Unexpected error refreshing session in sidebar:', err);
+            }
+        }, 4 * 60 * 1000); // Every 4 minutes
+        
+        return () => clearInterval(refreshInterval);
     }, []);
 
     const toggleDrawer = (open) => (event) => {

@@ -44,19 +44,78 @@ function MessageContent() {
 
   useEffect(() => {
     const getSession = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+      try {
+        const {
+          data: { session },
+          error
+        } = await supabase.auth.getSession();
 
-      setSession(session);
+        if (error) {
+          console.error("Error getting session:", error);
+          return;
+        }
+
+        // If there's no valid session, try refreshing it
+        if (!session) {
+          console.log("No valid session found, attempting to refresh...");
+          const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+          
+          if (refreshError) {
+            console.error("Failed to refresh missing session:", refreshError);
+            // Only redirect to login if we can't refresh the session
+            router.push('/login');
+            return;
+          }
+          
+          if (refreshData.session) {
+            console.log("Session successfully refreshed from initial empty state");
+            setSession(refreshData.session);
+          } else {
+            console.log("No session after refresh, redirecting to login");
+            router.push('/login');
+          }
+        } else {
+          setSession(session);
+          console.log("Session refreshed:", session ? `Valid session (${session.user.email})` : "No session");
+        }
+      } catch (err) {
+        console.error("Unexpected error in getSession:", err);
+      }
     };
+    
     getSession();
+    
     // Subscribe to auth state changes for persistent session handling
     const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log("Auth state changed:", event);
       setSession(session);
     });
+    
+    // Set up a periodic session refresh to prevent token expiration
+    const refreshInterval = setInterval(async () => {
+      try {
+        console.log("Refreshing session...");
+        const { data, error } = await supabase.auth.refreshSession();
+        
+        if (error) {
+          console.error("Error refreshing session:", error);
+          return;
+        }
+        
+        if (data.session) {
+          console.log("Session refreshed successfully:", data.session.user.email);
+          setSession(data.session);
+        } else {
+          console.warn("No session after refresh attempt");
+        }
+      } catch (err) {
+        console.error("Error in refresh interval:", err);
+      }
+    }, 4 * 60 * 1000); // Refresh every 4 minutes
+    
     return () => {
       authListener.subscription.unsubscribe();
+      clearInterval(refreshInterval);
     };
   }, []);
 
@@ -139,6 +198,24 @@ function MessageContent() {
     if (!conversationId) return;
 
     try {
+      // Check if session is still valid before proceeding
+      if (!session || !session.user) {
+        console.error("Session missing when trying to fetch messages");
+        
+        // Try to refresh the session
+        const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+        
+        if (refreshError || !refreshData.session) {
+          console.error("Failed to refresh session:", refreshError);
+          router.push('/login'); // Redirect to login if refresh fails
+          return;
+        } else {
+          console.log("Session successfully refreshed");
+          setSession(refreshData.session);
+        }
+      }
+
+      console.log("Fetching messages for conversation:", conversationId);
       const { data, error } = await supabase
         .from("messages")
         .select('*')
@@ -147,20 +224,72 @@ function MessageContent() {
         
       if (error) {
         console.error("Error fetching messages:", error);
+        
+        // Check specifically for auth errors
+        if (error.code === 'PGRST301' || error.message?.includes('JWT')) {
+          console.error("Authentication error detected, attempting to refresh session");
+          const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+          
+          if (refreshError) {
+            console.error("Failed to refresh session after auth error:", refreshError);
+            router.push('/login');
+          } else {
+            console.log("Session refreshed after auth error, retrying fetch");
+            // Don't retry immediately to avoid infinite loops, set session instead
+            setSession(refreshData.session);
+          }
+        }
         return;
       }
       
       // Make sure we have an array of messages
       const messageArray = Array.isArray(data) ? data : [];
       
-      // Ensure messages are properly sorted by sent_at timestamp
-      const sortedMessages = messageArray.sort((a, b) => {
-        return new Date(a.sent_at) - new Date(b.sent_at);
+      // Process messages to add reliable unique IDs for React keys
+      const currentUserId = session?.user?.id;
+      const processedMessages = messageArray.map(msg => ({
+        ...msg,
+        // Add a display sequence attribute to ensure rendering order
+        _displaySequence: `${msg.sent_at}_${msg.sender_id === currentUserId ? '1' : '0'}`
+      }));
+      
+      // Enhanced sorting algorithm to handle very close timestamps
+      const sortedMessages = processedMessages.sort((a, b) => {
+        // Create Date objects for proper comparison
+        const dateA = new Date(a.sent_at);
+        const dateB = new Date(b.sent_at);
+        
+        // Get timestamps as numbers for precise comparison
+        const timeA = dateA.getTime();
+        const timeB = dateB.getTime();
+        
+        // Check if timestamps are within 1 second of each other
+        const isCloseTime = Math.abs(timeA - timeB) < 1000;
+        
+        // If timestamps are very close and the messages are from different senders,
+        // ensure the current user's message appears below others
+        if (isCloseTime && a.sender_id !== b.sender_id) {
+          // If a is from current user, it should come after b
+          if (a.sender_id === currentUserId) return 1;
+          // If b is from current user, it should come after a
+          if (b.sender_id === currentUserId) return -1;
+        }
+        
+        // Default to normal timestamp-based sorting
+        console.log(`Sorting messages: ${dateA.toISOString()} vs ${dateB.toISOString()}`);
+        return timeA - timeB;
       });
       
+      console.log(`Sorted ${sortedMessages.length} messages by timestamp with enhanced logic`);
       setMessages(sortedMessages);
     } catch (err) {
       console.error("Unexpected error fetching messages:", err);
+      
+      // Check if it's an auth error by examining the error message
+      if (err.message?.includes('auth') || err.message?.includes('JWT') || err.message?.includes('session')) {
+        console.error("Authentication error in catch block, redirecting to login");
+        router.push('/login');
+      }
     }
   };
 
@@ -276,18 +405,127 @@ const fetchConversations = async () => {
     }
   };
 
+  // Universal timestamp utility functions
+  const formatTimeWithTimezone = (timestamp, showFull = false) => {
+    if (!timestamp) return "";
+    try {
+      // Create a date object using the timestamp
+      const date = new Date(timestamp);
+      
+      // Check if the date is valid
+      if (isNaN(date.getTime())) {
+        return "";
+      }
+      
+      // Log for debugging
+      console.log('Timestamp conversion:', {
+        inputTimestamp: timestamp,
+        systemLocalTime: date.toLocaleTimeString(),
+      });
+      
+      if (showFull) {
+        // Format with date, time and seconds for hover display
+        return date.toLocaleString('en-US', {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: 'numeric',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: true,
+          timeZone: 'Asia/Manila'
+        });
+      }
+      
+      // Format using Manila timezone (time only) for regular display
+      return date.toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+        timeZone: 'Asia/Manila'
+      });
+    } catch (e) {
+      console.error("Error formatting time:", e);
+      return "";
+    }
+  };
+  
+  // Replace the existing formatTime function with our new one
+  const formatTime = formatTimeWithTimezone;
+  
+  // Function to create a timestamp in Manila time
+  const createManilaTimestamp = () => {
+    const now = new Date();
+    
+    // Ensure this timestamp is slightly later than any existing message
+    if (messages.length > 0) {
+      // Find the latest message time
+      const latestMsgTime = Math.max(...messages.map(msg => new Date(msg.sent_at).getTime()));
+      const currentTime = now.getTime();
+      
+      // If the current time is not at least 100ms later than the latest message,
+      // add a small offset to ensure this message appears last
+      if (currentTime - latestMsgTime < 100) {
+        // Make the timestamp 100ms later than the latest message
+        now.setTime(latestMsgTime + 100);
+      }
+    }
+    
+    console.log('Creating new timestamp:', {
+      systemTime: now.toISOString(),
+      systemLocalTime: now.toLocaleTimeString(),
+      manilaTime: now.toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true,
+        timeZone: 'Asia/Manila'
+      })
+    });
+    
+    // Return ISO string (will be interpreted as UTC by the database)
+    return now.toISOString();
+  };
 
   const handleSendMessage = async () => {
-    if (!inputMessage.trim() || !conversationId || !session) return;
+    if (!inputMessage.trim() || !conversationId) return;
     
     try {
+      // Check if session is still valid
+      if (!session || !session.user) {
+        console.error("Session missing when trying to send message");
+        
+        // Try to refresh the session
+        const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+        
+        if (refreshError || !refreshData.session) {
+          console.error("Failed to refresh session before send:", refreshError);
+          alert("Your session has expired. Please login again.");
+          router.push('/login');
+          return;
+        } else {
+          console.log("Session successfully refreshed before send");
+          setSession(refreshData.session);
+        }
+      }
+      
+      // Use our new timestamp function
+      const messageTimestamp = createManilaTimestamp();
+      
+      // Log the timestamp
+      console.log('Message timestamp:', {
+        timestamp: messageTimestamp,
+        formattedTime: formatTime(messageTimestamp),
+        formattedFullTime: formatTime(messageTimestamp, true)
+      });
+      
       // Optimistically add the message to the UI
       const optimisticMessage = {
         message_id: `temp-${Date.now()}`,
         sender_id: session.user.id,
         conversation_id: conversationId,
         message_content: inputMessage,
-        sent_at: new Date().toISOString(),
+        sent_at: messageTimestamp,
         is_read: false,
         is_delivered: false
       };
@@ -305,6 +543,23 @@ const fetchConversations = async () => {
       
       if (!success) {
         console.error("Failed to send message:", error);
+        
+        // Check if it's an auth error
+        if (error && (error.message?.includes('auth') || error.message?.includes('JWT') || error.message?.includes('session'))) {
+          console.error("Authentication error when sending, attempting to refresh");
+          
+          const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+          
+          if (refreshError) {
+            console.error("Failed to refresh after send error:", refreshError);
+            alert("Your session has expired. Please login again.");
+            router.push('/login');
+          } else {
+            console.log("Session refreshed after send error, please try again");
+            setSession(refreshData.session);
+          }
+        }
+        
         // Remove the optimistic message on failure
         setMessages(prev => prev.filter(msg => msg.message_id !== optimisticMessage.message_id));
         // Restore the input
@@ -314,6 +569,12 @@ const fetchConversations = async () => {
       // No need to call fetchMessages() as the real-time subscription will handle it
     } catch (err) {
       console.error("Error in handleSendMessage:", err);
+      
+      // Handle any authentication errors in the catch block
+      if (err.message?.includes('auth') || err.message?.includes('JWT') || err.message?.includes('session')) {
+        alert("Your session has expired. Please login again.");
+        router.push('/login');
+      }
     }
   };
 
@@ -417,25 +678,6 @@ const fetchConversations = async () => {
     router.push("/login");
   };
 
-  const formatTime = (timestamp) => {
-    if (!timestamp) return "";
-    try {
-      // Create a date object using the timestamp
-      const date = new Date(timestamp);
-      
-      // Check if the date is valid
-      if (isNaN(date.getTime())) {
-        return "";
-      }
-      
-      // Format using browser's locale settings for consistency
-      return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-    } catch (e) {
-      console.error("Error formatting time:", e);
-      return "";
-    }
-  };
-
   const toggleSidebar = () => {
     setShowSidebar(!showSidebar);
   };
@@ -448,7 +690,7 @@ const fetchConversations = async () => {
           isMobile ? (showSidebar ? "block" : "hidden") : "block"
         } md:w-16 bg-gray-900 flex-shrink-0`}
       >
-        <Sidebar handleLogout={handleLogout} />
+        <Sidebar handleLogout={handleLogout} sessionProp={session} />
       </div>
 
       {/* Message Sidebar */}
@@ -609,9 +851,18 @@ const fetchConversations = async () => {
               ) : (
                 messages.map((msg, index) => {
                   const isCurrentUser = msg.sender_id === session?.user.id;
+                  
+                  // Log timestamp details for debugging - reduce verbosity
+                  console.log(`Message ${index}:`, {
+                    from: isCurrentUser ? 'Me' : 'Other',
+                    content: msg.message_content.substring(0, 15) + '...',
+                    sent: formatTime(msg.sent_at, true),
+                    rawTime: msg.sent_at
+                  });
+                  
                   return (
                     <div
-                      key={index}
+                      key={msg.message_id || msg._displaySequence || `msg-${index}`}
                       className={`flex ${
                         isCurrentUser ? "justify-end" : "justify-start"
                       } animate-fadeIn`}
@@ -634,11 +885,11 @@ const fetchConversations = async () => {
                           </div>
                         </div>
                         <div
-                          className={`text-xs mt-1 text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity ${
+                          className={`text-xs mt-1 text-gray-500 ${
                             isCurrentUser ? "text-right" : "text-left"
                           }`}
                         >
-                          {formatTime(msg.sent_at)}
+                          {formatTime(msg.sent_at, true)}
                         </div>
                       </div>
                     </div>

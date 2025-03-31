@@ -1206,8 +1206,8 @@ export default function CounselorPage() {
                                     label="Message Type"
                                     onChange={(e) => setCurrentMessage({ ...currentMessage, message_type: e.target.value })}
                                 >
-                                    <MenuItem value="greeting">options</MenuItem>
-                                    <MenuItem value="farewell">response</MenuItem>
+                                    <MenuItem value="options">options</MenuItem>
+                                    <MenuItem value="response">response</MenuItem>
                                 </Select>
                             </FormControl>
                             
@@ -1220,10 +1220,10 @@ export default function CounselorPage() {
                                     label="Message Role"
                                     onChange={(e) => setCurrentMessage({ ...currentMessage, message_role: e.target.value })}
                                 >
-                                    <MenuItem value="system">Counselor</MenuItem>
-                                    <MenuItem value="counselor">Secretary</MenuItem>
-                                    <MenuItem value="user">Student</MenuItem>
-                                    <MenuItem value="assistant">Director</MenuItem>
+                                    <MenuItem value="counselor">Counselor</MenuItem>
+                                    <MenuItem value="secretary">Secretary</MenuItem>
+                                    <MenuItem value="student">Student</MenuItem>
+                                    <MenuItem value="director">Director</MenuItem>
                                 </Select>
                             </FormControl>
                         </Box>

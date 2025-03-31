@@ -41,12 +41,30 @@ export async function sendMessage(messageData) {
     const supabase = await createClient();
     // Set default values if not provided
     console.log(messageData);
+    
+    // Create timestamp with detailed logging
+    const now = new Date();
+    console.log('Server timestamp creation:', {
+      utcTime: now.toISOString(),
+      localTime: now.toLocaleString(),
+      manilaTime: now.toLocaleString('en-US', {
+        timeZone: 'Asia/Manila',
+        hour12: true,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      })
+    });
+    
     const messageToInsert = {
         sender_id: messageData.sender_id,
         conversation_id: messageData.conversation_id,
         message_content: messageData.message_content,
         message_type: messageData.message_type || "text",
-        sent_at: new Date().toISOString(),
+        sent_at: now.toISOString(), // Store in ISO format for database
         is_delivered: false,
         is_read: false,
     };

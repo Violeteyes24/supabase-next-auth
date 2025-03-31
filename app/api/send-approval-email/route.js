@@ -77,7 +77,7 @@ export async function POST(request) {
       to: userEmail,
       subject: emailSubject,
       html: emailContent,
-    });
+    }); 
     
     if (emailError) {
       console.error('Error sending email:', emailError);
