@@ -22,6 +22,24 @@ import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import LockResetIcon from '@mui/icons-material/LockReset';
 import SmartphoneIcon from '@mui/icons-material/Smartphone';
 
+// Helper function to manually create a recovery session
+const redirectToRecovery = async (token, supabase) => {
+  // Construct recovery URL (this is what Supabase normally redirects to)
+  const recoveryPath = `/auth/recovery`;
+  
+  // Get Supabase URL from environment or use default
+  // You can also hard-code your Supabase URL here if needed
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://ybpoanqhkokhdqucwchy.supabase.co';
+  
+  // Construct the full recovery URL
+  const fullRecoveryUrl = `${supabaseUrl}${recoveryPath}?token=${token}&type=recovery&redirect_to=${window.location.origin}/reset-password`;
+  
+  console.log("Redirecting to Supabase recovery URL:", fullRecoveryUrl);
+  
+  // Redirect to Supabase recovery endpoint
+  window.location.href = fullRecoveryUrl;
+};
+
 export default function ResetPassword() {
   const supabase = createClientComponentClient();
   const router = useRouter();
@@ -41,32 +59,65 @@ export default function ResetPassword() {
 
   useEffect(() => {
     const extractTokenFromUrl = () => {
-      // Check for token in various formats
-      // Format 1: ?token=XXX
-      const queryParams = new URLSearchParams(window.location.search);
-      if (queryParams.has('token')) {
-        return queryParams.get('token');
+      // Add better debugging
+      console.log("Current URL:", window.location.href);
+      console.log("Hash:", window.location.hash);
+      console.log("Search params:", window.location.search);
+      
+      // Special case for recovery links where the token might be in a specific format
+      // Check for hash with type=recovery first (Supabase specific format)
+      const hash = window.location.hash.substring(1);
+      if (hash.includes('type=recovery')) {
+        const tokenMatch = hash.match(/token=([^&]+)/);
+        if (tokenMatch && tokenMatch[1]) {
+          console.log("Found recovery token in hash:", tokenMatch[1]);
+          return tokenMatch[1];
+        }
       }
       
-      // Format 2: #access_token=XXX (hash fragment)
-      const hash = window.location.hash.substring(1);
+      // Check for token in hash fragment (most common Supabase redirect format)
       const hashParams = new URLSearchParams(hash);
       if (hashParams.has('access_token')) {
+        console.log("Found access_token in hash:", hashParams.get('access_token'));
         return hashParams.get('access_token');
       }
       
-      // Format 3: URL path format like /verify/XXX
+      // Check for other hash parameters that might contain the token
+      if (hashParams.has('token')) {
+        console.log("Found token in hash params:", hashParams.get('token'));
+        return hashParams.get('token');
+      }
+      
+      // Check query parameters for token (standard URL parameter)
+      const queryParams = new URLSearchParams(window.location.search);
+      if (queryParams.has('token')) {
+        console.log("Found token in query params:", queryParams.get('token'));
+        return queryParams.get('token');
+      }
+      
+      // Check for specific Supabase format with type=recovery in query params
+      if (queryParams.has('type') && queryParams.get('type') === 'recovery') {
+        if (queryParams.has('token')) {
+          console.log("Found recovery token in query params:", queryParams.get('token'));
+          return queryParams.get('token');
+        }
+      }
+      
+      // URL path format like /verify/XXX
       const pathMatch = window.location.pathname.match(/\/verify\/([^\/]+)/);
       if (pathMatch && pathMatch[1]) {
+        console.log("Found token in URL path:", pathMatch[1]);
         return pathMatch[1];
       }
       
-      // Format 4: /auth/v1/verify?token=XXX
+      // Supabase direct format
       const verifyMatch = window.location.href.match(/\/auth\/v1\/verify\?token=([^&]+)/);
       if (verifyMatch && verifyMatch[1]) {
+        console.log("Found token in verify URL:", verifyMatch[1]);
         return verifyMatch[1];
       }
       
+      console.log("No token found in URL");
       return null;
     };
 
@@ -76,9 +127,12 @@ export default function ResetPassword() {
         
         // First try to get token from URL
         const token = extractTokenFromUrl();
+        console.log("Extracted token:", token);
+        
         if (token) {
           setResetToken(token);
           
+          console.log("Attempting to set session with token");
           // Try to set session with token
           const { data, error } = await supabase.auth.setSession({
             access_token: token,
@@ -86,18 +140,61 @@ export default function ResetPassword() {
           });
           
           if (error) {
+            console.error("Error setting session with token:", error);
+            
+            // If the token format might be for recovery rather than access
+            // Try using the verification API instead
+            try {
+              console.log("Attempting to verify token as recovery token");
+              const { error: verifyError } = await supabase.auth.verifyOtp({
+                token_hash: token,
+                type: 'recovery'
+              });
+              
+              if (verifyError) {
+                console.error("Recovery verification failed:", verifyError);
+                
+                // Last resort - try redirecting to Supabase recovery endpoint
+                // Only do this if user confirms
+                const shouldRedirect = window.confirm(
+                  "We're having trouble processing your password reset. Would you like to try an alternative reset method?"
+                );
+                
+                if (shouldRedirect) {
+                  redirectToRecovery(token, supabase);
+                  return;
+                }
+              } else {
+                console.log("Recovery verification successful");
+                // Don't need to redirect - user can now reset password
+                return;
+              }
+            } catch (verifyError) {
+              console.error("Error during recovery verification:", verifyError);
+            }
+            
             // If direct token usage fails, check if we have an active session
+            console.log("Checking for existing session");
             const { data: sessionData } = await supabase.auth.getSession();
             if (!sessionData.session?.user?.email) {
+              console.log("No active session found");
               showMessage("Invalid or expired recovery link", "error");
               setTimeout(() => router.push('/login'), 3000);
+            } else {
+              console.log("Active session found:", sessionData.session.user.email);
             }
+          } else {
+            console.log("Session set successfully");
           }
         } else {
           // Fallback to normal session check
+          console.log("No token found, checking for existing session");
           const { data } = await supabase.auth.getSession();
           if (!data.session?.user?.email) {
+            console.log("No active session found, redirecting to login");
             router.push('/login');
+          } else {
+            console.log("Active session found:", data.session.user.email);
           }
         }
       } catch (error) {
@@ -145,11 +242,52 @@ export default function ResetPassword() {
     try {
       setLoading(true);
       
+      // First try using the standard updateUser method
       const { error } = await supabase.auth.updateUser({
         password: passwordData.password
       });
       
-      if (error) throw error;
+      // If that fails and we have a reset token, try the alternative method
+      if (error && resetToken) {
+        console.log("Standard password update failed:", error);
+        console.log("Trying with recovery token");
+        
+        // Try to use recovery token directly
+        const { error: recoveryError } = await supabase.auth.resetPasswordForEmail(
+          undefined, // Email is not needed when you have a token
+          { 
+            redirectTo: window.location.origin + '/login',
+            token: resetToken,
+            password: passwordData.password
+          }
+        );
+        
+        if (recoveryError) {
+          console.log("Recovery error:", recoveryError);
+          
+          // Try another approach - directly using the token with OTP verification
+          try {
+            console.log("Trying OTP verification method");
+            const { error: otpError } = await supabase.auth.verifyOtp({
+              token_hash: resetToken,
+              type: 'recovery',
+              password: passwordData.password
+            });
+            
+            if (otpError) {
+              console.error("OTP verification method failed:", otpError);
+              throw otpError;
+            } else {
+              console.log("OTP verification successful");
+              // Success, continue to show success message below
+            }
+          } catch (otpError) {
+            throw otpError;
+          }
+        }
+      } else if (error) {
+        throw error;
+      }
       
       showMessage('Password reset successful!', 'success');
       setTimeout(() => router.push('/login'), 2000);
@@ -297,7 +435,7 @@ export default function ResetPassword() {
               {loading ? 'Updating...' : 'Reset Password'}
             </Button>
             
-            <Divider sx={{ my: 3 }}>
+            {/* <Divider sx={{ my: 3 }}>
               <Typography variant="body2" color="text.secondary">
                 OR
               </Typography>
@@ -320,7 +458,7 @@ export default function ResetPassword() {
               }}
             >
               Open in Mobile App
-            </Button>
+            </Button> */}
             
             <Box sx={{ textAlign: 'center', mt: 2 }}>
               <Button

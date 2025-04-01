@@ -215,7 +215,20 @@ export default function ProfilePage() {
     };
 
     const handleUpdatePassword = async () => {
+        // Clear previous errors
+        setPasswordError('');
+        
         // Validate passwords
+        if (!passwordData.currentPassword) {
+            setPasswordError("Current password is required");
+            return;
+        }
+        
+        if (!passwordData.newPassword) {
+            setPasswordError("New password is required");
+            return;
+        }
+        
         if (passwordData.newPassword !== passwordData.confirmPassword) {
             setPasswordError("New passwords don't match");
             return;
@@ -229,12 +242,33 @@ export default function ProfilePage() {
         try {
             setLoading(true);
             
-            // Update password via Supabase Auth
+            // Get current user to obtain email
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user || !user.email) {
+                throw new Error("Unable to retrieve user information");
+            }
+            
+            // Verify current password by attempting to sign in
+            // Note: This won't affect the current session
+            const { error: signInError } = await supabase.auth.signInWithPassword({
+                email: user.email,
+                password: passwordData.currentPassword,
+            });
+            
+            if (signInError) {
+                setPasswordError("Current password is incorrect");
+                setLoading(false);
+                return;
+            }
+            
+            // If current password is correct, update to the new password
             const { error } = await supabase.auth.updateUser({
                 password: passwordData.newPassword
             });
             
-            if (error) throw error;
+            if (error) {
+                throw error;
+            }
             
             // Reset form and close dialog
             setPasswordData({
@@ -666,10 +700,17 @@ export default function ProfilePage() {
                                     fullWidth
                                     label="Current Password"
                                     name="currentPassword"
-                                    type={showPasswords.current ? "text" : "password"}
+                                    type="text"
                                     value={passwordData.currentPassword}
                                     onChange={handlePasswordChange}
                                     margin="normal"
+                                    inputProps={{
+                                        style: {
+                                            WebkitTextSecurity: showPasswords.current ? 'none' : 'disc',
+                                            appearance: 'none',
+                                            WebkitAppearance: 'none',
+                                        }
+                                    }}
                                     InputProps={{
                                         sx: { borderRadius: 2 },
                                         endAdornment: (
@@ -691,10 +732,17 @@ export default function ProfilePage() {
                                     fullWidth
                                     label="New Password"
                                     name="newPassword"
-                                    type={showPasswords.new ? "text" : "password"}
+                                    type="text"
                                     value={passwordData.newPassword}
                                     onChange={handlePasswordChange}
                                     margin="normal"
+                                    inputProps={{
+                                        style: {
+                                            WebkitTextSecurity: showPasswords.new ? 'none' : 'disc',
+                                            appearance: 'none',
+                                            WebkitAppearance: 'none',
+                                        }
+                                    }}
                                     InputProps={{
                                         sx: { borderRadius: 2 },
                                         endAdornment: (
@@ -716,12 +764,19 @@ export default function ProfilePage() {
                                     fullWidth
                                     label="Confirm New Password"
                                     name="confirmPassword"
-                                    type={showPasswords.confirm ? "text" : "password"}
+                                    type="text"
                                     value={passwordData.confirmPassword}
                                     onChange={handlePasswordChange}
                                     margin="normal"
                                     error={Boolean(passwordError)}
                                     helperText={passwordError}
+                                    inputProps={{
+                                        style: {
+                                            WebkitTextSecurity: showPasswords.confirm ? 'none' : 'disc',
+                                            appearance: 'none',
+                                            WebkitAppearance: 'none',
+                                        }
+                                    }}
                                     InputProps={{
                                         sx: { borderRadius: 2 },
                                         endAdornment: (
