@@ -139,6 +139,149 @@ export default function AppointmentCard() {
     }
   }, [supabase]);
 
+  // Helper function to convert time string to Date object
+  const timeToDate = (timeStr, dateStr) => {
+    const [hours, minutes] = timeStr.split(':').map(Number);
+    const date = new Date(dateStr);
+    date.setHours(hours, minutes, 0, 0);
+    
+    // Log the conversion for debugging
+    console.log(`  - Converting ${dateStr} ${timeStr} to: ${date.toLocaleString()}`);
+    return date;
+  };
+  
+  // Function to check and complete expired individual appointments
+  const checkAndCompleteAppointments = async () => {
+    try {
+      if (!session) return;
+      
+      // Get current date and time
+      const now = new Date();
+      console.log('--------- CHECKING EXPIRED INDIVIDUAL APPOINTMENTS ---------');
+      console.log('Current time:', now.toLocaleString());
+      console.log('Current timezone:', Intl.DateTimeFormat().resolvedOptions().timeZone);
+      
+      let query = supabase
+        .from("appointments")
+        .select(`
+          appointment_id,
+          status,
+          appointment_type,
+          availability_schedule_id,
+          availability_schedules (
+            date,
+            start_time,
+            end_time,
+            is_available
+          )
+        `)
+        .eq("appointment_type", "individual")
+        .or('status.eq.pending,status.eq.rescheduled')
+        .not('availability_schedule_id', 'is', null);
+      
+      // Apply additional filtering based on user type
+      if (userType === 'counselor') {
+        query = query.eq("counselor_id", session.user.id);
+      } else if (userType === 'secretary') {
+        query = query.eq("secretary_id", session.user.id);
+      }
+      
+      const { data: incompleteAppointments, error } = await query;
+      
+      if (error) {
+        console.error("Error fetching incomplete individual appointments:", error);
+        return;
+      }
+      
+      console.log(`Found ${incompleteAppointments?.length || 0} incomplete individual appointments`);
+      
+      if (!incompleteAppointments || incompleteAppointments.length === 0) return;
+      
+      // Log raw appointment data for debugging
+      console.log('Incomplete appointments (raw data):', JSON.stringify(incompleteAppointments));
+      
+      const expiredAppointmentIds = [];
+      
+      // Check each appointment to see if it's expired
+      for (const appointment of incompleteAppointments) {
+        if (!appointment.availability_schedules) {
+          console.log(`Appointment #${appointment.appointment_id} has no schedule data`);
+          continue;
+        }
+        
+        const { date, end_time, is_available } = appointment.availability_schedules;
+        
+        // Convert appointment end time to Date object
+        const appointmentEndTime = timeToDate(end_time, date);
+        
+        console.log(`Checking appointment #${appointment.appointment_id}:`);
+        console.log(`  - Status: ${appointment.status}`);
+        console.log(`  - Schedule date: ${date}`);
+        console.log(`  - End time: ${end_time} (${appointmentEndTime.toLocaleString()})`);
+        console.log(`  - Is schedule available: ${is_available}`);
+        console.log(`  - Current time: ${now.toLocaleString()}`);
+        console.log(`  - Is expired: ${appointmentEndTime < now}`);
+        
+        // Check if the appointment has ended
+        if (appointmentEndTime < now) {
+          console.log(`  - EXPIRED: Appointment #${appointment.appointment_id} will be marked as completed`);
+          expiredAppointmentIds.push(appointment.appointment_id);
+        } else {
+          console.log(`  - NOT EXPIRED: Appointment #${appointment.appointment_id} has not ended yet`);
+        }
+      }
+      
+      // Update expired appointments to completed status
+      if (expiredAppointmentIds.length > 0) {
+        console.log(`Marking ${expiredAppointmentIds.length} expired appointments as completed:`, expiredAppointmentIds);
+        
+        // Force direct console output of the update parameters for debugging
+        console.log('UPDATE appointments SET status = "completed" WHERE appointment_id IN', expiredAppointmentIds);
+        
+        const { data, error: updateError } = await supabase
+          .from("appointments")
+          .update({ status: "completed" })
+          .in("appointment_id", expiredAppointmentIds)
+          .select();
+        
+        if (updateError) {
+          console.error("Error updating expired individual appointments:", updateError);
+        } else {
+          console.log(`Successfully marked ${data?.length || 0} individual appointments as completed:`, data);
+          
+          // Double check that appointments were actually updated
+          for (const id of expiredAppointmentIds) {
+            const { data: checkData, error: checkError } = await supabase
+              .from("appointments")
+              .select("appointment_id, status")
+              .eq("appointment_id", id)
+              .single();
+              
+            if (checkError) {
+              console.error(`Error verifying update for appointment ${id}:`, checkError);
+            } else {
+              console.log(`Verification - Appointment ${id} now has status: ${checkData.status}`);
+            }
+          }
+          
+          // Show success message
+          if (data?.length > 0) {
+            setSuccessMessage(`${data.length} ${data.length === 1 ? 'appointment' : 'appointments'} automatically marked as completed`);
+          }
+          
+          // Refresh the appointments list
+          fetchAppointments();
+        }
+      } else {
+        console.log('No expired individual appointments found');
+      }
+      
+      console.log('--------- FINISHED CHECKING EXPIRED INDIVIDUAL APPOINTMENTS ---------');
+    } catch (error) {
+      console.error("Unexpected error checking expired individual appointments:", error);
+    }
+  };
+
   // Modify the useEffect for initial load
   useEffect(() => {
     const initializeComponent = async () => {
@@ -147,6 +290,11 @@ export default function AppointmentCard() {
       } = await supabase.auth.getSession();
       setSession(session);
       await fetchAppointments();
+      
+      // Check for expired appointments immediately when component loads
+      if (session) {
+        checkAndCompleteAppointments();
+      }
     };
 
     initializeComponent();
@@ -161,12 +309,20 @@ export default function AppointmentCard() {
         (payload) => {
           console.log('Appointment change received:', payload);
           fetchAppointments(); // Refresh appointments when changes occur
+          checkAndCompleteAppointments(); // Check appointments when changes occur
         }
       )
       .subscribe();
-
+      
+    // Set up interval to check for expired appointments every minute
+    const checkExpiredInterval = setInterval(() => {
+      console.log('Running scheduled check for expired individual appointments');
+      checkAndCompleteAppointments();
+    }, 60 * 1000); // Run every minute
+    
     return () => {
       supabase.removeChannel(appointmentChannel);
+      clearInterval(checkExpiredInterval);
     };
   }, [fetchAppointments]);
 
