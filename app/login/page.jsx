@@ -15,6 +15,8 @@ export default function Auth() {
   const [otp, setOtp] = useState("");
   const [isOtpModalVisible, setOtpModalVisible] = useState(false);
   const [isPendingModalVisible, setPendingModalVisible] = useState(false);
+  const [isForgotPasswordModalVisible, setForgotPasswordModalVisible] = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const router = useRouter();
 
@@ -181,6 +183,31 @@ export default function Auth() {
     setLoading(false);
   }
 
+  async function handlePasswordReset() {
+    if (!resetEmail || !resetEmail.trim()) {
+      alert("Please enter your email address");
+      return;
+    }
+    
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+
+      if (error) {
+        alert(error.message);
+      } else {
+        alert("Password reset instructions sent to your email");
+        setForgotPasswordModalVisible(false);
+        setResetEmail("");
+      }
+    } catch (err) {
+      alert("An error occurred while sending password reset email.");
+    }
+    setLoading(false);
+  }
+
   async function handleNavigation(userId) {
     const { data, error } = await supabase
       .from("users")
@@ -271,6 +298,15 @@ export default function Auth() {
                     <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
                   </svg>
                 )}
+              </button>
+            </div>
+            <div className="text-right mt-1">
+              <button
+                type="button"
+                onClick={() => setForgotPasswordModalVisible(true)}
+                className="text-sm text-green-600 hover:text-green-800 font-medium"
+              >
+                Forgot password?
               </button>
             </div>
           </div>
@@ -382,6 +418,52 @@ export default function Auth() {
                 className="bg-green-500 text-white hover:bg-green-600 font-medium py-3 px-4 rounded-lg transition duration-200"
               >
                 Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isForgotPasswordModalVisible && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+          <div className="bg-white p-6 rounded-xl shadow-xl w-full max-w-md">
+            <h2 className="text-xl font-semibold text-gray-800 mb-4">
+              Reset Your Password
+            </h2>
+            <p className="text-gray-600 mb-4">
+              Enter your email address, and we'll send you instructions to reset your password.
+            </p>
+
+            <input
+              type="email"
+              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-400 focus:border-green-400 transition duration-200 text-black"
+              value={resetEmail}
+              onChange={(e) => setResetEmail(e.target.value)}
+              placeholder="email@address.com"
+            />
+
+            <div className="flex flex-col sm:flex-row justify-between gap-3 mt-6">
+              <button
+                onClick={handlePasswordReset}
+                disabled={loading || !resetEmail}
+                className={`${
+                  resetEmail
+                    ? "bg-green-500 hover:bg-green-600"
+                    : "bg-gray-300 cursor-not-allowed"
+                } text-white font-medium py-3 px-4 rounded-lg transition duration-200 sm:flex-1`}
+              >
+                {loading ? (
+                  <span className="inline-block h-5 w-5 animate-spin rounded-full border-4 border-solid border-current border-r-transparent align-middle" />
+                ) : (
+                  "Send Reset Link"
+                )}
+              </button>
+
+              <button
+                onClick={() => setForgotPasswordModalVisible(false)}
+                className="bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium py-3 px-4 rounded-lg transition duration-200 sm:flex-1"
+              >
+                Cancel
               </button>
             </div>
           </div>

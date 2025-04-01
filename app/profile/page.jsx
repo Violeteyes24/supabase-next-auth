@@ -19,7 +19,12 @@ import {
     IconButton,
     Stack,
     Tooltip,
-    Skeleton
+    Skeleton,
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
+    InputAdornment
 } from '@mui/material';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
@@ -28,6 +33,9 @@ import { useRouter } from 'next/navigation';
 import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
 import SaveIcon from '@mui/icons-material/Save';
 import EditIcon from '@mui/icons-material/Edit';
+import LockIcon from '@mui/icons-material/Lock';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 
 export default function ProfilePage() {
     const router = useRouter();
@@ -52,6 +60,18 @@ export default function ProfilePage() {
         credentials: ''
     });
     const [loading, setLoading] = useState(true);
+    const [openPasswordDialog, setOpenPasswordDialog] = useState(false);
+    const [passwordData, setPasswordData] = useState({
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: ''
+    });
+    const [showPasswords, setShowPasswords] = useState({
+        current: false,
+        new: false,
+        confirm: false
+    });
+    const [passwordError, setPasswordError] = useState('');
 
     useEffect(() => {
         fetchUserData();
@@ -176,6 +196,62 @@ export default function ProfilePage() {
         router.push('/login');
     };
 
+    const handlePasswordChange = (e) => {
+        const { name, value } = e.target;
+        setPasswordData(prev => ({
+            ...prev,
+            [name]: value
+        }));
+        
+        // Clear error when user starts typing again
+        if (passwordError) setPasswordError('');
+    };
+
+    const togglePasswordVisibility = (field) => {
+        setShowPasswords(prev => ({
+            ...prev,
+            [field]: !prev[field]
+        }));
+    };
+
+    const handleUpdatePassword = async () => {
+        // Validate passwords
+        if (passwordData.newPassword !== passwordData.confirmPassword) {
+            setPasswordError("New passwords don't match");
+            return;
+        }
+        
+        if (passwordData.newPassword.length < 8) {
+            setPasswordError("Password must be at least 8 characters");
+            return;
+        }
+        
+        try {
+            setLoading(true);
+            
+            // Update password via Supabase Auth
+            const { error } = await supabase.auth.updateUser({
+                password: passwordData.newPassword
+            });
+            
+            if (error) throw error;
+            
+            // Reset form and close dialog
+            setPasswordData({
+                currentPassword: '',
+                newPassword: '',
+                confirmPassword: ''
+            });
+            setOpenPasswordDialog(false);
+            showMessage('Password updated successfully!', 'success');
+        } catch (error) {
+            console.error('Error updating password:', error);
+            setPasswordError(error.message || 'Error updating password');
+        } finally {
+            setLoading(false);
+        }
+    };
+
     // Loading skeleton component with shimmer effect
     const ProfileSkeleton = () => (
         <div className="flex min-h-screen bg-gray-100">
@@ -286,6 +362,23 @@ export default function ProfilePage() {
                         >
                             Edit Profile
                         </Typography>
+                        <Button
+                            variant="outlined"
+                            startIcon={<LockIcon />}
+                            onClick={() => setOpenPasswordDialog(true)}
+                            sx={{
+                                borderColor: 'teal',
+                                color: 'teal',
+                                '&:hover': { 
+                                    borderColor: 'darkcyan',
+                                    backgroundColor: 'rgba(0, 128, 128, 0.05)'
+                                },
+                                borderRadius: 2,
+                                textTransform: 'none'
+                            }}
+                        >
+                            Change Password
+                        </Button>
                     </Box>
                     
                     <Divider sx={{ mb: 4 }} />
@@ -555,6 +648,128 @@ export default function ProfilePage() {
                         {message}
                     </Alert>
                 </Snackbar>
+                
+                {/* Password Change Dialog */}
+                <Dialog 
+                    open={openPasswordDialog} 
+                    onClose={() => setOpenPasswordDialog(false)}
+                    maxWidth="sm"
+                    fullWidth
+                >
+                    <DialogTitle sx={{ color: 'teal', fontWeight: 500 }}>
+                        Change Your Password
+                    </DialogTitle>
+                    <DialogContent>
+                        <Grid container spacing={3} sx={{ mt: 0.5 }}>
+                            <Grid item xs={12}>
+                                <TextField
+                                    fullWidth
+                                    label="Current Password"
+                                    name="currentPassword"
+                                    type={showPasswords.current ? "text" : "password"}
+                                    value={passwordData.currentPassword}
+                                    onChange={handlePasswordChange}
+                                    margin="normal"
+                                    InputProps={{
+                                        sx: { borderRadius: 2 },
+                                        endAdornment: (
+                                            <InputAdornment position="end">
+                                                <IconButton
+                                                    aria-label="toggle password visibility"
+                                                    onClick={() => togglePasswordVisibility('current')}
+                                                    edge="end"
+                                                >
+                                                    {showPasswords.current ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                                                </IconButton>
+                                            </InputAdornment>
+                                        )
+                                    }}
+                                />
+                            </Grid>
+                            <Grid item xs={12}>
+                                <TextField
+                                    fullWidth
+                                    label="New Password"
+                                    name="newPassword"
+                                    type={showPasswords.new ? "text" : "password"}
+                                    value={passwordData.newPassword}
+                                    onChange={handlePasswordChange}
+                                    margin="normal"
+                                    InputProps={{
+                                        sx: { borderRadius: 2 },
+                                        endAdornment: (
+                                            <InputAdornment position="end">
+                                                <IconButton
+                                                    aria-label="toggle password visibility"
+                                                    onClick={() => togglePasswordVisibility('new')}
+                                                    edge="end"
+                                                >
+                                                    {showPasswords.new ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                                                </IconButton>
+                                            </InputAdornment>
+                                        )
+                                    }}
+                                />
+                            </Grid>
+                            <Grid item xs={12}>
+                                <TextField
+                                    fullWidth
+                                    label="Confirm New Password"
+                                    name="confirmPassword"
+                                    type={showPasswords.confirm ? "text" : "password"}
+                                    value={passwordData.confirmPassword}
+                                    onChange={handlePasswordChange}
+                                    margin="normal"
+                                    error={Boolean(passwordError)}
+                                    helperText={passwordError}
+                                    InputProps={{
+                                        sx: { borderRadius: 2 },
+                                        endAdornment: (
+                                            <InputAdornment position="end">
+                                                <IconButton
+                                                    aria-label="toggle password visibility"
+                                                    onClick={() => togglePasswordVisibility('confirm')}
+                                                    edge="end"
+                                                >
+                                                    {showPasswords.confirm ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                                                </IconButton>
+                                            </InputAdornment>
+                                        )
+                                    }}
+                                />
+                            </Grid>
+                        </Grid>
+                    </DialogContent>
+                    <DialogActions sx={{ px: 3, pb: 3 }}>
+                        <Button 
+                            onClick={() => setOpenPasswordDialog(false)}
+                            variant="outlined"
+                            sx={{ 
+                                borderRadius: 2,
+                                textTransform: 'none',
+                                borderColor: 'grey.400',
+                                color: 'grey.700'
+                            }}
+                        >
+                            Cancel
+                        </Button>
+                        <Button 
+                            onClick={handleUpdatePassword}
+                            variant="contained"
+                            disabled={loading}
+                            sx={{ 
+                                bgcolor: 'teal',
+                                '&:hover': { bgcolor: 'darkcyan' },
+                                borderRadius: 2,
+                                textTransform: 'none',
+                                fontWeight: 600,
+                                minWidth: '100px'
+                            }}
+                        >
+                            {loading ? 'Updating...' : 'Update'}
+                        </Button>
+                    </DialogActions>
+                </Dialog>
             </Container>
         </div>
     );
