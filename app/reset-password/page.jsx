@@ -14,11 +14,13 @@ import {
   InputAdornment,
   IconButton,
   Snackbar,
-  Skeleton
+  Skeleton,
+  Divider
 } from '@mui/material';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import LockResetIcon from '@mui/icons-material/LockReset';
+import SmartphoneIcon from '@mui/icons-material/Smartphone';
 
 export default function ResetPassword() {
   const supabase = createClientComponentClient();
@@ -35,19 +37,71 @@ export default function ResetPassword() {
     confirmPassword: ''
   });
   const [checkingSession, setCheckingSession] = useState(true);
+  const [resetToken, setResetToken] = useState(null);
 
   useEffect(() => {
+    const extractTokenFromUrl = () => {
+      // Check for token in various formats
+      // Format 1: ?token=XXX
+      const queryParams = new URLSearchParams(window.location.search);
+      if (queryParams.has('token')) {
+        return queryParams.get('token');
+      }
+      
+      // Format 2: #access_token=XXX (hash fragment)
+      const hash = window.location.hash.substring(1);
+      const hashParams = new URLSearchParams(hash);
+      if (hashParams.has('access_token')) {
+        return hashParams.get('access_token');
+      }
+      
+      // Format 3: URL path format like /verify/XXX
+      const pathMatch = window.location.pathname.match(/\/verify\/([^\/]+)/);
+      if (pathMatch && pathMatch[1]) {
+        return pathMatch[1];
+      }
+      
+      // Format 4: /auth/v1/verify?token=XXX
+      const verifyMatch = window.location.href.match(/\/auth\/v1\/verify\?token=([^&]+)/);
+      if (verifyMatch && verifyMatch[1]) {
+        return verifyMatch[1];
+      }
+      
+      return null;
+    };
+
     const checkSession = async () => {
       try {
         setCheckingSession(true);
-        const { data, error } = await supabase.auth.getSession();
         
-        // Check if this is a recovery session
-        // If not, redirect to login
-        if (!data.session?.user?.email) {
-          router.push('/login');
+        // First try to get token from URL
+        const token = extractTokenFromUrl();
+        if (token) {
+          setResetToken(token);
+          
+          // Try to set session with token
+          const { data, error } = await supabase.auth.setSession({
+            access_token: token,
+            refresh_token: ''
+          });
+          
+          if (error) {
+            // If direct token usage fails, check if we have an active session
+            const { data: sessionData } = await supabase.auth.getSession();
+            if (!sessionData.session?.user?.email) {
+              showMessage("Invalid or expired recovery link", "error");
+              setTimeout(() => router.push('/login'), 3000);
+            }
+          }
+        } else {
+          // Fallback to normal session check
+          const { data } = await supabase.auth.getSession();
+          if (!data.session?.user?.email) {
+            router.push('/login');
+          }
         }
       } catch (error) {
+        console.error("Session check error:", error);
         showMessage("Invalid or expired recovery link", "error");
         setTimeout(() => router.push('/login'), 3000);
       } finally {
@@ -104,6 +158,14 @@ export default function ResetPassword() {
       setFormError(error.message || 'Error resetting password');
     } finally {
       setLoading(false);
+    }
+  };
+  
+  const openInApp = () => {
+    if (resetToken) {
+      window.location.href = `mentalhelp://reset-password?token=${resetToken}`;
+    } else {
+      showMessage("Unable to open app - no reset token found", "error");
     }
   };
   
@@ -235,6 +297,31 @@ export default function ResetPassword() {
               {loading ? 'Updating...' : 'Reset Password'}
             </Button>
             
+            <Divider sx={{ my: 3 }}>
+              <Typography variant="body2" color="text.secondary">
+                OR
+              </Typography>
+            </Divider>
+            
+            <Button
+              fullWidth
+              variant="outlined"
+              onClick={openInApp}
+              startIcon={<SmartphoneIcon />}
+              sx={{
+                mb: 2,
+                borderColor: 'teal',
+                color: 'teal',
+                '&:hover': { borderColor: 'darkcyan', bgcolor: 'rgba(0, 128, 128, 0.04)' },
+                borderRadius: 2,
+                padding: '12px 0',
+                textTransform: 'none',
+                fontWeight: 600
+              }}
+            >
+              Open in Mobile App
+            </Button>
+            
             <Box sx={{ textAlign: 'center', mt: 2 }}>
               <Button
                 onClick={() => router.push('/login')}
@@ -266,4 +353,4 @@ export default function ResetPassword() {
       </Snackbar>
     </div>
   );
-} 
+}
