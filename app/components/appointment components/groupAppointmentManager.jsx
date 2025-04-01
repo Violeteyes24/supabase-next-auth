@@ -96,6 +96,7 @@ export default function GroupAppointmentsManager() {
         fetchIndividualAppointments();
         fetchEligibleUsers();
         fetchGroupAppointments();
+        checkAndCompleteGroupAppointments(); // Check for expired appointments on load
       }
     }
   }, [session, userRole]);
@@ -104,8 +105,74 @@ export default function GroupAppointmentsManager() {
     if (userRole === 'secretary' && assignedCounselors.length > 0) {
       fetchEligibleUsers();
       fetchGroupAppointmentsForSecretary();
+      checkAndCompleteGroupAppointments(); // Check for expired appointments for secretary
     }
   }, [assignedCounselors]);
+
+  useEffect(() => {
+    // Only set up subscription if we have the necessary state
+    if (!session) return;
+    
+    console.log("Setting up real-time subscriptions for group appointments");
+    
+    // Run check immediately when component loads
+    checkAndCompleteGroupAppointments();
+    
+    // Set up real-time subscription for appointments changes
+    const appointmentChannel = supabase.channel('group-appointments-changes')
+      .on('postgres_changes', 
+        { 
+          event: '*', 
+          schema: 'public', 
+          table: 'appointments',
+          filter: 'appointment_type=eq.group'
+        }, 
+        (payload) => {
+          console.log('Group appointment change received:', payload);
+          checkAndCompleteGroupAppointments(); // Check appointments when changes occur
+          // Refresh the appropriate data based on user role
+          if (userRole === 'secretary' && assignedCounselors.length > 0) {
+            fetchGroupAppointmentsForSecretary();
+          } else if (userRole === 'counselor') {
+            fetchGroupAppointments();
+          }
+        }
+      )
+      .subscribe();
+      
+    // Also subscribe to groupappointments table to track participant changes
+    const participantsChannel = supabase.channel('group-participants-changes')
+      .on('postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'groupappointments'
+        },
+        (payload) => {
+          console.log('Group participants change received:', payload);
+          // Refresh the appropriate data based on user role
+          if (userRole === 'secretary' && assignedCounselors.length > 0) {
+            fetchGroupAppointmentsForSecretary();
+          } else if (userRole === 'counselor') {
+            fetchGroupAppointments();
+          }
+        }
+      )
+      .subscribe();
+      
+    // Set up interval to check for expired appointments every minute
+    const checkExpiredInterval = setInterval(() => {
+      console.log('Running scheduled check for expired group appointments');
+      checkAndCompleteGroupAppointments();
+    }, 60 * 1000); // Run every minute instead of every 5 minutes
+
+    return () => {
+      console.log("Cleaning up group appointments subscriptions");
+      supabase.removeChannel(appointmentChannel);
+      supabase.removeChannel(participantsChannel);
+      clearInterval(checkExpiredInterval);
+    };
+  }, [session, userRole, assignedCounselors]);
 
   const fetchIndividualAppointments = async () => {
     const {
@@ -364,6 +431,40 @@ export default function GroupAppointmentsManager() {
       return;
     }
 
+    // Check if date and time are provided and valid
+    if (groupDate && groupStartTime && groupEndTime) {
+      // Get current date and time
+      const now = dayjs();
+      const today = now.startOf('day');
+      
+      // Check if date is in the past
+      if (groupDate.isBefore(today)) {
+        showSnackbar("Cannot create session on a past date", "error");
+        return;
+      }
+      
+      // If the appointment is for today, check if start time is in the past
+      if (groupDate.isSame(today) && groupStartTime.isBefore(now)) {
+        showSnackbar("Cannot create session with a start time in the past", "error");
+        return;
+      }
+
+      // Check if end time is before start time
+      if (groupEndTime.isBefore(groupStartTime)) {
+        showSnackbar("End time must be after start time", "error");
+        return;
+      }
+
+      // Calculate duration between start and end time in minutes
+      const durationMinutes = groupEndTime.diff(groupStartTime, 'minute');
+      
+      // Check if duration is less than 30 minutes
+      if (durationMinutes < 30) {
+        showSnackbar("Session duration must be at least 30 minutes", "error");
+        return;
+      }
+    }
+
     try {
       // Get the current session to get the counselor ID
       const {
@@ -438,7 +539,13 @@ export default function GroupAppointmentsManager() {
       setOpenGroupModal(false);
 
       showSnackbar("Group appointment created successfully!", "success");
-      fetchGroupAppointments();
+      
+      // Refresh appointments based on user role
+      if (userRole === 'secretary' && assignedCounselors.length > 0) {
+        fetchGroupAppointmentsForSecretary();
+      } else {
+        fetchGroupAppointments();
+      }
     } catch (error) {
       console.error("Error creating group appointment:", error);
       showSnackbar(
@@ -472,6 +579,12 @@ export default function GroupAppointmentsManager() {
     // Check if selected date is in the past
     if (selectedDate.isBefore(today)) {
       showSnackbar("Cannot reschedule to a past date", "error");
+      return;
+    }
+    
+    // If rescheduling for today, check if start time is in the past
+    if (selectedDate.isSame(today) && rescheduleStartTime.isBefore(now)) {
+      showSnackbar("Cannot reschedule with a start time in the past", "error");
       return;
     }
     
@@ -545,7 +658,14 @@ export default function GroupAppointmentsManager() {
       if (error) throw error;
 
       setOpenRescheduleModal(false);
-      fetchGroupAppointments();
+      
+      // Refresh appointments based on user role
+      if (userRole === 'secretary' && assignedCounselors.length > 0) {
+        fetchGroupAppointmentsForSecretary();
+      } else {
+        fetchGroupAppointments();
+      }
+      
       showSnackbar("Group appointment rescheduled successfully", "success");
     } catch (error) {
       console.error("Error rescheduling group appointment:", error);
@@ -642,7 +762,14 @@ export default function GroupAppointmentsManager() {
       }
 
       setOpenCancelModal(false);
-      fetchGroupAppointments();
+      
+      // Refresh appointments based on user role
+      if (userRole === 'secretary' && assignedCounselors.length > 0) {
+        fetchGroupAppointmentsForSecretary();
+      } else {
+        fetchGroupAppointments();
+      }
+      
       showSnackbar("Group appointment cancelled successfully", "info");
     } catch (error) {
       console.error("Error cancelling group appointment:", error);
@@ -693,6 +820,163 @@ export default function GroupAppointmentsManager() {
   const handleChangeRowsPerPage = (event) => {
     setRowsPerPage(parseInt(event.target.value, 10));
     setPage(0);
+  };
+
+  // Helper function to convert time string to Date object
+  const timeToDate = (timeStr, dateStr) => {
+    const [hours, minutes] = timeStr.split(':').map(Number);
+    const date = new Date(dateStr);
+    date.setHours(hours, minutes, 0, 0);
+    
+    // Don't add hours - let JavaScript handle timezone conversion natively
+    // Instead just log the result for debugging
+    console.log(`  - Converting ${dateStr} ${timeStr} to: ${date.toLocaleString()}`);
+    return date;
+  };
+  
+  // Function to check and complete expired group appointments
+  const checkAndCompleteGroupAppointments = async () => {
+    try {
+      if (!session) return;
+      
+      const userId = session.user.id;
+      
+      // Check if user is a counselor or secretary
+      if (userRole !== 'counselor' && userRole !== 'secretary') {
+        console.log('User is not a counselor or secretary');
+        return;
+      }
+      
+      // Get current date and time in Manila timezone (UTC+8)
+      const now = new Date();
+      console.log('--------- CHECKING EXPIRED GROUP APPOINTMENTS ---------');
+      console.log('Current time:', now.toLocaleString());
+      console.log('Current timezone:', Intl.DateTimeFormat().resolvedOptions().timeZone);
+      
+      let query = supabase
+        .from("appointments")
+        .select(`
+          appointment_id,
+          status,
+          appointment_type,
+          availability_schedule_id,
+          availability_schedules (
+            date,
+            start_time,
+            end_time,
+            is_available
+          )
+        `)
+        .eq("appointment_type", "group")
+        .or('status.eq.pending,status.eq.rescheduled')
+        .not('availability_schedule_id', 'is', null);
+      
+      // Apply additional filtering based on user role
+      if (userRole === 'counselor') {
+        query = query.eq("counselor_id", userId);
+      } else if (userRole === 'secretary') {
+        if (assignedCounselors.length === 0) return;
+        query = query.in("counselor_id", assignedCounselors);
+      }
+      
+      const { data: incompleteAppointments, error } = await query;
+      
+      if (error) {
+        console.error("Error fetching incomplete group appointments:", error);
+        return;
+      }
+      
+      console.log(`Found ${incompleteAppointments?.length || 0} incomplete group appointments`);
+      
+      if (!incompleteAppointments || incompleteAppointments.length === 0) return;
+      
+      // Log raw appointment data for debugging
+      console.log('Incomplete appointments (raw data):', JSON.stringify(incompleteAppointments));
+      
+      const expiredAppointmentIds = [];
+      
+      // Check each appointment to see if it's expired
+      for (const appointment of incompleteAppointments) {
+        if (!appointment.availability_schedules) {
+          console.log(`Appointment #${appointment.appointment_id} has no schedule data`);
+          continue;
+        }
+        
+        const { date, end_time, is_available } = appointment.availability_schedules;
+        
+        // Convert appointment end time to Date object
+        const appointmentEndTime = timeToDate(end_time, date);
+        
+        console.log(`Checking appointment #${appointment.appointment_id}:`);
+        console.log(`  - Status: ${appointment.status}`);
+        console.log(`  - Schedule date: ${date}`);
+        console.log(`  - End time: ${end_time} (${appointmentEndTime.toLocaleString()})`);
+        console.log(`  - Is schedule available: ${is_available}`);
+        console.log(`  - Current time: ${now.toLocaleString()}`);
+        console.log(`  - Is expired: ${appointmentEndTime < now}`);
+        
+        // Check if the appointment has ended
+        if (appointmentEndTime < now) {
+          console.log(`  - EXPIRED: Appointment #${appointment.appointment_id} will be marked as completed`);
+          expiredAppointmentIds.push(appointment.appointment_id);
+        } else {
+          console.log(`  - NOT EXPIRED: Appointment #${appointment.appointment_id} has not ended yet`);
+        }
+      }
+      
+      // Update expired appointments to completed status
+      if (expiredAppointmentIds.length > 0) {
+        console.log(`Marking ${expiredAppointmentIds.length} expired appointments as completed:`, expiredAppointmentIds);
+        
+        // Force direct console output of the update parameters for debugging
+        console.log('UPDATE appointments SET status = "completed" WHERE appointment_id IN', expiredAppointmentIds);
+        
+        const { data, error: updateError } = await supabase
+          .from("appointments")
+          .update({ status: "completed" })
+          .in("appointment_id", expiredAppointmentIds)
+          .select();
+        
+        if (updateError) {
+          console.error("Error updating expired group appointments:", updateError);
+        } else {
+          console.log(`Successfully marked ${data?.length || 0} group appointments as completed:`, data);
+          
+          // Double check that appointments were actually updated
+          for (const id of expiredAppointmentIds) {
+            const { data: checkData, error: checkError } = await supabase
+              .from("appointments")
+              .select("appointment_id, status")
+              .eq("appointment_id", id)
+              .single();
+              
+            if (checkError) {
+              console.error(`Error verifying update for appointment ${id}:`, checkError);
+            } else {
+              console.log(`Verification - Appointment ${id} now has status: ${checkData.status}`);
+            }
+          }
+          
+          // Show notification that appointments were automatically completed
+          if (data?.length > 0) {
+            showSnackbar(`${data.length} group therapy ${data.length === 1 ? 'session' : 'sessions'} automatically marked as completed`, "info");
+          }
+          
+          // Refresh the appointments lists
+          if (userRole === 'secretary' && assignedCounselors.length > 0) {
+            fetchGroupAppointmentsForSecretary();
+          } else if (userRole === 'counselor') {
+            fetchGroupAppointments();
+          }
+        }
+      } else {
+        console.log('No expired appointments found');
+      }
+      
+      console.log('--------- FINISHED CHECKING EXPIRED APPOINTMENTS ---------');
+    } catch (error) {
+      console.error("Unexpected error checking expired group appointments:", error);
+    }
   };
 
   return (

@@ -68,6 +68,7 @@ export default function AppointmentCard() {
           .from("secretary_appointments_view")
           .select("*")
           .eq("secretary_id", userId)
+          .eq("appointment_type", "individual")
           .neq("status", "cancelled")
           .neq("status", "rescheduled")
           .neq("status", "completed")
@@ -114,6 +115,7 @@ export default function AppointmentCard() {
           `)
           .or('status.eq.pending,status.eq.rescheduled')
           .eq("counselor_id", userId)
+          .eq("appointment_type", "individual")
           .gte("availability_schedules.date", currentDate);
 
         if (error) {
