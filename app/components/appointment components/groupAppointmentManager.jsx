@@ -589,7 +589,7 @@ export default function GroupAppointmentsManager() {
     }
     
     // Check if end time is before or equal to start time
-    if (rescheduleEndTime.isSameOrBefore(rescheduleStartTime)) {
+    if (rescheduleEndTime.isBefore(rescheduleStartTime) || rescheduleEndTime.isSame(rescheduleStartTime)) {
       showSnackbar("End time must be greater than start time", "error");
       return;
     }
