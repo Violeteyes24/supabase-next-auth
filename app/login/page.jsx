@@ -346,7 +346,7 @@ export default function Auth() {
                 href="/register/counselor"
                 className="text-green-600 hover:text-green-800 font-medium"
               >
-                Sign up as a counselor
+                Sign up as a counselor 
               </LoadingButton>
               <LoadingButton 
                 href="/register/secretary"

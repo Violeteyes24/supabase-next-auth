@@ -1,0 +1,57 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+
+# Your rule content
+
+- You can @ files here
+- You can use markdown but dont have to
+
+
+These are some of my database schema, please review this first.
+
+
+create table public.users (
+  user_id uuid not null,
+  user_type character varying(50) not null,
+  approval_status character varying(50) null default 'pending'::character varying,
+  is_director boolean null default false,
+  name character varying(255) not null,
+  username character varying(100) null,
+  address text null,
+  contact_number character varying(50) null,
+  birthday date null,
+  gender character varying(20) null,
+  department_assigned character varying(100) null,
+  department character varying(100) null,
+  program character varying(100) null,
+  program_year_level integer null,
+  school_year character varying(20) null,
+  short_biography text null,
+  credentials text null,
+  profile_image_url text null,
+  proof_image_url text null,
+  constraint users_pkey primary key (user_id),
+  constraint fk_user_id foreign KEY (user_id) references auth.users (id) on delete CASCADE
+) TABLESPACE pg_default;
+
+
+create table public.mood_tracker (
+  mood_id uuid not null default gen_random_uuid (),
+  user_id uuid null,
+  mood_type character varying(50) not null,
+  intensity integer not null,
+  note text null,
+  tracked_at timestamp without time zone null default now(),
+  constraint mood_tracker_pkey primary key (mood_id),
+  constraint mood_tracker_user_id_fkey foreign KEY (user_id) references users (user_id) on delete CASCADE,
+  constraint mood_tracker_intensity_check check (
+    (
+      (intensity >= 1)
+      and (intensity <= 10)
+    )
+  )
+) TABLESPACE pg_default;
+

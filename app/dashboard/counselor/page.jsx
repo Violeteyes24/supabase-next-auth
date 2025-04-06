@@ -62,6 +62,10 @@ export default function CounselorPage() {
     const [programMostCases, setProgramMostCases] = useState('');
     const [averageMoodScore, setAverageMoodScore] = useState(0);
     const [chartData, setChartData] = useState([]);
+    const [moodDistribution, setMoodDistribution] = useState([]);
+    const [moodIntensityCategories, setMoodIntensityCategories] = useState([]);
+    const [totalMoodInstances, setTotalMoodInstances] = useState(0);
+    const [moodAverageIntensities, setMoodAverageIntensities] = useState([]);
     const router = useRouter();
     
     // State for chatbot management
@@ -86,8 +90,23 @@ export default function CounselorPage() {
     });
     const [openMessageDialog, setOpenMessageDialog] = useState(false);
 
+    // Add state for mood report tab
+    const [moodReportTab, setMoodReportTab] = useState(0);
+
+    // Add state for time period filtering
+    const [moodTimePeriod, setMoodTimePeriod] = useState('month');
+
+    // Add state for the mood analytics modal
+    const [moodAnalyticsOpen, setMoodAnalyticsOpen] = useState(false);
+
+    // Add state for student mood tracking
+    const [students, setStudents] = useState([]);
+    const [selectedStudent, setSelectedStudent] = useState(null);
+    const [studentMoods, setStudentMoods] = useState([]);
+    const [loadingStudentData, setLoadingStudentData] = useState(false);
+
     useEffect(() => {
-        async function getUser() {
+        async function fetchUserData() {
             try {
                 const { data: { user }, error: userError } = await supabase.auth.getUser();
                 
@@ -118,31 +137,7 @@ export default function CounselorPage() {
                         fetchChatbotQuestions();
                         fetchChatbotAnswers();
                         fetchPredefinedMessages();
-                        
-                        // Set up realtime subscriptions for chatbot tables
-                        const questionsChannel = supabase.channel('chatbot-questions-changes')
-                            .on('postgres_changes', { event: '*', schema: 'public', table: 'chatbot_questions' }, () => {
-                                fetchChatbotQuestions();
-                            })
-                            .subscribe();
-                            
-                        const answersChannel = supabase.channel('chatbot-answers-changes')
-                            .on('postgres_changes', { event: '*', schema: 'public', table: 'chatbot_answers' }, () => {
-                                fetchChatbotAnswers();
-                            })
-                            .subscribe();
-                            
-                        const messagesChannel = supabase.channel('predefined-messages-changes')
-                            .on('postgres_changes', { event: '*', schema: 'public', table: 'predefined_messages' }, () => {
-                                fetchPredefinedMessages();
-                            })
-                            .subscribe();
-                            
-                        return () => {
-                            supabase.removeChannel(questionsChannel);
-                            supabase.removeChannel(answersChannel);
-                            supabase.removeChannel(messagesChannel);
-                        };
+                        fetchStudents(); // Fetch students if director
                     }
                 }
             } catch (err) {
@@ -150,7 +145,30 @@ export default function CounselorPage() {
             }
         }
 
-        getUser();
+        // Set up realtime subscriptions for chatbot tables
+        let questionsChannel, answersChannel, messagesChannel;
+        
+        if (isDirector) {
+            questionsChannel = supabase.channel('chatbot-questions-changes')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'chatbot_questions' }, () => {
+                    fetchChatbotQuestions();
+                })
+                .subscribe();
+                
+            answersChannel = supabase.channel('chatbot-answers-changes')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'chatbot_answers' }, () => {
+                    fetchChatbotAnswers();
+                })
+                .subscribe();
+                
+            messagesChannel = supabase.channel('predefined-messages-changes')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'predefined_messages' }, () => {
+                    fetchPredefinedMessages();
+                })
+                .subscribe();
+        }
+
+        fetchUserData();
         fetchUsers();
         fetchAppointments();
         fetchMoodScores();
@@ -175,6 +193,9 @@ export default function CounselorPage() {
             .subscribe();
 
         return () => {
+            if (questionsChannel) supabase.removeChannel(questionsChannel);
+            if (answersChannel) supabase.removeChannel(answersChannel);
+            if (messagesChannel) supabase.removeChannel(messagesChannel);
             supabase.removeChannel(userChannel);
             supabase.removeChannel(appointmentChannel);
             supabase.removeChannel(moodChannel);
@@ -258,29 +279,146 @@ export default function CounselorPage() {
         updateDashboardData();
     }
 
-    async function fetchMoodScores() {
+    async function fetchMoodScores(period = 'month') {
+        // Calculate date range based on period
+        const now = new Date();
+        let startDate;
+        
+        switch(period) {
+            case 'week':
+                startDate = new Date(now);
+                startDate.setDate(now.getDate() - 7);
+                break;
+            case 'month':
+                startDate = new Date(now);
+                startDate.setMonth(now.getMonth() - 1);
+                break;
+            case 'year':
+                startDate = new Date(now);
+                startDate.setFullYear(now.getFullYear() - 1);
+                break;
+            default:
+                startDate = new Date(now);
+                startDate.setMonth(now.getMonth() - 1);
+        }
+        
+        const formattedStartDate = startDate.toISOString();
+        
         const { data: moods, error } = await supabase
             .from('mood_tracker')
-            .select('intensity, tracked_at');
+            .select('mood_type, intensity, tracked_at')
+            .gte('tracked_at', formattedStartDate);
 
         if (error) {
             console.error('Error fetching mood scores:', error);
             return;
         }
 
-        const totalMoodScore = moods.reduce((sum, mood) => sum + mood.intensity, 0);
-        const averageMood = moods.length ? (totalMoodScore / moods.length).toFixed(1) : 0;
-        setAverageMoodScore(averageMood);
+        // Set total mood instances (divided by 6 as each usage inserts 6 mood types)
+        setTotalMoodInstances(Math.round(moods.length / 6));
 
-        const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+        // Calculate average intensity per mood type
+        const moodIntensitySums = {};
+        const moodTypeCounts = {};
+        
+        moods.forEach(mood => {
+            if (!moodIntensitySums[mood.mood_type]) {
+                moodIntensitySums[mood.mood_type] = 0;
+                moodTypeCounts[mood.mood_type] = 0;
+            }
+            moodIntensitySums[mood.mood_type] += mood.intensity;
+            moodTypeCounts[mood.mood_type] += 1;
+        });
+        
+        const averageIntensities = Object.keys(moodIntensitySums).map(moodType => {
+            const average = moodTypeCounts[moodType] 
+                ? (moodIntensitySums[moodType] / moodTypeCounts[moodType]).toFixed(1) 
+                : 0;
+            
+            let category;
+            const avgValue = parseFloat(average);
+            if (avgValue >= 1 && avgValue <= 3) {
+                category = 'LOW';
+            } else if (avgValue >= 4 && avgValue <= 6) {
+                category = 'MODERATE';
+            } else if (avgValue >= 7 && avgValue <= 10) {
+                category = 'HIGH';
+            } else {
+                category = 'N/A';
+            }
+            
+            return {
+                type: moodType,
+                average: parseFloat(average),
+                category
+            };
+        }).sort((a, b) => b.average - a.average);
+        
+        setMoodAverageIntensities(averageIntensities);
+
+        // Calculate mood distribution by type
+        const moodCounts = {};
+        moods.forEach(mood => {
+            moodCounts[mood.mood_type] = (moodCounts[mood.mood_type] || 0) + 1;
+        });
+        
+        const moodDistributionData = Object.entries(moodCounts).map(([type, count]) => ({
+            type,
+            count
+        })).sort((a, b) => b.count - a.count);
+        
+        setMoodDistribution(moodDistributionData);
+        
+        // Categorize mood intensities
+        const intensityCategories = {
+            LOW: 0,
+            MODERATE: 0,
+            HIGH: 0
+        };
+        
+        moods.forEach(mood => {
+            if (mood.intensity >= 1 && mood.intensity <= 3) {
+                intensityCategories.LOW += 1;
+            } else if (mood.intensity >= 4 && mood.intensity <= 6) {
+                intensityCategories.MODERATE += 1;
+            } else if (mood.intensity >= 7 && mood.intensity <= 10) {
+                intensityCategories.HIGH += 1;
+            }
+        });
+        
+        const intensityCategoriesData = Object.entries(intensityCategories).map(([category, count]) => ({
+            category,
+            count
+        }));
+        
+        setMoodIntensityCategories(intensityCategoriesData);
+
+        // Keep original chart data logic for now but modify to use most common mood type by day
+        const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
         const moodData = daysOfWeek.map(day => {
             const dayMoods = moods.filter(mood => 
                 new Date(mood.tracked_at).toLocaleDateString('en-US', { weekday: 'long' }) === day
             );
-            const dayTotalMood = dayMoods.reduce((sum, mood) => sum + mood.intensity, 0);
-            const dayAverageMood = dayMoods.length ? (dayTotalMood / dayMoods.length).toFixed(1) : 0;
-            return { day, mood: parseFloat(dayAverageMood) };
+            
+            // Find most common mood for the day
+            const moodTypeCount = {};
+            dayMoods.forEach(mood => {
+                moodTypeCount[mood.mood_type] = (moodTypeCount[mood.mood_type] || 0) + 1;
+            });
+            
+            let mostCommonMood = 'None';
+            let maxCount = 0;
+            
+            Object.entries(moodTypeCount).forEach(([type, count]) => {
+                if (count > maxCount) {
+                    mostCommonMood = type;
+                    maxCount = count;
+                }
+            });
+            
+            return { day, mostCommonMood, count: maxCount };
         });
+        
         setChartData(moodData);
         
         // Store data in global object for text reports
@@ -296,7 +434,8 @@ export default function CounselorPage() {
                 activeSecretaries,
                 activeStudents,
                 appointmentsThisMonth,
-                averageMoodScore,
+                moodDistribution,
+                moodIntensityCategories,
                 departmentMostCases,
                 programMostCases,
                 weeklyMoodData: chartData
@@ -319,7 +458,7 @@ export default function CounselorPage() {
         { title: 'Active Secretaries', value: activeSecretaries, icon: 'smile' },
         { title: 'Active Students', value: activeStudents, icon: 'user' },
         { title: 'Appointments This Month', value: appointmentsThisMonth, icon: 'calendar' },
-        { title: 'Average Mood Score', value: averageMoodScore, icon: 'smile' },
+        { title: 'Mood Tracker Usage', value: totalMoodInstances, icon: 'chart-line' },
         { title: 'Department most cases', value: departmentMostCases, icon: 'building' },
         { title: 'Program with most cases', value: programMostCases, icon: 'graduation-cap' },
     ];
@@ -404,6 +543,177 @@ export default function CounselorPage() {
             showSnackbar('Failed to load messages', 'error');
         }
     }
+
+    // Function to fetch all students
+    async function fetchStudents() {
+        try {
+            const { data, error } = await supabase
+                .from('users')
+                .select('*')
+                .eq('user_type', 'student');
+                
+            if (error) throw error;
+            setStudents(data || []);
+        } catch (error) {
+            console.error('Error fetching students:', error);
+            showSnackbar('Failed to load students', 'error');
+        }
+    }
+
+    // Function to fetch mood data for a specific student
+    async function fetchStudentMoods(studentId) {
+        setLoadingStudentData(true);
+        try {
+            console.log('Fetching moods for student ID:', studentId);
+            
+            const { data, error } = await supabase
+                .from('mood_tracker')
+                .select('*')
+                .eq('user_id', studentId)
+                .order('tracked_at', { ascending: false });
+                
+            if (error) throw error;
+            
+            console.log('Mood data retrieved:', data?.length || 0, 'entries');
+            
+            // Handle no data case
+            if (!data || data.length === 0) {
+                setStudentMoods([]);
+                setLoadingStudentData(false);
+                return;
+            }
+            
+            // Process the mood data by date
+            const moodsByDate = {};
+            data.forEach(mood => {
+                const date = new Date(mood.tracked_at).toLocaleDateString();
+                if (!moodsByDate[date]) {
+                    moodsByDate[date] = {
+                        entries: [],
+                        moodTypes: {
+                            happy: { sum: 0, count: 0 },
+                            afraid: { sum: 0, count: 0 },
+                            confused: { sum: 0, count: 0 },
+                            angry: { sum: 0, count: 0 },
+                            disappointed: { sum: 0, count: 0 },
+                            stressed: { sum: 0, count: 0 }
+                        },
+                        timestamp: new Date(mood.tracked_at).getTime()
+                    };
+                }
+                moodsByDate[date].entries.push(mood);
+                
+                // Add to correct mood type
+                const moodType = mood.mood_type.toLowerCase();
+                if (moodsByDate[date].moodTypes[moodType]) {
+                    moodsByDate[date].moodTypes[moodType].sum += mood.intensity;
+                    moodsByDate[date].moodTypes[moodType].count += 1;
+                }
+            });
+            
+            // Calculate average for each mood type by date
+            const processedMoods = Object.entries(moodsByDate).map(([date, data]) => {
+                const { entries, moodTypes, timestamp } = data;
+                
+                // Calculate average intensity for each mood type
+                const averageMoods = {};
+                Object.entries(moodTypes).forEach(([type, { sum, count }]) => {
+                    averageMoods[type] = count > 0 ? (sum / count).toFixed(1) : 0;
+                });
+                
+                // Calculate mood progress (simple version)
+                // Check if positive emotions have high intensity and negative emotions have low intensity
+                const happyIntensity = parseFloat(averageMoods.happy);
+                const negativeIntensity = [
+                    parseFloat(averageMoods.afraid), 
+                    parseFloat(averageMoods.angry),
+                    parseFloat(averageMoods.stressed),
+                    parseFloat(averageMoods.confused),
+                    parseFloat(averageMoods.disappointed)
+                ].reduce((sum, val) => sum + val, 0) / 5; // Average of negative emotions
+                
+                let progressStatus = 'neutral';
+                if (happyIntensity > 7 && negativeIntensity < 4) {
+                    progressStatus = 'positive';
+                } else if (happyIntensity < 4 && negativeIntensity > 7) {
+                    progressStatus = 'negative';
+                }
+                
+                // Get the actual date object for checking if it's recent
+                const entryDate = new Date(timestamp);
+                const isRecent = (new Date() - entryDate) < (24 * 60 * 60 * 1000); // Within last 24 hours
+                
+                // Format time from first entry
+                const time = new Date(entries[0].tracked_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                
+                return {
+                    date,
+                    time,
+                    entryDate,
+                    entries,
+                    moodAverages: averageMoods,
+                    progressStatus,
+                    isRecent,
+                    entryCount: entries.length
+                };
+            }).sort((a, b) => b.entryDate - a.entryDate); // Sort by date (newest first)
+            
+            setStudentMoods(processedMoods);
+        } catch (error) {
+            console.error('Error fetching student moods:', error);
+            showSnackbar('Failed to load student mood data', 'error');
+        } finally {
+            setLoadingStudentData(false);
+        }
+    }
+
+    // Handle selecting a student
+    const handleSelectStudent = (student) => {
+        console.log('Selected student:', student);
+        console.log('Student user_id:', student.user_id);
+        
+        if (!student.user_id) {
+            showSnackbar('Student has no user ID assigned', 'error');
+            return;
+        }
+        
+        setSelectedStudent(student);
+        fetchStudentMoods(student.user_id);
+    };
+
+    // Helper function to get mood status icon
+    const getMoodStatusIcon = (status) => {
+        switch(status) {
+            case 'positive':
+                return (
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="#10B981">
+                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm3.5-9c.83 0 1.5-.67 1.5-1.5S16.33 8 15.5 8 14 8.67 14 9.5s.67 1.5 1.5 1.5zm-7 0c.83 0 1.5-.67 1.5-1.5S9.33 8 8.5 8 7 8.67 7 9.5 7.67 11 8.5 11zm3.5 6.5c2.03 0 3.8-1.11 4.75-2.75.19-.33-.05-.75-.44-.75H7.69c-.38 0-.63.42-.44.75.95 1.64 2.72 2.75 4.75 2.75z"/>
+                        </svg>
+                        <Typography sx={{ fontWeight: 'medium', color: '#10B981' }}>Positive</Typography>
+                    </Box>
+                );
+            case 'negative':
+                return (
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="#EF4444">
+                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm3.5-9c.83 0 1.5-.67 1.5-1.5S16.33 8 15.5 8 14 8.67 14 9.5s.67 1.5 1.5 1.5zm-7 0c.83 0 1.5-.67 1.5-1.5S9.33 8 8.5 8 7 8.67 7 9.5 7.67 11 8.5 11zm8.93 6H7.57c-.42 0-.77.3-.83.71-.1.73.4 1.29 1.05 1.29h8.42c.64 0 1.15-.57 1.05-1.29-.06-.4-.4-.7-.83-.7z"/>
+                        </svg>
+                        <Typography sx={{ fontWeight: 'medium', color: '#EF4444' }}>Negative</Typography>
+                    </Box>
+                );
+            case 'neutral':
+            default:
+                return (
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="#6B7280">
+                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm3.5-9c.83 0 1.5-.67 1.5-1.5S16.33 8 15.5 8 14 8.67 14 9.5s.67 1.5 1.5 1.5zm-7 0c.83 0 1.5-.67 1.5-1.5S9.33 8 8.5 8 7 8.67 7 9.5 7.67 11 8.5 11zm8.5 6H7c-.55 0-1 .45-1 1s.45 1 1 1h10c.55 0 1-.45 1-1s-.45-1-1-1z"/>
+                        </svg>
+                        <Typography sx={{ fontWeight: 'medium', color: '#6B7280' }}>Neutral</Typography>
+                    </Box>
+                );
+        }
+    };
 
     // CRUD operations for questions
     const addQuestion = async () => {
@@ -596,6 +906,17 @@ export default function CounselorPage() {
         setTabValue(newValue);
     };
 
+    // Add handler for mood report tab changes
+    const handleMoodReportTabChange = (event, newValue) => {
+        setMoodReportTab(newValue);
+    };
+
+    // Handle mood time period change
+    const handleMoodTimePeriodChange = (event) => {
+        setMoodTimePeriod(event.target.value);
+        fetchMoodScores(event.target.value);
+    };
+
     // CRUD operations for messages
     const addMessage = async () => {
         try {
@@ -681,6 +1002,15 @@ export default function CounselorPage() {
         setOpenMessageDialog(false);
         setCurrentMessage({ message_type: '', message_role: '', message_content: '' });
         setIsEditing(false);
+    };
+
+    // Handle open and close for mood analytics modal
+    const handleOpenMoodAnalytics = () => {
+        setMoodAnalyticsOpen(true);
+    };
+
+    const handleCloseMoodAnalytics = () => {
+        setMoodAnalyticsOpen(false);
     };
 
     return (
@@ -804,6 +1134,14 @@ export default function CounselorPage() {
                                     '&.Mui-selected': { color: '#3B82F6' }
                                 }} 
                             />
+                            <Tab 
+                                icon={<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path><g><circle cx="12" cy="10" r="2"/><path d="M12 8v0"/><path d="M12 12v0"/></g></svg>}
+                                label="Student Mood Tracking" 
+                                sx={{ 
+                                    fontWeight: 'bold',
+                                    '&.Mui-selected': { color: '#3B82F6' }
+                                }} 
+                            />
                         </Tabs>
                     )}
 
@@ -866,21 +1204,141 @@ export default function CounselorPage() {
                                         }}
                                     >
                                         <Box sx={{ p: 3, backgroundColor: '#f8fafc' }}>
-                                            <Typography variant="h6" className="font-semibold text-gray-800">
-                                                Mood State Report
-                                            </Typography>
-                                            <Typography variant="body2" className="text-gray-500">
-                                                Weekly average mood scores
-                                            </Typography>
+                                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                <div>
+                                                    <Typography variant="h6" className="font-semibold text-gray-800">
+                                                        Mood Trends Report
+                                                    </Typography>
+                                                    <Typography variant="body2" className="text-gray-500">
+                                                        Student mood analysis
+                                                    </Typography>
+                                                </div>
+                                                <FormControl size="small" sx={{ minWidth: 120 }}>
+                                                    <InputLabel id="time-period-label">Time Period</InputLabel>
+                                                    <Select
+                                                        labelId="time-period-label"
+                                                        id="time-period-select"
+                                                        value={moodTimePeriod}
+                                                        label="Time Period"
+                                                        onChange={handleMoodTimePeriodChange}
+                                                    >
+                                                        <MenuItem value="week">Week</MenuItem>
+                                                        <MenuItem value="month">Month</MenuItem>
+                                                        <MenuItem value="year">Year</MenuItem>
+                                                    </Select>
+                                                </FormControl>
+                                            </Box>
+                                            <Tabs 
+                                                value={moodReportTab} 
+                                                onChange={handleMoodReportTabChange} 
+                                                sx={{ mt: 2 }}
+                                                variant="fullWidth"
+                                            >
+                                                <Tab label="Mood Intensities" />
+                                                <Tab label="Weekly Trend" />
+                                            </Tabs>
                                         </Box>
-                                        <Box sx={{ p: 3, height: 'calc(100% - 80px)' }}>
-                                            <Charts 
-                                                data={chartData}
-                                                chartColors={{
-                                                    stroke: '#3B82F6',
-                                                    fill: 'rgba(59, 130, 246, 0.1)'
-                                                }}
-                                            />
+                                        <Box sx={{ p: 3, height: 'calc(100% - 130px)', overflowY: 'auto' }}>
+                                            {/* Mood Distribution Tab */}
+                                            {moodReportTab === 0 && (
+                                                <>
+                                                    <Box sx={{ mb: 3 }}>
+                                                        <Typography variant="body2" sx={{ mb: 1, color: 'text.secondary' }}>
+                                                            Intensity Range Guide:
+                                                        </Typography>
+                                                        <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                                                            <Chip size="small" label="LOW: 1-3" sx={{ bgcolor: '#10B981', color: 'white' }} />
+                                                            <Chip size="small" label="MODERATE: 4-6" sx={{ bgcolor: '#FBBF24', color: 'white' }} />
+                                                            <Chip size="small" label="HIGH: 7-10" sx={{ bgcolor: '#EF4444', color: 'white' }} />
+                                                        </Box>
+                                                    </Box>
+                                                    <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 'bold' }}>
+                                                        Mood Average Intensities:
+                                                    </Typography>
+                                                    {moodAverageIntensities.length > 0 ? (
+                                                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                                            {moodAverageIntensities.map((item) => (
+                                                                <Box 
+                                                                    key={item.type} 
+                                                                    sx={{ 
+                                                                        display: 'flex', 
+                                                                        justifyContent: 'space-between', 
+                                                                        alignItems: 'center',
+                                                                        pb: 1,
+                                                                        borderBottom: '1px solid #eee'
+                                                                    }}
+                                                                >
+                                                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                                        <Typography sx={{ textTransform: 'capitalize', fontWeight: 'medium' }}>
+                                                                            {item.type}:
+                                                                        </Typography>
+                                                                        <Typography sx={{ fontWeight: 'bold' }}>
+                                                                            {item.average}
+                                                                        </Typography>
+                                                                    </Box>
+                                                                    <Chip 
+                                                                        label={item.category} 
+                                                                        sx={{ 
+                                                                            backgroundColor: 
+                                                                                item.category === 'LOW' ? '#10B981' : 
+                                                                                item.category === 'MODERATE' ? '#FBBF24' : '#EF4444',
+                                                                            color: 'white',
+                                                                            fontWeight: 'bold'
+                                                                        }} 
+                                                                    />
+                                                                </Box>
+                                                            ))}
+                                                        </Box>
+                                                    ) : (
+                                                        <Typography variant="body2" sx={{ color: 'text.secondary', textAlign: 'center', py: 4 }}>
+                                                            No mood data available
+                                                        </Typography>
+                                                    )}
+                                                </>
+                                            )}
+                                            
+                                            {/* Weekly Trend Tab */}
+                                            {moodReportTab === 1 && (
+                                                <Box sx={{ height: '100%' }}>
+                                                    <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 'bold' }}>
+                                                        Weekly Mood Trends:
+                                                    </Typography>
+                                                    {chartData.length > 0 ? (
+                                                        <Table size="small">
+                                                            <TableHead>
+                                                                <TableRow>
+                                                                    <TableCell>Day</TableCell>
+                                                                    <TableCell>Most Common Mood</TableCell>
+                                                                    <TableCell align="right">Count</TableCell>
+                                                                </TableRow>
+                                                            </TableHead>
+                                                            <TableBody>
+                                                                {chartData.map((data) => (
+                                                                    <TableRow key={data.day}>
+                                                                        <TableCell>{data.day}</TableCell>
+                                                                        <TableCell sx={{ textTransform: 'capitalize' }}>{data.mostCommonMood}</TableCell>
+                                                                        <TableCell align="right">{data.count}</TableCell>
+                                                                    </TableRow>
+                                                                ))}
+                                                            </TableBody>
+                                                        </Table>
+                                                    ) : (
+                                                        <Typography variant="body2" sx={{ color: 'text.secondary', textAlign: 'center', py: 4 }}>
+                                                            No weekly mood data available
+                                                        </Typography>
+                                                    )}
+                                                </Box>
+                                            )}
+                                        </Box>
+                                        <Box sx={{ p: 3, textAlign: 'center', borderTop: '1px solid rgba(229, 231, 235, 0.8)' }}>
+                                            <Button 
+                                                variant="contained" 
+                                                color="primary" 
+                                                onClick={handleOpenMoodAnalytics}
+                                                sx={{ borderRadius: 8 }}
+                                            >
+                                                View Detailed Analytics
+                                            </Button>
                                         </Box>
                                     </Paper>
                                 </Grid>
@@ -888,228 +1346,239 @@ export default function CounselorPage() {
                         </>
                     )}
 
-                    {/* Chatbot Management (Only for directors) */}
-                    {isDirector && tabValue === 1 && (
+                    {/* Student Mood Tracking (Only for directors) */}
+                    {isDirector && tabValue === 3 && (
                         <Box sx={{ mt: 2 }}>
-                            {/* Questions Section */}
-                            <Paper 
-                                elevation={0} 
-                                sx={{ 
-                                    p: 3, 
-                                    mb: 4, 
-                                    borderRadius: 2, 
-                                    boxShadow: '0 4px 20px rgba(0,0,0,0.05)', 
-                                    border: '1px solid rgba(229, 231, 235, 0.8)' 
-                                }}
-                            >
-                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                                    <Typography variant="h6" component="h3" sx={{ fontWeight: 'bold' }}>
-                                        Questions
-                                    </Typography>
-                                    <Button 
-                                        variant="contained" 
-                                        color="primary" 
-                                        startIcon={<AddIcon />}
-                                        onClick={() => handleOpenQuestionDialog()}
-                                        sx={{ borderRadius: 8 }}
+                            <Grid container spacing={3}>
+                                {/* Student List */}
+                                <Grid item xs={12} md={4}>
+                                    <Paper 
+                                        elevation={0} 
+                                        sx={{ 
+                                            p: 3, 
+                                            borderRadius: 2, 
+                                            boxShadow: '0 4px 20px rgba(0,0,0,0.05)', 
+                                            border: '1px solid rgba(229, 231, 235, 0.8)',
+                                            height: '70vh',
+                                            overflowY: 'auto'
+                                        }}
                                     >
-                                        Add Question
-                                    </Button>
-                                </Box>
+                                        <Typography variant="h6" component="h3" sx={{ fontWeight: 'bold', mb: 3 }}>
+                                            Students
+                                        </Typography>
+                                        
+                                        {students.length > 0 ? (
+                                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                                {students.map((student) => (
+                                                    <Box 
+                                                        key={student.user_id}
+                                                        onClick={() => handleSelectStudent(student)}
+                                                        sx={{ 
+                                                            display: 'flex', 
+                                                            alignItems: 'center', 
+                                                            p: 2,
+                                                            borderRadius: 2,
+                                                            cursor: 'pointer',
+                                                            backgroundColor: selectedStudent?.user_id === student.user_id ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
+                                                            border: selectedStudent?.user_id === student.user_id ? '1px solid rgba(59, 130, 246, 0.3)' : '1px solid transparent',
+                                                            '&:hover': {
+                                                                backgroundColor: 'rgba(59, 130, 246, 0.05)'
+                                                            }
+                                                        }}
+                                                    >
+                                                        <Avatar 
+                                                            src={student.profile_image_url || ''} 
+                                                            alt={student.name}
+                                                            sx={{ 
+                                                                width: 40, 
+                                                                height: 40, 
+                                                                mr: 2,
+                                                                bgcolor: !student.profile_image_url ? '#10B981' : undefined
+                                                            }}
+                                                        >
+                                                            {!student.profile_image_url && student.name.charAt(0).toUpperCase()}
+                                                        </Avatar>
+                                                        <Box>
+                                                            <Typography sx={{ fontWeight: 'medium' }}>
+                                                                {student.name}
+                                                            </Typography>
+                                                            <Typography variant="body2" color="text.secondary">
+                                                                {student.program || 'No program specified'}
+                                                            </Typography>
+                                                        </Box>
+                                                    </Box>
+                                                ))}
+                                            </Box>
+                                        ) : (
+                                            <Typography variant="body2" sx={{ color: 'text.secondary', textAlign: 'center', py: 4 }}>
+                                                No students found
+                                            </Typography>
+                                        )}
+                                    </Paper>
+                                </Grid>
                                 
-                                <TableContainer>
-                                    <Table sx={{ minWidth: 650 }}>
-                                        <TableHead>
-                                            <TableRow>
-                                                <TableCell sx={{ fontWeight: 'bold' }}>Question</TableCell>
-                                                <TableCell align="right" sx={{ fontWeight: 'bold' }}>Actions</TableCell>
-                                            </TableRow>
-                                        </TableHead>
-                                        <TableBody>
-                                            {questions.length > 0 ? (
-                                                questions.map((question) => (
-                                                    <TableRow key={question.chat_question_id}>
-                                                        <TableCell>{question.chatbot_question}</TableCell>
-                                                        <TableCell align="right">
-                                                            <IconButton 
-                                                                color="primary" 
-                                                                onClick={() => handleOpenQuestionDialog(question)}
-                                                                size="small"
-                                                            >
-                                                                <EditIcon />
-                                                            </IconButton>
-                                                            <IconButton 
-                                                                color="error" 
-                                                                onClick={() => handleOpenDeleteConfirmDialog('question', question.chat_question_id)}
-                                                                size="small"
-                                                            >
-                                                                <DeleteIcon />
-                                                            </IconButton>
-                                                        </TableCell>
-                                                    </TableRow>
-                                                ))
-                                            ) : (
-                                                <TableRow>
-                                                    <TableCell colSpan={2} align="center">
-                                                        {loading ? 'Loading questions...' : 'No questions found'}
-                                                    </TableCell>
-                                                </TableRow>
-                                            )}
-                                        </TableBody>
-                                    </Table>
-                                </TableContainer>
-                            </Paper>
-                            
-                            {/* Answers Section */}
-                            <Paper 
-                                elevation={0} 
-                                sx={{ 
-                                    p: 3, 
-                                    borderRadius: 2, 
-                                    boxShadow: '0 4px 20px rgba(0,0,0,0.05)', 
-                                    border: '1px solid rgba(229, 231, 235, 0.8)' 
-                                }}
-                            >
-                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                                    <Typography variant="h6" component="h3" sx={{ fontWeight: 'bold' }}>
-                                        Answers
-                                    </Typography>
-                                    <Button 
-                                        variant="contained" 
-                                        color="primary" 
-                                        startIcon={<AddIcon />}
-                                        onClick={() => handleOpenAnswerDialog()}
-                                        disabled={questions.length === 0}
-                                        sx={{ borderRadius: 8 }}
+                                {/* Student Mood Data */}
+                                <Grid item xs={12} md={8}>
+                                    <Paper 
+                                        elevation={0} 
+                                        sx={{ 
+                                            p: 3, 
+                                            borderRadius: 2, 
+                                            boxShadow: '0 4px 20px rgba(0,0,0,0.05)', 
+                                            border: '1px solid rgba(229, 231, 235, 0.8)',
+                                            height: '70vh',
+                                            overflowY: 'auto'
+                                        }}
                                     >
-                                        Add Answer
-                                    </Button>
-                                </Box>
-                                
-                                <TableContainer>
-                                    <Table sx={{ minWidth: 650 }}>
-                                        <TableHead>
-                                            <TableRow>
-                                                <TableCell sx={{ fontWeight: 'bold' }}>Related Question</TableCell>
-                                                <TableCell sx={{ fontWeight: 'bold' }}>Answer</TableCell>
-                                                <TableCell align="right" sx={{ fontWeight: 'bold' }}>Actions</TableCell>
-                                            </TableRow>
-                                        </TableHead>
-                                        <TableBody>
-                                            {answers.length > 0 ? (
-                                                answers.map((answer) => (
-                                                    <TableRow key={answer.chat_answer_id}>
-                                                        <TableCell>{getQuestionTextById(answer.chat_question_id)}</TableCell>
-                                                        <TableCell>{answer.chatbot_answer}</TableCell>
-                                                        <TableCell align="right">
-                                                            <IconButton 
-                                                                color="primary" 
-                                                                onClick={() => handleOpenAnswerDialog(answer)}
-                                                                size="small"
+                                        {selectedStudent ? (
+                                            <>
+                                                {/* Student Profile Header */}
+                                                <Box sx={{ display: 'flex', alignItems: 'center', mb: 4 }}>
+                                                    <Avatar 
+                                                        src={selectedStudent.profile_image_url || ''} 
+                                                        alt={selectedStudent.name}
+                                                        sx={{ 
+                                                            width: 64, 
+                                                            height: 64, 
+                                                            mr: 3,
+                                                            bgcolor: !selectedStudent.profile_image_url ? '#10B981' : undefined
+                                                        }}
+                                                    >
+                                                        {!selectedStudent.profile_image_url && selectedStudent.name.charAt(0).toUpperCase()}
+                                                    </Avatar>
+                                                    <Box>
+                                                        <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+                                                            {selectedStudent.name}
+                                                        </Typography>
+                                                        <Box sx={{ display: 'flex', gap: 2, mt: 1 }}>
+                                                            {selectedStudent.program && (
+                                                                <Chip 
+                                                                    size="small" 
+                                                                    label={selectedStudent.program} 
+                                                                    sx={{ bgcolor: 'rgba(59, 130, 246, 0.1)', color: '#3B82F6' }} 
+                                                                />
+                                                            )}
+                                                            {selectedStudent.program_year_level && (
+                                                                <Chip 
+                                                                    size="small" 
+                                                                    label={`Year ${selectedStudent.program_year_level}`} 
+                                                                    sx={{ bgcolor: 'rgba(16, 185, 129, 0.1)', color: '#10B981' }} 
+                                                                />
+                                                            )}
+                                                            {selectedStudent.department && (
+                                                                <Chip 
+                                                                    size="small" 
+                                                                    label={selectedStudent.department} 
+                                                                    sx={{ bgcolor: 'rgba(139, 92, 246, 0.1)', color: '#8B5CF6' }} 
+                                                                />
+                                                            )}
+                                                        </Box>
+                                                    </Box>
+                                                </Box>
+                                                
+                                                {/* Mood Entries */}
+                                                <Typography variant="h6" sx={{ mb: 3, fontWeight: 'bold' }}>
+                                                    Mood Tracking History
+                                                </Typography>
+                                                
+                                                {loadingStudentData ? (
+                                                    <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                                                        <Typography>Loading mood data...</Typography>
+                                                    </Box>
+                                                ) : studentMoods.length > 0 ? (
+                                                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                                                        {studentMoods.map((entry, index) => (
+                                                            <Paper 
+                                                                key={entry.date}
+                                                                elevation={0}
+                                                                sx={{ 
+                                                                    p: 3, 
+                                                                    border: '1px solid rgba(229, 231, 235, 0.8)',
+                                                                    borderRadius: 2,
+                                                                    borderLeft: '4px solid',
+                                                                    borderLeftColor: 
+                                                                        entry.progressStatus === 'positive' ? '#10B981' : 
+                                                                        entry.progressStatus === 'negative' ? '#EF4444' : '#6B7280'
+                                                                }}
                                                             >
-                                                                <EditIcon />
-                                                            </IconButton>
-                                                            <IconButton 
-                                                                color="error" 
-                                                                onClick={() => handleOpenDeleteConfirmDialog('answer', answer.chat_answer_id)}
-                                                                size="small"
-                                                            >
-                                                                <DeleteIcon />
-                                                            </IconButton>
-                                                        </TableCell>
-                                                    </TableRow>
-                                                ))
-                                            ) : (
-                                                <TableRow>
-                                                    <TableCell colSpan={3} align="center">
-                                                        {loading ? 'Loading answers...' : 'No answers found'}
-                                                    </TableCell>
-                                                </TableRow>
-                                            )}
-                                        </TableBody>
-                                    </Table>
-                                </TableContainer>
-                            </Paper>
-                        </Box>
-                    )}
-
-                    {/* Messages Management (Only for directors) */}
-                    {isDirector && tabValue === 2 && (
-                        <Box sx={{ mt: 2 }}>
-                            <Paper 
-                                elevation={0} 
-                                sx={{ 
-                                    p: 3, 
-                                    borderRadius: 2, 
-                                    boxShadow: '0 4px 20px rgba(0,0,0,0.05)', 
-                                    border: '1px solid rgba(229, 231, 235, 0.8)' 
-                                }}
-                            >
-                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                                    <Typography variant="h6" component="h3" sx={{ fontWeight: 'bold' }}>
-                                        Predefined Messages
-                                    </Typography>
-                                    <Button 
-                                        variant="contained" 
-                                        color="primary" 
-                                        startIcon={<AddIcon />}
-                                        onClick={() => handleOpenMessageDialog()}
-                                        sx={{ borderRadius: 8 }}
-                                    >
-                                        Add Message
-                                    </Button>
-                                </Box>
-                                
-                                <TableContainer>
-                                    <Table sx={{ minWidth: 650 }}>
-                                        <TableHead>
-                                            <TableRow>
-                                                <TableCell sx={{ fontWeight: 'bold' }}>Type</TableCell>
-                                                <TableCell sx={{ fontWeight: 'bold' }}>Role</TableCell>
-                                                <TableCell sx={{ fontWeight: 'bold' }}>Content</TableCell>
-                                                <TableCell align="right" sx={{ fontWeight: 'bold' }}>Actions</TableCell>
-                                            </TableRow>
-                                        </TableHead>
-                                        <TableBody>
-                                            {messages.length > 0 ? (
-                                                messages.map((message) => (
-                                                    <TableRow key={message.message_content_id}>
-                                                        <TableCell>{message.message_type}</TableCell>
-                                                        <TableCell>{message.message_role}</TableCell>
-                                                        <TableCell>
-                                                            {message.message_content.length > 100 
-                                                                ? `${message.message_content.substring(0, 100)}...` 
-                                                                : message.message_content}
-                                                        </TableCell>
-                                                        <TableCell align="right">
-                                                            <IconButton 
-                                                                color="primary" 
-                                                                onClick={() => handleOpenMessageDialog(message)}
-                                                                size="small"
-                                                            >
-                                                                <EditIcon />
-                                                            </IconButton>
-                                                            <IconButton 
-                                                                color="error" 
-                                                                onClick={() => handleOpenDeleteConfirmDialog('message', message.message_content_id)}
-                                                                size="small"
-                                                            >
-                                                                <DeleteIcon />
-                                                            </IconButton>
-                                                        </TableCell>
-                                                    </TableRow>
-                                                ))
-                                            ) : (
-                                                <TableRow>
-                                                    <TableCell colSpan={4} align="center">
-                                                        {loading ? 'Loading messages...' : 'No messages found'}
-                                                    </TableCell>
-                                                </TableRow>
-                                            )}
-                                        </TableBody>
-                                    </Table>
-                                </TableContainer>
-                            </Paper>
+                                                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                                                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                                        <Typography sx={{ fontWeight: 'medium' }}>
+                                                                            {entry.date}
+                                                                        </Typography>
+                                                                        {entry.isRecent && (
+                                                                            <Chip size="small" label="Recent" color="primary" />
+                                                                        )}
+                                                                        <Typography variant="body2" color="text.secondary">
+                                                                            ({entry.entryCount} {entry.entryCount === 1 ? 'entry' : 'entries'}) {entry.time}
+                                                                        </Typography>
+                                                                    </Box>
+                                                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                                        <Typography sx={{ fontSize: '0.9rem', fontWeight: 'medium' }}>
+                                                                            Mood Status:
+                                                                        </Typography>
+                                                                        {getMoodStatusIcon(entry.progressStatus)}
+                                                                    </Box>
+                                                                </Box>
+                                                                
+                                                                <Box sx={{ mt: 2 }}>
+                                                                    <Grid container spacing={2}>
+                                                                        {Object.entries(entry.moodAverages).map(([type, intensity]) => (
+                                                                            <Grid item xs={6} sm={4} key={type}>
+                                                                                <Box sx={{ 
+                                                                                    display: 'flex', 
+                                                                                    justifyContent: 'space-between', 
+                                                                                    p: 1.5,
+                                                                                    borderRadius: 1,
+                                                                                    bgcolor: 'rgba(0, 0, 0, 0.02)',
+                                                                                    border: '1px solid rgba(0, 0, 0, 0.05)'
+                                                                                }}>
+                                                                                    <Typography sx={{ textTransform: 'uppercase', fontWeight: 'medium' }}>
+                                                                                        {type}:
+                                                                                    </Typography>
+                                                                                    <Typography sx={{ 
+                                                                                        fontWeight: 'bold',
+                                                                                        color: 
+                                                                                            parseFloat(intensity) >= 7 ? '#EF4444' :
+                                                                                            parseFloat(intensity) >= 4 ? '#FBBF24' : '#10B981'
+                                                                                    }}>
+                                                                                        {intensity}
+                                                                                    </Typography>
+                                                                                </Box>
+                                                                            </Grid>
+                                                                        ))}
+                                                                    </Grid>
+                                                                </Box>
+                                                            </Paper>
+                                                        ))}
+                                                    </Box>
+                                                ) : (
+                                                    <Box sx={{ textAlign: 'center', py: 4, border: '1px dashed #d1d5db', borderRadius: 2 }}>
+                                                        <Typography color="text.secondary">
+                                                            No mood entries found for this student
+                                                        </Typography>
+                                                    </Box>
+                                                )}
+                                            </>
+                                        ) : (
+                                            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+                                                <Box sx={{ textAlign: 'center', maxWidth: 400 }}>
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#d1d5db" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round">
+                                                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                                                        <circle cx="12" cy="10" r="3"/>
+                                                    </svg>
+                                                    <Typography variant="h6" sx={{ mt: 2, color: 'text.secondary' }}>
+                                                        Select a Student
+                                                    </Typography>
+                                                    <Typography sx={{ mt: 1, color: 'text.secondary' }}>
+                                                        Choose a student from the list to view their mood tracking data
+                                                    </Typography>
+                                                </Box>
+                                            </Box>
+                                        )}
+                                    </Paper>
+                                </Grid>
+                            </Grid>
                         </Box>
                     )}
                 </Container>
@@ -1291,6 +1760,140 @@ export default function CounselorPage() {
                         {snackbar.message}
                     </Alert>
                 </Snackbar>
+
+                {/* Mood Analytics Modal */}
+                <Dialog
+                    open={moodAnalyticsOpen}
+                    onClose={handleCloseMoodAnalytics}
+                    fullWidth
+                    maxWidth="md"
+                >
+                    <DialogTitle>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            Mood Analytics Dashboard
+                            <IconButton onClick={handleCloseMoodAnalytics} size="small">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                                </svg>
+                            </IconButton>
+                        </Box>
+                    </DialogTitle>
+                    <DialogContent dividers>
+                        <Box sx={{ mb: 4 }}>
+                            <FormControl fullWidth>
+                                <InputLabel id="modal-time-period-label">Time Period</InputLabel>
+                                <Select
+                                    labelId="modal-time-period-label"
+                                    id="modal-time-period-select"
+                                    value={moodTimePeriod}
+                                    label="Time Period"
+                                    onChange={handleMoodTimePeriodChange}
+                                >
+                                    <MenuItem value="week">Last 7 Days</MenuItem>
+                                    <MenuItem value="month">Last 30 Days</MenuItem>
+                                    <MenuItem value="year">Last Year</MenuItem>
+                                </Select>
+                            </FormControl>
+                        </Box>
+                        
+                        <Grid container spacing={3}>
+                            {/* Mood Average Intensities Section */}
+                            <Grid item xs={12} md={6}>
+                                <Paper elevation={0} sx={{ p: 3, height: '100%', border: '1px solid rgba(229, 231, 235, 0.8)' }}>
+                                    <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold' }}>
+                                        Mood Average Intensities
+                                    </Typography>
+                                    <Box sx={{ mb: 3 }}>
+                                        <Typography variant="body2" sx={{ mb: 1, color: 'text.secondary' }}>
+                                            Intensity Range Guide:
+                                        </Typography>
+                                        <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                                            <Chip size="small" label="LOW: 1-3" sx={{ bgcolor: '#10B981', color: 'white' }} />
+                                            <Chip size="small" label="MODERATE: 4-6" sx={{ bgcolor: '#FBBF24', color: 'white' }} />
+                                            <Chip size="small" label="HIGH: 7-10" sx={{ bgcolor: '#EF4444', color: 'white' }} />
+                                        </Box>
+                                    </Box>
+                                    {moodAverageIntensities.length > 0 ? (
+                                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                            {moodAverageIntensities.map((item) => (
+                                                <Box 
+                                                    key={item.type} 
+                                                    sx={{ 
+                                                        display: 'flex', 
+                                                        justifyContent: 'space-between', 
+                                                        alignItems: 'center',
+                                                        pb: 1,
+                                                        borderBottom: '1px solid #eee'
+                                                    }}
+                                                >
+                                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                        <Typography sx={{ textTransform: 'capitalize', fontWeight: 'medium' }}>
+                                                            {item.type}:
+                                                        </Typography>
+                                                        <Typography sx={{ fontWeight: 'bold' }}>
+                                                            {item.average}
+                                                        </Typography>
+                                                    </Box>
+                                                    <Chip 
+                                                        label={item.category} 
+                                                        sx={{ 
+                                                            backgroundColor: 
+                                                                item.category === 'LOW' ? '#10B981' : 
+                                                                item.category === 'MODERATE' ? '#FBBF24' : '#EF4444',
+                                                            color: 'white',
+                                                            fontWeight: 'bold'
+                                                        }} 
+                                                    />
+                                                </Box>
+                                            ))}
+                                        </Box>
+                                    ) : (
+                                        <Typography variant="body2" sx={{ color: 'text.secondary', textAlign: 'center', py: 4 }}>
+                                            No mood data available
+                                        </Typography>
+                                    )}
+                                </Paper>
+                            </Grid>
+                            
+                            {/* Weekly Trends Section */}
+                            <Grid item xs={12} md={6}>
+                                <Paper elevation={0} sx={{ p: 3, height: '100%', border: '1px solid rgba(229, 231, 235, 0.8)' }}>
+                                    <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold' }}>
+                                        Weekly Mood Trends
+                                    </Typography>
+                                    {chartData.length > 0 ? (
+                                        <Table>
+                                            <TableHead>
+                                                <TableRow>
+                                                    <TableCell>Day</TableCell>
+                                                    <TableCell>Most Common Mood</TableCell>
+                                                    <TableCell align="right">Count</TableCell>
+                                                </TableRow>
+                                            </TableHead>
+                                            <TableBody>
+                                                {chartData.map((data) => (
+                                                    <TableRow key={data.day}>
+                                                        <TableCell>{data.day}</TableCell>
+                                                        <TableCell sx={{ textTransform: 'capitalize' }}>{data.mostCommonMood}</TableCell>
+                                                        <TableCell align="right">{data.count}</TableCell>
+                                                    </TableRow>
+                                                ))}
+                                            </TableBody>
+                                        </Table>
+                                    ) : (
+                                        <Typography variant="body2" sx={{ color: 'text.secondary', textAlign: 'center', py: 4 }}>
+                                            No weekly mood data available
+                                        </Typography>
+                                    )}
+                                </Paper>
+                            </Grid>
+                        </Grid>
+                    </DialogContent>
+                    <DialogActions>
+                        <Button onClick={handleCloseMoodAnalytics}>Close</Button>
+                    </DialogActions>
+                </Dialog>
             </Box>
         </Box>
     );
