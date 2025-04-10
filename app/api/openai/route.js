@@ -94,7 +94,7 @@ export async function POST(request) {
     
     ${moodInfo}
     
-    Analyze them and generate a brief but informative report in simple words.
+    Analyze them and generate a brief but informative report in simple words(Don't use any names).
     
     Format:
     - Most Frequent Topic: (Choose only one from these 3: Relationships, Academic, Family) This is absolutely necessary to choose only one of the 3.
