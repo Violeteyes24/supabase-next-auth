@@ -363,13 +363,14 @@ export default function AppointmentCard() {
           return;
       }
 
+      // Fetch existing schedules that might overlap with the requested time slot
       const { data: existingSchedules, error: fetchError } = await supabase
           .from('availability_schedules')
           .select('*')
           .eq('date', selectedDate.format('YYYY-MM-DD'))
           .neq('availability_schedule_id', selectedAppointment.availability_schedule_id)
-          .gte('start_time', startTime.format('HH:mm'))
-          .lt('end_time', endTime.format('HH:mm'));
+          .eq('counselor_id', selectedAppointment.counselor_id)
+          .neq('is_available', true);
 
       if (fetchError) {
           console.error('Error fetching existing schedules:', fetchError.message);
@@ -378,8 +379,30 @@ export default function AppointmentCard() {
           return;
       }
 
-      if (existingSchedules?.length > 0) {
-          setErrorMessage('This time slot conflicts with an existing schedule.');
+      // Check for overlapping time slots
+      const newStartTime = startTime.format("HH:mm");
+      const newEndTime = endTime.format("HH:mm");
+      
+      const overlappingSchedule = existingSchedules?.find(schedule => {
+          // Convert times to minutes for easier comparison
+          const scheduleStart = schedule.start_time.split(':').map(Number);
+          const scheduleEnd = schedule.end_time.split(':').map(Number);
+          const scheduleStartMinutes = scheduleStart[0] * 60 + scheduleStart[1];
+          const scheduleEndMinutes = scheduleEnd[0] * 60 + scheduleEnd[1];
+          
+          const newStartMinutes = startTime.hour() * 60 + startTime.minute();
+          const newEndMinutes = endTime.hour() * 60 + endTime.minute();
+          
+          // Check if there's any overlap between the time slots
+          return (
+              (newStartMinutes >= scheduleStartMinutes && newStartMinutes < scheduleEndMinutes) || // new start time is within existing schedule
+              (newEndMinutes > scheduleStartMinutes && newEndMinutes <= scheduleEndMinutes) || // new end time is within existing schedule
+              (newStartMinutes <= scheduleStartMinutes && newEndMinutes >= scheduleEndMinutes) // new schedule completely contains existing schedule
+          );
+      });
+
+      if (overlappingSchedule) {
+          setErrorMessage(`This time slot conflicts with an existing appointment from ${overlappingSchedule.start_time} to ${overlappingSchedule.end_time}.`);
           setOpenErrorModal(true);
           return;
       }
@@ -388,8 +411,8 @@ export default function AppointmentCard() {
         .from("availability_schedules")
         .update({
           date: selectedDate.format('YYYY-MM-DD'),
-          start_time: startTime.format("HH:mm"),
-          end_time: endTime.format("HH:mm"),
+          start_time: newStartTime,
+          end_time: newEndTime,
         })
         .eq(
           "availability_schedule_id",
@@ -595,14 +618,57 @@ export default function AppointmentCard() {
       // If follow-up needed, create a new availability schedule and appointment
       let followUpAppointmentId = null;
       if (completionStatus === "follow_up_needed") {
+        // Validate follow-up date and time
+        const followUpStartTimeStr = followUpStartTime.format("HH:mm");
+        const followUpEndTimeStr = followUpEndTime.format("HH:mm");
+        
+        // Check for overlapping schedules
+        const { data: existingSchedules, error: fetchError } = await supabase
+          .from('availability_schedules')
+          .select('*')
+          .eq('date', followUpDate.format('YYYY-MM-DD'))
+          .eq('counselor_id', selectedAppointment.counselor_id)
+          .neq('is_available', true);
+        
+        if (fetchError) {
+          console.error("Error checking for overlapping schedules:", fetchError);
+          setError("An error occurred while checking schedule availability.");
+          return;
+        }
+        
+        // Check for overlapping time slots
+        const overlappingSchedule = existingSchedules?.find(schedule => {
+          // Convert times to minutes for easier comparison
+          const scheduleStart = schedule.start_time.split(':').map(Number);
+          const scheduleEnd = schedule.end_time.split(':').map(Number);
+          const scheduleStartMinutes = scheduleStart[0] * 60 + scheduleStart[1];
+          const scheduleEndMinutes = scheduleEnd[0] * 60 + scheduleEnd[1];
+          
+          const newStartMinutes = followUpStartTime.hour() * 60 + followUpStartTime.minute();
+          const newEndMinutes = followUpEndTime.hour() * 60 + followUpEndTime.minute();
+          
+          // Check if there's any overlap
+          return (
+            (newStartMinutes >= scheduleStartMinutes && newStartMinutes < scheduleEndMinutes) || // new start time is within existing schedule
+            (newEndMinutes > scheduleStartMinutes && newEndMinutes <= scheduleEndMinutes) || // new end time is within existing schedule
+            (newStartMinutes <= scheduleStartMinutes && newEndMinutes >= scheduleEndMinutes) // new schedule completely contains existing schedule
+          );
+        });
+        
+        if (overlappingSchedule) {
+          setErrorMessage(`The follow-up time conflicts with an existing appointment from ${overlappingSchedule.start_time} to ${overlappingSchedule.end_time}.`);
+          setOpenErrorModal(true);
+          return;
+        }
+
         // Create a new availability schedule for the follow-up
         const { data: scheduleData, error: scheduleError } = await supabase
           .from("availability_schedules")
           .insert({
             counselor_id: selectedAppointment.counselor_id,
             date: followUpDate.format('YYYY-MM-DD'),
-            start_time: followUpStartTime.format("HH:mm"),
-            end_time: followUpEndTime.format("HH:mm"),
+            start_time: followUpStartTimeStr,
+            end_time: followUpEndTimeStr,
             is_available: false
           })
           .select()

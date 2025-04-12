@@ -415,19 +415,15 @@ export default function GroupAppointmentsManager() {
   };
 
   const createGroupAppointment = async () => {
-    if (selectedUsers.length < 2) {
-      showSnackbar(
-        "Please select at least two users for a group appointment",
-        "error"
-      );
+    // Check if at least one user is selected
+    if (selectedUsers.length === 0) {
+      showSnackbar("Please select at least one user for the group appointment", "error");
       return;
     }
 
+    // Check if a category is selected
     if (!selectedCategory) {
-      showSnackbar(
-        "Please select a category for the group appointment",
-        "error"
-      );
+      showSnackbar("Please select a category for the group appointment", "error");
       return;
     }
 
@@ -461,6 +457,59 @@ export default function GroupAppointmentsManager() {
       // Check if duration is less than 30 minutes
       if (durationMinutes < 30) {
         showSnackbar("Session duration must be at least 30 minutes", "error");
+        return;
+      }
+      
+      // Get current counselor ID
+      const {
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
+
+      if (sessionError || !session) {
+        console.error("Error getting session:", sessionError);
+        showSnackbar("Authentication error. Please try again.", "error");
+        return;
+      }
+
+      const counselorId = session.user.id;
+      
+      // Check for time conflicts with existing schedules
+      const { data: existingSchedules, error: fetchError } = await supabase
+        .from('availability_schedules')
+        .select('*')
+        .eq('date', groupDate.format('YYYY-MM-DD'))
+        .neq('availability_schedule_id', null)
+        .eq('counselor_id', counselorId);
+
+      if (fetchError) {
+        console.error('Error fetching existing schedules:', fetchError.message);
+        showSnackbar("Error checking for schedule conflicts", "error");
+        return;
+      }
+
+      // Convert new time slot to minutes for easier comparison
+      const newStartMinutes = groupStartTime.hour() * 60 + groupStartTime.minute();
+      const newEndMinutes = groupEndTime.hour() * 60 + groupEndTime.minute();
+      
+      // Check for overlapping time slots
+      const overlappingSchedule = existingSchedules?.find(schedule => {
+        // Convert existing schedule times to minutes
+        const scheduleStart = schedule.start_time.split(':').map(Number);
+        const scheduleEnd = schedule.end_time.split(':').map(Number);
+        const scheduleStartMinutes = scheduleStart[0] * 60 + scheduleStart[1];
+        const scheduleEndMinutes = scheduleEnd[0] * 60 + scheduleEnd[1];
+        
+        // Check if there's any overlap between the time slots
+        return (
+          (newStartMinutes >= scheduleStartMinutes && newStartMinutes < scheduleEndMinutes) || // new start time is within existing schedule
+          (newEndMinutes > scheduleStartMinutes && newEndMinutes <= scheduleEndMinutes) || // new end time is within existing schedule
+          (newStartMinutes <= scheduleStartMinutes && newEndMinutes >= scheduleEndMinutes) // new schedule completely contains existing schedule
+        );
+      });
+
+      if (overlappingSchedule) {
+        showSnackbar(`This time slot conflicts with an existing schedule from ${overlappingSchedule.start_time} to ${overlappingSchedule.end_time}`, "error");
         return;
       }
     }
@@ -606,6 +655,57 @@ export default function GroupAppointmentsManager() {
     }
 
     try {
+      // Get current session to get counselor ID
+      const {
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
+
+      if (sessionError || !session) {
+        console.error("Error getting session:", sessionError);
+        showSnackbar("Authentication error. Please try again.", "error");
+        return;
+      }
+
+      // Check for time conflicts with existing schedules
+      const { data: existingSchedules, error: fetchError } = await supabase
+        .from('availability_schedules')
+        .select('*')
+        .eq('date', rescheduleDate.format('YYYY-MM-DD'))
+        .neq('availability_schedule_id', selectedGroupAppointment.availability_schedule_id)
+        .eq('counselor_id', selectedGroupAppointment.counselor_id || session.user.id);
+
+      if (fetchError) {
+        console.error('Error fetching existing schedules:', fetchError.message);
+        showSnackbar("Error checking for schedule conflicts", "error");
+        return;
+      }
+
+      // Convert new time slot to minutes for easier comparison
+      const newStartMinutes = rescheduleStartTime.hour() * 60 + rescheduleStartTime.minute();
+      const newEndMinutes = rescheduleEndTime.hour() * 60 + rescheduleEndTime.minute();
+      
+      // Check for overlapping time slots
+      const overlappingSchedule = existingSchedules?.find(schedule => {
+        // Convert existing schedule times to minutes
+        const scheduleStart = schedule.start_time.split(':').map(Number);
+        const scheduleEnd = schedule.end_time.split(':').map(Number);
+        const scheduleStartMinutes = scheduleStart[0] * 60 + scheduleStart[1];
+        const scheduleEndMinutes = scheduleEnd[0] * 60 + scheduleEnd[1];
+        
+        // Check if there's any overlap between the time slots
+        return (
+          (newStartMinutes >= scheduleStartMinutes && newStartMinutes < scheduleEndMinutes) || // new start time is within existing schedule
+          (newEndMinutes > scheduleStartMinutes && newEndMinutes <= scheduleEndMinutes) || // new end time is within existing schedule
+          (newStartMinutes <= scheduleStartMinutes && newEndMinutes >= scheduleEndMinutes) // new schedule completely contains existing schedule
+        );
+      });
+
+      if (overlappingSchedule) {
+        showSnackbar(`This time slot conflicts with an existing schedule from ${overlappingSchedule.start_time} to ${overlappingSchedule.end_time}`, "error");
+        return;
+      }
+
       // Check if there's an existing availability schedule
       if (selectedGroupAppointment.availability_schedule_id) {
         // Update existing schedule

@@ -470,13 +470,12 @@ export default function AppointmentPage() {
 
         setError('');
 
-        // Check for time conflicts
+        // Check for time conflicts using a more robust approach
         const { data: existingSchedules, error: fetchError } = await supabase
             .from('availability_schedules')
             .select('*')
             .eq('date', selectedDate.format('YYYY-MM-DD'))
-            .gte('start_time', startTime.format('HH:mm'))
-            .lt('end_time', endTime.format('HH:mm'));
+            .eq('counselor_id', session.user.id);
 
         if (fetchError) {
             console.error('Error fetching existing schedules:', fetchError.message);
@@ -485,8 +484,28 @@ export default function AppointmentPage() {
             return;
         }
 
-        if (existingSchedules?.length > 0) {
-            setErrorMessage('This time slot conflicts with an existing schedule.');
+        // Convert new time slot to minutes for easier comparison
+        const newStartMinutes = startTime.hour() * 60 + startTime.minute();
+        const newEndMinutes = endTime.hour() * 60 + endTime.minute();
+        
+        // Check for overlapping time slots
+        const overlappingSchedule = existingSchedules?.find(schedule => {
+            // Convert existing schedule times to minutes
+            const scheduleStart = schedule.start_time.split(':').map(Number);
+            const scheduleEnd = schedule.end_time.split(':').map(Number);
+            const scheduleStartMinutes = scheduleStart[0] * 60 + scheduleStart[1];
+            const scheduleEndMinutes = scheduleEnd[0] * 60 + scheduleEnd[1];
+            
+            // Check if there's any overlap between the time slots
+            return (
+                (newStartMinutes >= scheduleStartMinutes && newStartMinutes < scheduleEndMinutes) || // new start time is within existing schedule
+                (newEndMinutes > scheduleStartMinutes && newEndMinutes <= scheduleEndMinutes) || // new end time is within existing schedule
+                (newStartMinutes <= scheduleStartMinutes && newEndMinutes >= scheduleEndMinutes) // new schedule completely contains existing schedule
+            );
+        });
+
+        if (overlappingSchedule) {
+            setErrorMessage(`This time slot conflicts with an existing schedule from ${overlappingSchedule.start_time} to ${overlappingSchedule.end_time}.`);
             setOpenErrorModal(true);
             return;
         }
@@ -631,6 +650,47 @@ export default function AppointmentPage() {
         }
 
         try {
+            // Check for time conflicts using a more robust approach
+            const { data: existingSchedules, error: fetchError } = await supabase
+                .from('availability_schedules')
+                .select('*')
+                .eq('date', selectedDate.format('YYYY-MM-DD'))
+                .neq('availability_schedule_id', selectedSchedule.availability_schedule_id)
+                .eq('counselor_id', session.user.id);
+
+            if (fetchError) {
+                console.error('Error fetching existing schedules:', fetchError.message);
+                setErrorMessage('An error occurred while checking for schedule conflicts.');
+                setOpenErrorModal(true);
+                return;
+            }
+
+            // Convert new time slot to minutes for easier comparison
+            const newStartMinutes = startTime.hour() * 60 + startTime.minute();
+            const newEndMinutes = endTime.hour() * 60 + endTime.minute();
+            
+            // Check for overlapping time slots
+            const overlappingSchedule = existingSchedules?.find(schedule => {
+                // Convert existing schedule times to minutes
+                const scheduleStart = schedule.start_time.split(':').map(Number);
+                const scheduleEnd = schedule.end_time.split(':').map(Number);
+                const scheduleStartMinutes = scheduleStart[0] * 60 + scheduleStart[1];
+                const scheduleEndMinutes = scheduleEnd[0] * 60 + scheduleEnd[1];
+                
+                // Check if there's any overlap between the time slots
+                return (
+                    (newStartMinutes >= scheduleStartMinutes && newStartMinutes < scheduleEndMinutes) || // new start time is within existing schedule
+                    (newEndMinutes > scheduleStartMinutes && newEndMinutes <= scheduleEndMinutes) || // new end time is within existing schedule
+                    (newStartMinutes <= scheduleStartMinutes && newEndMinutes >= scheduleEndMinutes) // new schedule completely contains existing schedule
+                );
+            });
+
+            if (overlappingSchedule) {
+                setErrorMessage(`This time slot conflicts with an existing schedule from ${overlappingSchedule.start_time} to ${overlappingSchedule.end_time}.`);
+                setOpenErrorModal(true);
+                return;
+            }
+
             const { data, error } = await supabase
                 .from('availability_schedules')
                 .update({
@@ -753,7 +813,7 @@ export default function AppointmentPage() {
             .eq('secretary_id', userId)
             .eq('status', 'completed')
             .eq('appointment_type', showGroupCompleted ? 'group' : 'individual')
-            .order('date', { ascending: false });
+            .order('date', { ascending: true });
           
           if (error) {
             console.error('Error fetching completed appointments for secretary:', error);
@@ -772,7 +832,7 @@ export default function AppointmentPage() {
               .eq('counselor_id', userId)
               .eq('status', 'completed')
               .eq('appointment_type', 'individual')
-              .order('availability_schedules(date)', { ascending: false });
+              .order('availability_schedules(date)', { ascending: true });
             
             if (error) {
               console.error('Error fetching completed appointments:', error);
@@ -794,7 +854,7 @@ export default function AppointmentPage() {
               .eq('counselor_id', userId)
               .eq('status', 'completed')
               .eq('appointment_type', 'group')
-              .order('availability_schedules(date)', { ascending: false });
+              .order('availability_schedules(date)', { ascending: true });
             
             if (groupError) {
               console.error('Error fetching completed group appointments:', groupError);
@@ -842,7 +902,7 @@ export default function AppointmentPage() {
             .eq('secretary_id', userId)
             .eq('status', 'cancelled')
             .eq('appointment_type', isGroup ? 'group' : 'individual')
-            .order('date', { ascending: false });
+            .order('date', { ascending: true });
           
           if (error) {
             console.error('Error fetching cancelled appointments for secretary:', error);
@@ -861,7 +921,7 @@ export default function AppointmentPage() {
               .eq('counselor_id', userId)
               .eq('status', 'cancelled')
               .eq('appointment_type', 'individual')
-              .order('availability_schedules(date)', { ascending: false });
+              .order('availability_schedules(date)', { ascending: true });
             
             if (error) {
               console.error('Error fetching cancelled appointments:', error);
@@ -883,7 +943,7 @@ export default function AppointmentPage() {
               .eq('counselor_id', userId)
               .eq('status', 'cancelled')
               .eq('appointment_type', 'group')
-              .order('availability_schedules(date)', { ascending: false });
+              .order('availability_schedules(date)', { ascending: true });
             
             if (groupError) {
               console.error('Error fetching cancelled group appointments:', groupError);
