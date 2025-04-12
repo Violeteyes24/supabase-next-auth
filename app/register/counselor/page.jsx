@@ -337,6 +337,11 @@ export default function CounselorRegister() {
         }
     };
 
+    const handleRemoveImage = () => {
+        setImageFile(null);
+        setImagePreview(null);
+    };
+
     const handleProofImageChange = (e) => {
         const file = e.target.files[0];
         if (file) {
@@ -347,6 +352,11 @@ export default function CounselorRegister() {
             };
             reader.readAsDataURL(file);
         }
+    };
+
+    const handleRemoveProofImage = () => {
+        setProofImageFile(null);
+        setProofImagePreview(null);
     };
 
     const nextStep = () => {
@@ -690,6 +700,15 @@ export default function CounselorRegister() {
                                     {imagePreview ? "Change Image" : "Upload Profile Picture"}
                                 </span>
                             </label>
+                            {imagePreview && (
+                                <button 
+                                    type="button"
+                                    onClick={handleRemoveImage}
+                                    className="mt-2 px-3 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700"
+                                >
+                                    Remove Image
+                                </button>
+                            )}
                         </div>
                     </div>
                     
@@ -723,6 +742,15 @@ export default function CounselorRegister() {
                                     {proofImagePreview ? "Change Image" : "Upload Identity Proof"}
                                 </span>
                             </label>
+                            {proofImagePreview && (
+                                <button 
+                                    type="button"
+                                    onClick={handleRemoveProofImage}
+                                    className="mt-2 px-3 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700"
+                                >
+                                    Remove Image
+                                </button>
+                            )}
                         </div>
                         <p className="mt-1 text-xs text-gray-400">
                             Please upload an ID or certificate proving your counselor credentials.

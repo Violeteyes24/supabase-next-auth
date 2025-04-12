@@ -337,13 +337,14 @@ export default function CounselorPage() {
             
             let category;
             const avgValue = parseFloat(average);
-            if (avgValue >= 1 && avgValue <= 3) {
+            if (avgValue >= 1 && avgValue < 4) {
                 category = 'LOW';
-            } else if (avgValue >= 4 && avgValue <= 6) {
+            } else if (avgValue >= 4 && avgValue < 7) {
                 category = 'MODERATE';
             } else if (avgValue >= 7 && avgValue <= 10) {
                 category = 'HIGH';
             } else {
+                // This should only happen if the value is 0 or outside the 1-10 range
                 category = 'N/A';
             }
             
@@ -1246,9 +1247,16 @@ export default function CounselorPage() {
                                                         <Typography variant="body2" sx={{ mb: 1, color: 'text.secondary' }}>
                                                             Intensity Range Guide:
                                                         </Typography>
-                                                        <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                                                        {/* <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
                                                             <Chip size="small" label="LOW: 1-3" sx={{ bgcolor: '#10B981', color: 'white' }} />
+                                                            <Chip size="small" label="LOW: 1-3.9" sx={{ bgcolor: '#10B981', color: 'white' }} />
                                                             <Chip size="small" label="MODERATE: 4-6" sx={{ bgcolor: '#FBBF24', color: 'white' }} />
+                                                            <Chip size="small" label="HIGH: 7-10" sx={{ bgcolor: '#EF4444', color: 'white' }} />
+                                                        </Box> */}
+
+                                                        <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                                                            <Chip size="small" label="LOW: 1-3.9" sx={{ bgcolor: '#10B981', color: 'white' }} />
+                                                            <Chip size="small" label="MODERATE: 4-6.9" sx={{ bgcolor: '#FBBF24', color: 'white' }} />
                                                             <Chip size="small" label="HIGH: 7-10" sx={{ bgcolor: '#EF4444', color: 'white' }} />
                                                         </Box>
                                                     </Box>
@@ -2080,7 +2088,14 @@ export default function CounselorPage() {
                                         </Typography>
                                         <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
                                             <Chip size="small" label="LOW: 1-3" sx={{ bgcolor: '#10B981', color: 'white' }} />
+                                            <Chip size="small" label="LOW: 1-3.9" sx={{ bgcolor: '#10B981', color: 'white' }} />
                                             <Chip size="small" label="MODERATE: 4-6" sx={{ bgcolor: '#FBBF24', color: 'white' }} />
+                                            <Chip size="small" label="HIGH: 7-10" sx={{ bgcolor: '#EF4444', color: 'white' }} />
+                                        </Box>
+
+                                        <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                                            <Chip size="small" label="LOW: 1-3.9" sx={{ bgcolor: '#10B981', color: 'white' }} />
+                                            <Chip size="small" label="MODERATE: 4-6.9" sx={{ bgcolor: '#FBBF24', color: 'white' }} />
                                             <Chip size="small" label="HIGH: 7-10" sx={{ bgcolor: '#EF4444', color: 'white' }} />
                                         </Box>
                                     </Box>

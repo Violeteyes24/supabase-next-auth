@@ -1274,7 +1274,7 @@ export default function AppointmentCard() {
                   <textarea
                     id="completion-notes"
                     rows={3}
-                    className="shadow-sm focus:ring-emerald-500 focus:border-emerald-500 block w-full sm:text-sm border border-gray-300 rounded-md p-2"
+                    className="text-black shadow-sm focus:ring-emerald-500 focus:border-emerald-500 block w-full sm:text-sm border border-gray-300 rounded-md p-2"
                     placeholder="Add any notes about this appointment..."
                     value={completionNotes}
                     onChange={(e) => setCompletionNotes(e.target.value)}

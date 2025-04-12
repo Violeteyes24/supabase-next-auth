@@ -40,6 +40,9 @@ export default function ApproveDenyPage() {
     // New state for status conflict modal
     const [openStatusModal, setOpenStatusModal] = useState(false);
     const [statusModalMessage, setStatusModalMessage] = useState('');
+    const [openHistoryModal, setOpenHistoryModal] = useState(false);
+    const [statusHistory, setStatusHistory] = useState([]);
+    const [historyUser, setHistoryUser] = useState(null);
 
     // Log initial state and after first render
     useEffect(() => {
@@ -237,9 +240,16 @@ export default function ApproveDenyPage() {
                 )
             );
             
+            const timestamp = new Date().toISOString();
+            
+            // Update user status
             const { data, error } = await supabase
                 .from('users')
-                .update({ approval_status: 'approved' })
+                .update({ 
+                    approval_status: 'approved',
+                    approved_at: timestamp,
+                    approved_by: currentUser?.user_id
+                })
                 .eq('user_id', id)
                 .select();
 
@@ -249,6 +259,21 @@ export default function ApproveDenyPage() {
                 fetchRegistrants();
             } else {
                 console.log("Registrant approved:", data);
+                
+                // Create status history record
+                const { error: historyError } = await supabase
+                    .from('status_history')
+                    .insert({
+                        user_id: id,
+                        status: 'approved',
+                        changed_by: currentUser?.user_id,
+                        changed_by_name: currentUser?.name,
+                        timestamp: timestamp
+                    });
+                
+                if (historyError) {
+                    console.error("Error recording approval history:", historyError);
+                }
                 
                 // Send approval email
                 try {
@@ -297,9 +322,16 @@ export default function ApproveDenyPage() {
                 )
             );
             
+            const timestamp = new Date().toISOString();
+            
+            // Update user status
             const { data, error } = await supabase
                 .from('users')
-                .update({ approval_status: 'denied' })
+                .update({ 
+                    approval_status: 'denied',
+                    denied_at: timestamp,
+                    denied_by: currentUser?.user_id
+                })
                 .eq('user_id', id)
                 .select();
 
@@ -309,6 +341,21 @@ export default function ApproveDenyPage() {
                 fetchRegistrants();
             } else {
                 console.log("Registrant denied:", data);
+                
+                // Create status history record
+                const { error: historyError } = await supabase
+                    .from('status_history')
+                    .insert({
+                        user_id: id,
+                        status: 'denied',
+                        changed_by: currentUser?.user_id,
+                        changed_by_name: currentUser?.name,
+                        timestamp: timestamp
+                    });
+                
+                if (historyError) {
+                    console.error("Error recording denial history:", historyError);
+                }
                 
                 // Send denial email
                 try {
@@ -550,6 +597,29 @@ export default function ApproveDenyPage() {
         </div>
     );
 
+    // New function to view status history
+    const handleViewHistory = async (id, name) => {
+        try {
+            const { data, error } = await supabase
+                .from('status_history')
+                .select('*')
+                .eq('user_id', id)
+                .order('timestamp', { ascending: false });
+                
+            if (error) {
+                console.error("Error fetching status history:", error);
+                showSnackbar("Failed to load status history", "error");
+            } else {
+                setStatusHistory(data || []);
+                setHistoryUser({id, name});
+                setOpenHistoryModal(true);
+            }
+        } catch (err) {
+            console.error("Unexpected error in handleViewHistory:", err);
+            showSnackbar("An error occurred while loading history", "error");
+        }
+    };
+
     if (loading) {
         return <ApproveDenySkeleton />;
     }
@@ -704,10 +774,16 @@ export default function ApproveDenyPage() {
                                                             Deny
                                                         </button>
                                                         <button
-                                                            className="bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded text-xs font-medium transition-colors duration-150 ease-in-out"
+                                                            className="bg-gray-500 hover:bg-gray-600 text-white px-2 py-1 rounded text-xs font-medium transition-colors duration-150 ease-in-out"
                                                             onClick={() => handleView(registrant.user_id)}
                                                         >
-                                                            View
+                                                            View ID
+                                                        </button>
+                                                        <button
+                                                            className="bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded text-xs font-medium transition-colors duration-150 ease-in-out"
+                                                            onClick={() => handleViewHistory(registrant.user_id, registrant.name)}
+                                                        >
+                                                            History
                                                         </button>
                                                     </div>
                                                 </td>
@@ -1126,6 +1202,81 @@ export default function ApproveDenyPage() {
                     </div>
                 </Box>
             </Modal>
+
+            {/* Status History Modal */}
+            <Modal
+                open={openHistoryModal}
+                onClose={() => setOpenHistoryModal(false)}
+                aria-labelledby="status-history-modal"
+            >
+                <Box 
+                    sx={{ 
+                        position: 'absolute',
+                        top: '50%',
+                        left: '50%',
+                        transform: 'translate(-50%, -50%)',
+                        width: 600,
+                        bgcolor: 'background.paper',
+                        borderRadius: 2,
+                        boxShadow: 24,
+                        p: 4
+                    }}
+                >
+                    <Typography id="modal-modal-title" color="black" variant="h6" component="h2" sx={{ mb: 2 }}>
+                        Status History for {historyUser?.name}
+                    </Typography>
+                    
+                    <Divider sx={{ mb: 2 }} />
+                    
+                    {statusHistory.length === 0 ? (
+                        <Typography sx={{ textAlign: 'center', py: 3, color: 'text.secondary' }}>
+                            No status change history found for this user.
+                        </Typography>
+                    ) : (
+                        <div className="max-h-[400px] overflow-y-auto">
+                            <table className="min-w-full divide-y divide-gray-200">
+                                <thead className="bg-gray-50 sticky top-0">
+                                    <tr>
+                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Changed By</th>
+                                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Timestamp</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="bg-white divide-y divide-gray-200">
+                                        {statusHistory.map((record) => (
+                                            <tr key={record.id}>
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusBadgeClass(record.status)}`}>
+                                                        {record.status}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                    {record.changed_by_name || "Unknown"}
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                    {new Date(record.timestamp).toLocaleString()}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                        
+                        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 3 }}>
+                            <Button 
+                                onClick={() => setOpenHistoryModal(false)}
+                                variant="contained"
+                                sx={{ 
+                                    bgcolor: 'gray.700',
+                                    '&:hover': { bgcolor: 'gray.800' }
+                                }}
+                            >
+                                Close
+                            </Button>
+                        </Box>
+                    </Box>
+                </Modal>
         </div>
     );
 }

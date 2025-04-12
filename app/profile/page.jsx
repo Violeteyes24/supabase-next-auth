@@ -72,6 +72,7 @@ export default function ProfilePage() {
         confirm: false
     });
     const [passwordError, setPasswordError] = useState('');
+    const [formErrors, setFormErrors] = useState({});
 
     useEffect(() => {
         fetchUserData();
@@ -110,13 +111,48 @@ export default function ProfilePage() {
             ...prev,
             [name]: value
         }));
+        
+        // Clear error for this field when user types
+        if (formErrors[name]) {
+            setFormErrors(prev => ({
+                ...prev,
+                [name]: null
+            }));
+        }
     };
 
     const handleDateChange = (date) => {
+        // Don't allow future dates for birthday
+        if (date && date.isAfter(dayjs())) {
+            setFormErrors(prev => ({
+                ...prev,
+                birthday: "Birthday cannot be in the future"
+            }));
+            return;
+        }
+        
+        // Check if user is at least 18 years old
+        const eighteenYearsAgo = dayjs().subtract(18, 'year');
+        if (date && date.isAfter(eighteenYearsAgo)) {
+            setFormErrors(prev => ({
+                ...prev,
+                birthday: "You must be at least 18 years old"
+            }));
+            return;
+        }
+        
         setFormData(prev => ({
             ...prev,
             birthday: date
         }));
+        
+        // Clear birthday error when user selects a valid date
+        if (formErrors.birthday) {
+            setFormErrors(prev => ({
+                ...prev,
+                birthday: null
+            }));
+        }
     };
 
     const handleImageChange = (e) => {
@@ -139,6 +175,34 @@ export default function ProfilePage() {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        
+        // Validate all required fields
+        const errors = {};
+        if (!formData.name) errors.name = "Name is required";
+        if (!formData.username) errors.username = "Username is required";
+        if (!formData.address) errors.address = "Address is required";
+        if (!formData.contact_number) errors.contact_number = "Contact number is required";
+        else if (!/^\d{11}$/.test(formData.contact_number)) errors.contact_number = "Contact number must be 11 digits";
+        if (!formData.birthday) errors.birthday = "Birthday is required";
+        else if (formData.birthday.isAfter(dayjs())) errors.birthday = "Birthday cannot be in the future";
+        else {
+            // Check if user is at least 18 years old
+            const eighteenYearsAgo = dayjs().subtract(18, 'year');
+            if (formData.birthday.isAfter(eighteenYearsAgo)) {
+                errors.birthday = "You must be at least 18 years old";
+            }
+        }
+        if (!formData.gender) errors.gender = "Gender is required";
+        if (!formData.short_biography) errors.short_biography = "Short biography is required";
+        if (!formData.credentials) errors.credentials = "Credentials are required";
+        
+        // If there are errors, show them and stop the submission
+        if (Object.keys(errors).length > 0) {
+            setFormErrors(errors);
+            showMessage('Please fill in all required fields correctly', 'error');
+            return;
+        }
+        
         try {
             setLoading(true);
             const { data: { user } } = await supabase.auth.getUser();
@@ -469,6 +533,9 @@ export default function ProfilePage() {
                                     name="name"
                                     value={formData.name}
                                     onChange={handleChange}
+                                    required
+                                    error={!!formErrors.name}
+                                    helperText={formErrors.name}
                                     InputProps={{
                                         sx: { borderRadius: 2 }
                                     }}
@@ -481,6 +548,9 @@ export default function ProfilePage() {
                                     name="username"
                                     value={formData.username || ''}
                                     onChange={handleChange}
+                                    required
+                                    error={!!formErrors.username}
+                                    helperText={formErrors.username}
                                     InputProps={{
                                         sx: { borderRadius: 2 }
                                     }}
@@ -495,6 +565,9 @@ export default function ProfilePage() {
                                     rows={2}
                                     value={formData.address || ''}
                                     onChange={handleChange}
+                                    required
+                                    error={!!formErrors.address}
+                                    helperText={formErrors.address}
                                     InputProps={{
                                         sx: { borderRadius: 2 }
                                     }}
@@ -507,6 +580,9 @@ export default function ProfilePage() {
                                     name="contact_number"
                                     value={formData.contact_number || ''}
                                     onChange={handleChange}
+                                    required
+                                    error={!!formErrors.contact_number}
+                                    helperText={formErrors.contact_number}
                                     InputProps={{
                                         sx: { borderRadius: 2 }
                                     }}
@@ -519,8 +595,13 @@ export default function ProfilePage() {
                                         value={formData.birthday}
                                         onChange={handleDateChange}
                                         sx={{ width: '100%' }}
+                                        required
+                                        maxDate={dayjs().subtract(18, 'year')}
                                         slotProps={{
                                             textField: {
+                                                required: true,
+                                                error: !!formErrors.birthday,
+                                                helperText: formErrors.birthday,
                                                 InputProps: {
                                                     sx: { borderRadius: 2 }
                                                 }
@@ -537,6 +618,9 @@ export default function ProfilePage() {
                                     name="gender"
                                     value={formData.gender || ''}
                                     onChange={handleChange}
+                                    required
+                                    error={!!formErrors.gender}
+                                    helperText={formErrors.gender}
                                     InputProps={{
                                         sx: { borderRadius: 2 }
                                     }}
@@ -628,6 +712,9 @@ export default function ProfilePage() {
                                     rows={4}
                                     value={formData.short_biography || ''}
                                     onChange={handleChange}
+                                    required
+                                    error={!!formErrors.short_biography}
+                                    helperText={formErrors.short_biography}
                                     InputProps={{
                                         sx: { borderRadius: 2 }
                                     }}
@@ -642,6 +729,9 @@ export default function ProfilePage() {
                                     rows={4}
                                     value={formData.credentials || ''}
                                     onChange={handleChange}
+                                    required
+                                    error={!!formErrors.credentials}
+                                    helperText={formErrors.credentials}
                                     InputProps={{
                                         sx: { borderRadius: 2 }
                                     }}
