@@ -152,7 +152,7 @@ export default function ViewNotificationsPage() {
                       Sent at: {new Date(notification.sent_at).toLocaleString()}
                     </Typography>
                   </div>
-                  <IconButton
+                  {/* <IconButton
                     edge="end"
                     aria-label="delete"
                     onClick={() => {
@@ -160,7 +160,7 @@ export default function ViewNotificationsPage() {
                     }}
                   >
                     <DeleteIcon />
-                  </IconButton>
+                  </IconButton> */}
                 </div>
               </Paper>
             ))}

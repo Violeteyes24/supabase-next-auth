@@ -34,7 +34,7 @@ const DepartmentAppointmentChart = () => {
         fetchData();
     }, [supabase]);
 
-    const COLORS = ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF'];
+    const COLORS = ['#fbbf24', '#f97316', '#06b6d4', '#10b981', '#8b5cf6'];
 
     return (
         <ResponsiveContainer width="100%" height={400}>
@@ -45,16 +45,27 @@ const DepartmentAppointmentChart = () => {
                     nameKey="name"
                     cx="50%"
                     cy="50%"
-                    outerRadius={150}
+                    outerRadius={120}
                     fill="#8884d8"
-                    label
+                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                    labelLine={false}
                 >
                     {data.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                 </Pie>
-                <Tooltip />
-                <Legend />
+                <Tooltip 
+                    contentStyle={{ 
+                        backgroundColor: 'white', 
+                        border: '1px solid #ccc', 
+                        color: '#333',
+                        borderRadius: '4px'
+                    }}
+                />
+                <Legend 
+                    wrapperStyle={{ color: '#333' }} 
+                    formatter={(value) => <span style={{ color: '#333' }}>{value}</span>}
+                />
             </PieChart>
         </ResponsiveContainer>
     );

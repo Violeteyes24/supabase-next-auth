@@ -51,12 +51,21 @@ const EmotionalStateChart = () => {
     return (
         <ResponsiveContainer width="100%" height={300}>
             <LineChart data={emotionalData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" label={{ value: 'Date', position: 'insideBottom', offset: -5 }} />
-                <YAxis label={{ value: 'Emotion Intensity', angle: -90, position: 'insideLeft' }} />
-                <Tooltip formatter={(value) => `${value}`} />
-                <Legend />
-                <Line type="basis" dataKey="emotion" stroke="#8884d8" activeDot={{ r: 8 }} />
+                <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
+                <XAxis 
+                    dataKey="date" 
+                    label={{ value: 'Date', position: 'insideBottom', offset: -5, fill: '#333' }} 
+                    tick={{ fill: '#333' }}
+                    stroke="#333"
+                />
+                <YAxis 
+                    label={{ value: 'Emotion Intensity', angle: -90, position: 'insideLeft', fill: '#333' }} 
+                    tick={{ fill: '#333' }}
+                    stroke="#333"
+                />
+                <Tooltip contentStyle={{ backgroundColor: 'white', border: '1px solid #ccc', color: '#333' }} />
+                <Legend wrapperStyle={{ color: '#333' }} />
+                <Line type="basis" dataKey="emotion" stroke="#16a34a" strokeWidth={2} activeDot={{ r: 8, fill: '#16a34a' }} />
             </LineChart>
         </ResponsiveContainer>
     );

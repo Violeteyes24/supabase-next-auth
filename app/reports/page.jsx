@@ -495,28 +495,52 @@ export default function ReportsPage() {
     // Custom card styles with gradient backgrounds
     const cardStyles = [
         { 
-            backgroundColor: 'linear-gradient(135deg, #a3e635 0%, #22c55e 100%)', 
-            color: '#1a2e05'
+            // Emotional State - using a color scheme that represents mood/emotion
+            backgroundColor: 'linear-gradient(135deg, #4ade80 0%, #16a34a 100%)',
+            color: '#ffffff',
+            textShadow: '0 1px 1px rgba(0,0,0,0.2)',
+            title: "Emotional Health",
+            iconColor: '#e9f5e9'
         },
         { 
-            backgroundColor: 'linear-gradient(135deg, #38bdf8 0%, #0ea5e9 100%)', 
-            color: '#0c3256'
+            // Frequent Topics - using blue shades for knowledge/information
+            backgroundColor: 'linear-gradient(135deg, #60a5fa 0%, #2563eb 100%)',
+            color: '#ffffff',
+            textShadow: '0 1px 1px rgba(0,0,0,0.2)',
+            title: "Discussion Topics",
+            iconColor: '#e0eaff'
         },
         { 
-            backgroundColor: 'linear-gradient(135deg, #a78bfa 0%, #8b5cf6 100%)', 
-            color: '#2e1065'
+            // Demographics - using purple for people/population data
+            backgroundColor: 'linear-gradient(135deg, #c084fc 0%, #8b5cf6 100%)',
+            color: '#ffffff',
+            textShadow: '0 1px 1px rgba(0,0,0,0.2)',
+            title: "User Demographics",
+            iconColor: '#f3e8ff'
         },
         { 
-            backgroundColor: 'linear-gradient(135deg, #fb923c 0%, #f97316 100%)', 
-            color: '#431407'
+            // Feedback - using warmer orange tones for ratings/reviews
+            backgroundColor: 'linear-gradient(135deg, #fb923c 0%, #ea580c 100%)',
+            color: '#ffffff',
+            textShadow: '0 1px 1px rgba(0,0,0,0.2)',
+            title: "User Satisfaction",
+            iconColor: '#ffedd5'
         },
         { 
-            backgroundColor: 'linear-gradient(135deg, #f472b6 0%, #ec4899 100%)', 
-            color: '#500724'
+            // Appointment Types - using pink/rose for scheduling/meetings
+            backgroundColor: 'linear-gradient(135deg, #f472b6 0%, #db2777 100%)',
+            color: '#ffffff', 
+            textShadow: '0 1px 1px rgba(0,0,0,0.2)',
+            title: "Session Categories",
+            iconColor: '#fce7f3'
         },
         { 
-            backgroundColor: 'linear-gradient(135deg, #fdba74 0%, #f59e0b 100%)', 
-            color: '#451a03'
+            // Department Analysis - using amber/gold for organizational data
+            backgroundColor: 'linear-gradient(135deg, #fbbf24 0%, #d97706 100%)',
+            color: '#ffffff',
+            textShadow: '0 1px 1px rgba(0,0,0,0.2)',
+            title: "Department Data",
+            iconColor: '#fef3c7'
         }
     ];
 
@@ -584,30 +608,43 @@ export default function ReportsPage() {
                                         }}
                                     />
 
+                                    {/* Icon placeholder */}
+                                    <div className="absolute top-4 right-4 bg-white bg-opacity-20 rounded-full p-1 w-8 h-8"></div>
+
                                     <div className="flex flex-col h-full">
+                                        <div className="mb-3">
+                                            <Skeleton 
+                                                variant="text" 
+                                                width="40%" 
+                                                height={16} 
+                                                sx={{ bgcolor: 'rgba(255,255,255,0.2)' }} 
+                                            />
+                                            <Skeleton 
+                                                variant="text" 
+                                                width="60%" 
+                                                height={32} 
+                                                sx={{ bgcolor: 'rgba(255,255,255,0.2)', mt: 1 }} 
+                                            />
+                                            <div className="h-1 w-16 mt-2 rounded-full bg-white bg-opacity-30"></div>
+                                        </div>
+                                        
                                         <div className="flex-1 flex items-center justify-center">
                                             <Skeleton 
                                                 variant="rectangular" 
                                                 width="100%" 
-                                                height={160} 
+                                                height={140} 
                                                 sx={{ 
                                                     bgcolor: 'rgba(255,255,255,0.1)', 
                                                     borderRadius: 2,
                                                 }}
                                             />
                                         </div>
-                                        <div className="mt-6">
-                                            <Skeleton 
-                                                variant="text" 
-                                                width="60%" 
-                                                height={32} 
-                                                sx={{ bgcolor: 'rgba(255,255,255,0.1)' }} 
-                                            />
+                                        <div className="mt-4">
                                             <Skeleton 
                                                 variant="text" 
                                                 width="80%" 
-                                                height={20} 
-                                                sx={{ bgcolor: 'rgba(255,255,255,0.1)', mt: 1 }} 
+                                                height={16} 
+                                                sx={{ bgcolor: 'rgba(255,255,255,0.2)' }} 
                                             />
                                         </div>
                                     </div>
@@ -634,28 +671,43 @@ export default function ReportsPage() {
             <div className="flex-1 overflow-auto py-8 px-4">
                 <Container maxWidth="xl">
                     <div className="mb-10">
-                        <h1 className="text-4xl font-extrabold text-gray-800 dark:text-white text-center">
-                            Reports Dashboard
-                        </h1>
-                        <p className="text-center text-gray-600 dark:text-gray-300 mt-2">
-                            Analytics and insights for MentalHelp
-                        </p>
-                        <div className="flex justify-center mt-4">
+                        <div className="text-center">
+                            <div className="inline-block px-4 py-1 rounded-full bg-gradient-to-r from-teal-500 to-cyan-600 text-white text-sm font-medium mb-3">
+                                Analytics Dashboard
+                            </div>
+                            <h1 className="text-4xl font-extrabold text-gray-800 dark:text-white text-center">
+                                <span className="bg-clip-text text-transparent bg-gradient-to-r from-teal-500 to-cyan-600">
+                                    MentalHelp
+                                </span>
+                                <span> Reports</span>
+                            </h1>
+                            <p className="text-center text-gray-600 dark:text-gray-300 mt-2 max-w-lg mx-auto">
+                                Comprehensive insights and data analytics for mental health tracking and support services
+                            </p>
+                        </div>
+                        <div className="flex justify-center mt-6">
                             <Button
                                 variant="contained"
                                 startIcon={<DownloadIcon />}
                                 onClick={handleDownloadAllPDF}
                                 sx={{
-                                    background: 'linear-gradient(135deg, #38bdf8 0%, #0ea5e9 100%)',
+                                    background: 'linear-gradient(135deg, #2dd4bf 0%, #0891b2 100%)',
                                     '&:hover': {
-                                        background: 'linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)',
+                                        background: 'linear-gradient(135deg, #0d9488 0%, #0e7490 100%)',
                                     },
                                     boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
                                     textTransform: 'none',
                                     fontWeight: 'bold',
+                                    borderRadius: '12px',
+                                    padding: '10px 24px',
+                                    fontSize: '1rem',
                                 }}
+                                size="large"
                             >
-                                Download 3-Page Report
+                                <span className="flex items-center">
+                                    Download Complete Report
+                                    <span className="ml-1 text-xs bg-white bg-opacity-20 rounded px-2 py-0.5">PDF</span>
+                                </span>
                             </Button>
                         </div>
                     </div>
@@ -686,15 +738,49 @@ export default function ReportsPage() {
                                             boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 10px 10px -5px rgba(0, 0, 0, 0.1)',
                                         },
                                         display: 'flex',
-                                        flexDirection: 'column'
+                                        flexDirection: 'column',
+                                        overflow: 'hidden'
                                     }}
                                 >
-                                    <div id={`chart-${index}`} className="flex-1">
-                                        {item.component}
+                                    <div className="absolute top-4 right-4 bg-white bg-opacity-20 rounded-full p-1" 
+                                         style={{ color: cardStyles[index].iconColor }}>
+                                        {/* This would be better with real icons, but using unicode for simplicity */}
+                                        {index === 0 && <span className="text-xl">😊</span>}
+                                        {index === 1 && <span className="text-xl">💬</span>}
+                                        {index === 2 && <span className="text-xl">👥</span>}
+                                        {index === 3 && <span className="text-xl">⭐</span>}
+                                        {index === 4 && <span className="text-xl">📅</span>}
+                                        {index === 5 && <span className="text-xl">🏢</span>}
                                     </div>
-                                    <div className="mt-6">
-                                        <h2 className="text-2xl font-bold">{item.title}</h2>
-                                        <p className="mt-1 opacity-80">{item.description}</p>
+                                    
+                                    <div className="mb-3 mt-0">
+                                        <span className="text-sm font-medium uppercase tracking-wider opacity-80">
+                                            {cardStyles[index].title}
+                                        </span>
+                                        <h2 className="text-2xl font-bold" style={{ textShadow: cardStyles[index].textShadow }}>
+                                            {item.title}
+                                        </h2>
+                                        <div className="h-1 w-16 mt-2 rounded-full bg-white bg-opacity-30"></div>
+                                    </div>
+                                    
+                                    <div id={`chart-${index}`} className="flex-1 flex items-center justify-center py-2">
+                                        <div className="w-full h-full bg-white rounded-xl p-3 flex items-center justify-center overflow-hidden" 
+                                             style={{ 
+                                                 boxShadow: '0 4px 6px rgba(0,0,0,0.05), 0 1px 3px rgba(0,0,0,0.08)', 
+                                                 color: index === 1 ? '#333' : 'inherit'  // Darker text for frequent topics (index 1)
+                                             }}>
+                                            {index === 1 ? (
+                                                <div className="text-sm w-full h-full overflow-auto" style={{ maxHeight: '220px' }}>
+                                                    {item.component}
+                                                </div>
+                                            ) : (
+                                                item.component
+                                            )}
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="mt-4">
+                                        <p className="text-sm" style={{ opacity: 0.9 }}>{item.description}</p>
                                     </div>
                                 </Paper>
                             </Grid>

@@ -47,12 +47,12 @@ const FeedbackChart = () => {
     return (
         <ResponsiveContainer width="100%" height={400}>
             <BarChart data={feedbackData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="rating" />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                <Bar dataKey="count" fill="#82ca9d" />
+                <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
+                <XAxis dataKey="rating" tick={{ fill: '#333' }} stroke="#333" />
+                <YAxis tick={{ fill: '#333' }} stroke="#333" />
+                <Tooltip contentStyle={{ backgroundColor: 'white', border: '1px solid #ccc', color: '#333' }} />
+                <Legend wrapperStyle={{ color: '#333' }} />
+                <Bar dataKey="count" fill="#ea580c" radius={[4, 4, 0, 0]} />
             </BarChart>
         </ResponsiveContainer>
     );

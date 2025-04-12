@@ -34,7 +34,7 @@ const AppointmentTypeChart = () => {
         fetchData();
     }, [supabase]);
 
-    const COLORS = ['#FF6384', '#36A2EB'];
+    const COLORS = ['#db2777', '#60a5fa'];
 
     return (
         <ResponsiveContainer width="100%" height={400}>
@@ -45,16 +45,27 @@ const AppointmentTypeChart = () => {
                     nameKey="name"
                     cx="50%"
                     cy="50%"
-                    outerRadius={150}
+                    outerRadius={120}
                     fill="#8884d8"
-                    label
+                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                    labelLine={false}
                 >
                     {data.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                 </Pie>
-                <Tooltip />
-                <Legend />
+                <Tooltip 
+                    contentStyle={{ 
+                        backgroundColor: 'white', 
+                        border: '1px solid #ccc', 
+                        color: '#333',
+                        borderRadius: '4px'
+                    }}
+                />
+                <Legend 
+                    wrapperStyle={{ color: '#333' }} 
+                    formatter={(value) => <span style={{ color: '#333' }}>{value}</span>}
+                />
             </PieChart>
         </ResponsiveContainer>
     );

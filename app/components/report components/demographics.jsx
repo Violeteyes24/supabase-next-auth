@@ -45,7 +45,7 @@ const DemographicsChart = () => {
         fetchData();
     }, [supabase]);
 
-    const COLORS = ['#8884d8', '#83a6ed', '#8dd1e1'];
+    const COLORS = ['#c084fc', '#60a5fa', '#a3e635'];
 
     return (
         <div style={{ width: '100%', height: 300 }}>
@@ -57,14 +57,25 @@ const DemographicsChart = () => {
                     outerRadius={100}
                     fill="#8884d8"
                     dataKey="value"
-                    label
+                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                    labelLine={false}
                 >
                     {data.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                 </Pie>
-                <Tooltip />
-                <Legend />
+                <Tooltip 
+                    contentStyle={{ 
+                        backgroundColor: 'white', 
+                        border: '1px solid #ccc', 
+                        color: '#333',
+                        borderRadius: '4px'
+                    }} 
+                />
+                <Legend 
+                    wrapperStyle={{ color: '#333' }} 
+                    formatter={(value) => <span style={{ color: '#333' }}>{value}</span>}
+                />
             </PieChart>
         </div>
     );

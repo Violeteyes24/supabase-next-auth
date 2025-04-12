@@ -174,10 +174,12 @@ const FrequentTopicText = () => {
         backgroundColor: 'background.paper',
         boxShadow: 1,
         borderRadius: 2,
-        p: 3
+        p: 2,
+        width: '100%',
+        height: '100%'
       }}
     >
-      <Typography variant="h5" color="text.primary" gutterBottom>
+      <Typography variant="subtitle1" color="text.primary" gutterBottom fontWeight="bold">
         Report Results
       </Typography>
       
@@ -192,10 +194,23 @@ const FrequentTopicText = () => {
             textDecoration: (typeof report === 'object' || report.length > 200) 
               ? 'underline' 
               : 'none'
-          }
+          },
+          maxHeight: '170px',
+          overflow: 'auto'
         }}
       >
-        {formatReport(report, true)}
+        {/* Modify the display to use smaller font and better spacing */}
+        {typeof report === 'object' ? (
+          formatReport(report, true)
+        ) : (
+          <Box sx={{ fontSize: '0.8rem', lineHeight: 1.4, color: '#333' }}>
+            {report.split('\n').map((line, i) => (
+              <Typography key={i} paragraph sx={{ mb: 0.5, fontSize: '0.8rem' }}>
+                {line}
+              </Typography>
+            ))}
+          </Box>
+        )}
       </Box>
 
       {/* Modal/Lightbox */}
