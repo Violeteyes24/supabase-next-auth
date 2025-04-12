@@ -1346,6 +1346,276 @@ export default function CounselorPage() {
                         </>
                     )}
 
+                    {/* Chatbot Management (Only for directors) */}
+                    {isDirector && tabValue === 1 && (
+                        <Box sx={{ mt: 2 }}>
+                            <Grid container spacing={3}>
+                                {/* Questions Management */}
+                                <Grid item xs={12} md={6}>
+                                    <Paper 
+                                        elevation={0} 
+                                        sx={{ 
+                                            p: 3, 
+                                            borderRadius: 2, 
+                                            boxShadow: '0 4px 20px rgba(0,0,0,0.05)', 
+                                            border: '1px solid rgba(229, 231, 235, 0.8)',
+                                            height: '70vh',
+                                            display: 'flex',
+                                            flexDirection: 'column'
+                                        }}
+                                    >
+                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                                            <Typography variant="h6" component="h3" sx={{ fontWeight: 'bold' }}>
+                                                Chatbot Questions
+                                            </Typography>
+                                            <Button
+                                                variant="contained"
+                                                color="primary"
+                                                startIcon={<AddIcon />}
+                                                onClick={() => handleOpenQuestionDialog()}
+                                                sx={{ borderRadius: 8 }}
+                                            >
+                                                Add Question
+                                            </Button>
+                                        </Box>
+                                        
+                                        <Box sx={{ flexGrow: 1, overflow: 'auto' }}>
+                                            {loading ? (
+                                                <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+                                                    <Typography>Loading questions...</Typography>
+                                                </Box>
+                                            ) : questions.length > 0 ? (
+                                                <TableContainer component={Box}>
+                                                    <Table stickyHeader>
+                                                        <TableHead>
+                                                            <TableRow>
+                                                                <TableCell>Question</TableCell>
+                                                                <TableCell align="right">Actions</TableCell>
+                                                            </TableRow>
+                                                        </TableHead>
+                                                        <TableBody>
+                                                            {questions.map((question) => (
+                                                                <TableRow key={question.chat_question_id}>
+                                                                    <TableCell>{question.chatbot_question}</TableCell>
+                                                                    <TableCell align="right">
+                                                                        <IconButton 
+                                                                            color="primary" 
+                                                                            onClick={() => handleOpenQuestionDialog(question)}
+                                                                            size="small"
+                                                                        >
+                                                                            <EditIcon fontSize="small" />
+                                                                        </IconButton>
+                                                                        <IconButton 
+                                                                            color="error" 
+                                                                            onClick={() => handleOpenDeleteConfirmDialog('question', question.chat_question_id)}
+                                                                            size="small"
+                                                                        >
+                                                                            <DeleteIcon fontSize="small" />
+                                                                        </IconButton>
+                                                                    </TableCell>
+                                                                </TableRow>
+                                                            ))}
+                                                        </TableBody>
+                                                    </Table>
+                                                </TableContainer>
+                                            ) : (
+                                                <Box sx={{ textAlign: 'center', py: 4, border: '1px dashed #d1d5db', borderRadius: 2 }}>
+                                                    <Typography color="text.secondary">
+                                                        No questions added yet
+                                                    </Typography>
+                                                </Box>
+                                            )}
+                                        </Box>
+                                    </Paper>
+                                </Grid>
+                                
+                                {/* Answers Management */}
+                                <Grid item xs={12} md={6}>
+                                    <Paper 
+                                        elevation={0} 
+                                        sx={{ 
+                                            p: 3, 
+                                            borderRadius: 2, 
+                                            boxShadow: '0 4px 20px rgba(0,0,0,0.05)', 
+                                            border: '1px solid rgba(229, 231, 235, 0.8)',
+                                            height: '70vh',
+                                            display: 'flex',
+                                            flexDirection: 'column'
+                                        }}
+                                    >
+                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                                            <Typography variant="h6" component="h3" sx={{ fontWeight: 'bold' }}>
+                                                Chatbot Answers
+                                            </Typography>
+                                            <Button
+                                                variant="contained"
+                                                color="primary"
+                                                startIcon={<AddIcon />}
+                                                onClick={() => handleOpenAnswerDialog()}
+                                                sx={{ borderRadius: 8 }}
+                                            >
+                                                Add Answer
+                                            </Button>
+                                        </Box>
+                                        
+                                        <Box sx={{ flexGrow: 1, overflow: 'auto' }}>
+                                            {loading ? (
+                                                <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+                                                    <Typography>Loading answers...</Typography>
+                                                </Box>
+                                            ) : answers.length > 0 ? (
+                                                <TableContainer component={Box}>
+                                                    <Table stickyHeader>
+                                                        <TableHead>
+                                                            <TableRow>
+                                                                <TableCell>Related Question</TableCell>
+                                                                <TableCell>Answer</TableCell>
+                                                                <TableCell align="right">Actions</TableCell>
+                                                            </TableRow>
+                                                        </TableHead>
+                                                        <TableBody>
+                                                            {answers.map((answer) => (
+                                                                <TableRow key={answer.chat_answer_id}>
+                                                                    <TableCell>{getQuestionTextById(answer.chat_question_id)}</TableCell>
+                                                                    <TableCell>
+                                                                        {answer.chatbot_answer.length > 50 
+                                                                            ? `${answer.chatbot_answer.substring(0, 50)}...` 
+                                                                            : answer.chatbot_answer}
+                                                                    </TableCell>
+                                                                    <TableCell align="right">
+                                                                        <IconButton 
+                                                                            color="primary" 
+                                                                            onClick={() => handleOpenAnswerDialog(answer)}
+                                                                            size="small"
+                                                                        >
+                                                                            <EditIcon fontSize="small" />
+                                                                        </IconButton>
+                                                                        <IconButton 
+                                                                            color="error" 
+                                                                            onClick={() => handleOpenDeleteConfirmDialog('answer', answer.chat_answer_id)}
+                                                                            size="small"
+                                                                        >
+                                                                            <DeleteIcon fontSize="small" />
+                                                                        </IconButton>
+                                                                    </TableCell>
+                                                                </TableRow>
+                                                            ))}
+                                                        </TableBody>
+                                                    </Table>
+                                                </TableContainer>
+                                            ) : (
+                                                <Box sx={{ textAlign: 'center', py: 4, border: '1px dashed #d1d5db', borderRadius: 2 }}>
+                                                    <Typography color="text.secondary">
+                                                        No answers added yet
+                                                    </Typography>
+                                                </Box>
+                                            )}
+                                        </Box>
+                                    </Paper>
+                                </Grid>
+                            </Grid>
+                        </Box>
+                    )}
+
+                    {/* Messages Management (Only for directors) */}
+                    {isDirector && tabValue === 2 && (
+                        <Box sx={{ mt: 2 }}>
+                            <Paper 
+                                elevation={0} 
+                                sx={{ 
+                                    p: 3, 
+                                    borderRadius: 2, 
+                                    boxShadow: '0 4px 20px rgba(0,0,0,0.05)', 
+                                    border: '1px solid rgba(229, 231, 235, 0.8)',
+                                    minHeight: '70vh',
+                                    display: 'flex',
+                                    flexDirection: 'column'
+                                }}
+                            >
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                                    <Typography variant="h6" component="h3" sx={{ fontWeight: 'bold' }}>
+                                        Predefined Messages
+                                    </Typography>
+                                    <Button
+                                        variant="contained"
+                                        color="primary"
+                                        startIcon={<AddIcon />}
+                                        onClick={() => handleOpenMessageDialog()}
+                                        sx={{ borderRadius: 8 }}
+                                    >
+                                        Add Message
+                                    </Button>
+                                </Box>
+                                
+                                <Box sx={{ flexGrow: 1, overflow: 'auto' }}>
+                                    {loading ? (
+                                        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+                                            <Typography>Loading messages...</Typography>
+                                        </Box>
+                                    ) : messages.length > 0 ? (
+                                        <TableContainer component={Box}>
+                                            <Table stickyHeader>
+                                                <TableHead>
+                                                    <TableRow>
+                                                        <TableCell>Message Type</TableCell>
+                                                        <TableCell>Role</TableCell>
+                                                        <TableCell>Content</TableCell>
+                                                        <TableCell align="right">Actions</TableCell>
+                                                    </TableRow>
+                                                </TableHead>
+                                                <TableBody>
+                                                    {messages.map((message) => (
+                                                        <TableRow key={message.message_content_id}>
+                                                            <TableCell>
+                                                                <Chip 
+                                                                    label={message.message_type} 
+                                                                    sx={{ 
+                                                                        bgcolor: message.message_type === 'options' ? 'rgba(59, 130, 246, 0.1)' : 'rgba(16, 185, 129, 0.1)',
+                                                                        color: message.message_type === 'options' ? '#3B82F6' : '#10B981',
+                                                                        textTransform: 'capitalize'
+                                                                    }}
+                                                                    size="small"
+                                                                />
+                                                            </TableCell>
+                                                            <TableCell sx={{ textTransform: 'capitalize' }}>{message.message_role}</TableCell>
+                                                            <TableCell>
+                                                                {message.message_content.length > 50 
+                                                                    ? `${message.message_content.substring(0, 50)}...` 
+                                                                    : message.message_content}
+                                                            </TableCell>
+                                                            <TableCell align="right">
+                                                                <IconButton 
+                                                                    color="primary" 
+                                                                    onClick={() => handleOpenMessageDialog(message)}
+                                                                    size="small"
+                                                                >
+                                                                    <EditIcon fontSize="small" />
+                                                                </IconButton>
+                                                                <IconButton 
+                                                                    color="error" 
+                                                                    onClick={() => handleOpenDeleteConfirmDialog('message', message.message_content_id)}
+                                                                    size="small"
+                                                                >
+                                                                    <DeleteIcon fontSize="small" />
+                                                                </IconButton>
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    ))}
+                                                </TableBody>
+                                            </Table>
+                                        </TableContainer>
+                                    ) : (
+                                        <Box sx={{ textAlign: 'center', py: 4, border: '1px dashed #d1d5db', borderRadius: 2 }}>
+                                            <Typography color="text.secondary">
+                                                No messages added yet
+                                            </Typography>
+                                        </Box>
+                                    )}
+                                </Box>
+                            </Paper>
+                        </Box>
+                    )}
+
                     {/* Student Mood Tracking (Only for directors) */}
                     {isDirector && tabValue === 3 && (
                         <Box sx={{ mt: 2 }}>
