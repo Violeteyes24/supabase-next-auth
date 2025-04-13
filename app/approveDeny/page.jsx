@@ -43,6 +43,33 @@ export default function ApproveDenyPage() {
     const [openHistoryModal, setOpenHistoryModal] = useState(false);
     const [statusHistory, setStatusHistory] = useState([]);
     const [historyUser, setHistoryUser] = useState(null);
+    // New state for creating a director
+    const [openDirectorModal, setOpenDirectorModal] = useState(false);
+    const [directorForm, setDirectorForm] = useState({
+        email: '',
+        password: '',
+        name: '',
+        username: '',
+        department_assigned: 'COECS',
+        contact_number: '',
+        gender: 'Male',
+        birthday: '',
+    });
+    const [directorFormErrors, setDirectorFormErrors] = useState({});
+    // Add state for director creation password verification modal
+    const [directorPasswordModal, setDirectorPasswordModal] = useState({
+        open: false,
+        password: '',
+        errorMessage: '',
+    });
+    // Password confirmation for sensitive actions
+    const [confirmPasswordModal, setConfirmPasswordModal] = useState({
+        open: false,
+        password: '',
+        actionType: '', // 'approve', 'deny', 'createDirector'
+        userId: null, // For approve/deny actions
+        errorMessage: '',
+    });
 
     // Log initial state and after first render
     useEffect(() => {
@@ -232,77 +259,14 @@ export default function ApproveDenyPage() {
             return;
         }
         
-        try {
-            // Optimistically update UI first
-            setRegistrants(prev => 
-                prev.map(reg => 
-                    reg.user_id === id ? {...reg, approval_status: 'approved'} : reg
-                )
-            );
-            
-            const timestamp = new Date().toISOString();
-            
-            // Update user status
-            const { data, error } = await supabase
-                .from('users')
-                .update({ 
-                    approval_status: 'approved',
-                    approved_at: timestamp,
-                    approved_by: currentUser?.user_id
-                })
-                .eq('user_id', id)
-                .select();
-
-            if (error) {
-                console.error("Error approving registrant:", error.message, error.details, error.hint);
-                // Revert the optimistic update on error
-                fetchRegistrants();
-            } else {
-                console.log("Registrant approved:", data);
-                
-                // Create status history record
-                const { error: historyError } = await supabase
-                    .from('status_history')
-                    .insert({
-                        user_id: id,
-                        status: 'approved',
-                        changed_by: currentUser?.user_id,
-                        changed_by_name: currentUser?.name,
-                        timestamp: timestamp
-                    });
-                
-                if (historyError) {
-                    console.error("Error recording approval history:", historyError);
-                }
-                
-                // Send approval email
-                try {
-                    // Call the approval email function with just the user ID
-                    const response = await fetch('/api/send-approval-email', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                            userId: id
-                        }),
-                    });
-                    
-                    if (!response.ok) {
-                        const errorData = await response.json();
-                        throw new Error(errorData.error || 'Failed to send approval email');
-                    }
-                    
-                    showSnackbar("User approved and notification email sent", "success");
-                } catch (emailError) {
-                    console.error("Error sending approval email:", emailError);
-                    showSnackbar("User approved but failed to send email", "warning");
-                }
-            }
-        } catch (err) {
-            console.error("Unexpected error in handleApprove:", err);
-            fetchRegistrants(); // Revert on unexpected error
-        }
+        // Open password confirmation modal
+        setConfirmPasswordModal({
+            open: true,
+            password: '',
+            actionType: 'approve',
+            userId: id,
+            errorMessage: '',
+        });
     };
 
     const handleDeny = async (id) => {
@@ -314,77 +278,14 @@ export default function ApproveDenyPage() {
             return;
         }
         
-        try {
-            // Optimistically update UI first
-            setRegistrants(prev => 
-                prev.map(reg => 
-                    reg.user_id === id ? {...reg, approval_status: 'denied'} : reg
-                )
-            );
-            
-            const timestamp = new Date().toISOString();
-            
-            // Update user status
-            const { data, error } = await supabase
-                .from('users')
-                .update({ 
-                    approval_status: 'denied',
-                    denied_at: timestamp,
-                    denied_by: currentUser?.user_id
-                })
-                .eq('user_id', id)
-                .select();
-
-            if (error) {
-                console.error("Error denying registrant:", error.message, error.details, error.hint);
-                // Revert the optimistic update on error
-                fetchRegistrants();
-            } else {
-                console.log("Registrant denied:", data);
-                
-                // Create status history record
-                const { error: historyError } = await supabase
-                    .from('status_history')
-                    .insert({
-                        user_id: id,
-                        status: 'denied',
-                        changed_by: currentUser?.user_id,
-                        changed_by_name: currentUser?.name,
-                        timestamp: timestamp
-                    });
-                
-                if (historyError) {
-                    console.error("Error recording denial history:", historyError);
-                }
-                
-                // Send denial email
-                try {
-                    // Call the denial email function with just the user ID
-                    const response = await fetch('/api/send-denial-email', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                            userId: id
-                        }),
-                    });
-                    
-                    if (!response.ok) {
-                        const errorData = await response.json();
-                        throw new Error(errorData.error || 'Failed to send denial email');
-                    }
-                    
-                    showSnackbar("User denied and notification email sent", "success");
-                } catch (emailError) {
-                    console.error("Error sending denial email:", emailError);
-                    showSnackbar("User denied but failed to send email", "warning");
-                }
-            }
-        } catch (err) {
-            console.error("Unexpected error in handleDeny:", err);
-            fetchRegistrants(); // Revert on unexpected error
-        }
+        // Open password confirmation modal
+        setConfirmPasswordModal({
+            open: true,
+            password: '',
+            actionType: 'deny',
+            userId: id,
+            errorMessage: '',
+        });
     };
 
     const handleView = async (id) => {
@@ -620,6 +521,449 @@ export default function ApproveDenyPage() {
         }
     };
 
+    // Handle director form change
+    const handleDirectorFormChange = (e) => {
+        const { name, value } = e.target;
+        setDirectorForm(prev => ({
+            ...prev,
+            [name]: value
+        }));
+        
+        // Clear error for this field if it exists
+        if (directorFormErrors[name]) {
+            setDirectorFormErrors(prev => ({
+                ...prev,
+                [name]: ''
+            }));
+        }
+    };
+
+    // Validate director form
+    const validateDirectorForm = () => {
+        const errors = {};
+        
+        // Validate email
+        if (!directorForm.email) {
+            errors.email = 'Email is required';
+        } else if (!directorForm.email.includes('@')) {
+            errors.email = 'Please enter a valid email';
+        // } else if (!directorForm.email.endsWith('@hnu.edu.ph')) {
+        //     errors.email = 'Email must be an HNU email address (@hnu.edu.ph)';
+        }
+        
+        // Validate password
+        if (!directorForm.password) {
+            errors.password = 'Password is required';
+        } else if (directorForm.password.length < 6) {
+            errors.password = 'Password must be at least 6 characters';
+        }
+        
+        // Validate name
+        if (!directorForm.name) {
+            errors.name = 'Name is required';
+        }
+        
+        // Validate username
+        if (!directorForm.username) {
+            errors.username = 'Username is required';
+        }
+        
+        // Validate contact number
+        if (!directorForm.contact_number) {
+            errors.contact_number = 'Contact number is required';
+        } else if (!/^\d{10,11}$/.test(directorForm.contact_number.replace(/[^0-9]/g, ''))) {
+            errors.contact_number = 'Contact number must be 10-11 digits';
+        }
+        
+        // Validate birthday
+        if (!directorForm.birthday) {
+            errors.birthday = 'Birthday is required';
+        } else {
+            const birthDate = new Date(directorForm.birthday);
+            const today = new Date();
+            
+            // Check if birth date is in the future
+            if (birthDate > today) {
+                errors.birthday = 'Birthday cannot be in the future';
+            } else {
+                // Check if at least 18 years old
+                const age = today.getFullYear() - birthDate.getFullYear();
+                const monthDiff = today.getMonth() - birthDate.getMonth();
+                
+                if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+                    // Not yet had birthday this year
+                    if (age - 1 < 18) {
+                        errors.birthday = 'Director must be at least 18 years old';
+                    }
+                } else {
+                    // Had birthday this year already
+                    if (age < 18) {
+                        errors.birthday = 'Director must be at least 18 years old';
+                    }
+                }
+            }
+        }
+        
+        setDirectorFormErrors(errors);
+        return Object.keys(errors).length === 0;
+    };
+
+    // Handle "Create Director" button click - show password verification modal first
+    const handleCreateDirectorClick = () => {
+        setDirectorPasswordModal({
+            open: true,
+            password: '',
+            errorMessage: '',
+        });
+    };
+
+    // Handle verification for director creation
+    const handleDirectorPasswordVerify = async () => {
+        if (!directorPasswordModal.password) {
+            setDirectorPasswordModal(prev => ({
+                ...prev,
+                errorMessage: 'Please enter your password',
+            }));
+            return;
+        }
+
+        try {
+            // Get current user email
+            const { data: { user } } = await supabase.auth.getUser();
+            
+            if (!user || !user.email) {
+                setDirectorPasswordModal(prev => ({
+                    ...prev,
+                    errorMessage: 'Could not retrieve current user information',
+                }));
+                return;
+            }
+            
+            // Verify password
+            const { error } = await supabase.auth.signInWithPassword({
+                email: user.email,
+                password: directorPasswordModal.password,
+            });
+            
+            if (error) {
+                setDirectorPasswordModal(prev => ({
+                    ...prev,
+                    errorMessage: 'Invalid password. Please try again.',
+                }));
+                return;
+            }
+            
+            // Password is correct, close password modal and open director form modal
+            setDirectorPasswordModal({
+                open: false,
+                password: '',
+                errorMessage: '',
+            });
+            
+            // Open the director creation form modal
+            setOpenDirectorModal(true);
+            
+        } catch (error) {
+            console.error('Error verifying password:', error);
+            setDirectorPasswordModal(prev => ({
+                ...prev,
+                errorMessage: 'An error occurred. Please try again.',
+            }));
+        }
+    };
+
+    // Create director
+    const handleCreateDirector = async () => {
+        if (!validateDirectorForm()) {
+            return;
+        }
+        
+        // Proceed with director creation
+        await executeCreateDirector();
+    };
+
+    // Execute director creation after password confirmation
+    const executeCreateDirector = async () => {
+        try {
+            // First create the auth user
+            const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+                email: directorForm.email,
+                password: directorForm.password,
+            });
+            
+            if (signUpError) {
+                console.error('Error creating director auth:', signUpError);
+                showSnackbar(signUpError.message, 'error');
+                return;
+            }
+            
+            if (!signUpData.user) {
+                showSnackbar('Failed to create director account', 'error');
+                return;
+            }
+            
+            // Create the user profile with director flag
+            const { error: insertError } = await supabase
+                .from('users')
+                .insert([
+                    {
+                        user_id: signUpData.user.id,
+                        user_type: 'counselor', // Directors are typically counselors with special privileges
+                        approval_status: 'approved', // Auto-approve directors
+                        is_director: true,
+                        name: directorForm.name,
+                        username: directorForm.username,
+                        department_assigned: directorForm.department_assigned,
+                        gender: directorForm.gender,
+                        contact_number: directorForm.contact_number,
+                        birthday: directorForm.birthday,
+                        // Set default values for required fields
+                        address: 'HNU Campus',
+                        short_biography: 'System Director',
+                        credentials: 'System Director',
+                    },
+                ]);
+                
+            if (insertError) {
+                console.error('Error creating director profile:', insertError);
+                showSnackbar('Failed to create director profile', 'error');
+                return;
+            }
+            
+            showSnackbar('Director created successfully', 'success');
+            setOpenDirectorModal(false);
+            setDirectorForm({
+                email: '',
+                password: '',
+                name: '',
+                username: '',
+                department_assigned: 'COECS',
+                contact_number: '',
+                gender: 'Male',
+                birthday: '',
+            });
+        } catch (error) {
+            console.error('Unexpected error creating director:', error);
+            showSnackbar('An unexpected error occurred', 'error');
+        }
+    };
+
+    // Execute approve after password confirmation
+    const executeApprove = async (id) => {
+        try {
+            // Optimistically update UI first
+            setRegistrants(prev => 
+                prev.map(reg => 
+                    reg.user_id === id ? {...reg, approval_status: 'approved'} : reg
+                )
+            );
+            
+            const timestamp = new Date().toISOString();
+            
+            // Update user status
+            const { data, error } = await supabase
+                .from('users')
+                .update({ 
+                    approval_status: 'approved',
+                    approved_at: timestamp,
+                    approved_by: currentUser?.user_id
+                })
+                .eq('user_id', id)
+                .select();
+
+            if (error) {
+                console.error("Error approving registrant:", error.message, error.details, error.hint);
+                // Revert the optimistic update on error
+                fetchRegistrants();
+            } else {
+                console.log("Registrant approved:", data);
+                
+                // Create status history record
+                const { error: historyError } = await supabase
+                    .from('status_history')
+                    .insert({
+                        user_id: id,
+                        status: 'approved',
+                        changed_by: currentUser?.user_id,
+                        changed_by_name: currentUser?.name,
+                        timestamp: timestamp
+                    });
+                
+                if (historyError) {
+                    console.error("Error recording approval history:", historyError);
+                }
+                
+                // Send approval email
+                try {
+                    // Call the approval email function with just the user ID
+                    const response = await fetch('/api/send-approval-email', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            userId: id
+                        }),
+                    });
+                    
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.error || 'Failed to send approval email');
+                    }
+                    
+                    showSnackbar("User approved and notification email sent", "success");
+                } catch (emailError) {
+                    console.error("Error sending approval email:", emailError);
+                    showSnackbar("User approved but failed to send email", "warning");
+                }
+            }
+        } catch (err) {
+            console.error("Unexpected error in handleApprove:", err);
+            fetchRegistrants(); // Revert on unexpected error
+        }
+    };
+
+    // Execute deny after password confirmation
+    const executeDeny = async (id) => {
+        try {
+            // Optimistically update UI first
+            setRegistrants(prev => 
+                prev.map(reg => 
+                    reg.user_id === id ? {...reg, approval_status: 'denied'} : reg
+                )
+            );
+            
+            const timestamp = new Date().toISOString();
+            
+            // Update user status
+            const { data, error } = await supabase
+                .from('users')
+                .update({ 
+                    approval_status: 'denied',
+                    denied_at: timestamp,
+                    denied_by: currentUser?.user_id
+                })
+                .eq('user_id', id)
+                .select();
+
+            if (error) {
+                console.error("Error denying registrant:", error.message, error.details, error.hint);
+                // Revert the optimistic update on error
+                fetchRegistrants();
+            } else {
+                console.log("Registrant denied:", data);
+                
+                // Create status history record
+                const { error: historyError } = await supabase
+                    .from('status_history')
+                    .insert({
+                        user_id: id,
+                        status: 'denied',
+                        changed_by: currentUser?.user_id,
+                        changed_by_name: currentUser?.name,
+                        timestamp: timestamp
+                    });
+                
+                if (historyError) {
+                    console.error("Error recording denial history:", historyError);
+                }
+                
+                // Send denial email
+                try {
+                    // Call the denial email function with just the user ID
+                    const response = await fetch('/api/send-denial-email', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            userId: id
+                        }),
+                    });
+                    
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.error || 'Failed to send denial email');
+                    }
+                    
+                    showSnackbar("User denied and notification email sent", "success");
+                } catch (emailError) {
+                    console.error("Error sending denial email:", emailError);
+                    showSnackbar("User denied but failed to send email", "warning");
+                }
+            }
+        } catch (err) {
+            console.error("Unexpected error in handleDeny:", err);
+            fetchRegistrants(); // Revert on unexpected error
+        }
+    };
+
+    // Handle password confirmation for approve/deny actions
+    const handleConfirmPassword = async () => {
+        // Store current search term to restore it later
+        const currentSearchTerm = searchTerm;
+        
+        try {
+            // Verify current user's password
+            const { data: { user } } = await supabase.auth.getUser();
+            
+            if (!user || !user.email) {
+                setConfirmPasswordModal(prev => ({
+                    ...prev,
+                    errorMessage: 'Could not retrieve current user information.',
+                }));
+                return;
+            }
+            
+            // Use the actual email from the authenticated user
+            const { error } = await supabase.auth.signInWithPassword({
+                email: user.email,
+                password: confirmPasswordModal.password,
+            });
+            
+            if (error) {
+                setConfirmPasswordModal(prev => ({
+                    ...prev,
+                    errorMessage: 'Invalid password. Please try again.',
+                }));
+                return;
+            }
+            
+            // Password is correct, proceed with the action
+            switch(confirmPasswordModal.actionType) {
+                case 'approve':
+                    await executeApprove(confirmPasswordModal.userId);
+                    break;
+                case 'deny':
+                    await executeDeny(confirmPasswordModal.userId);
+                    break;
+                default:
+                    break;
+            }
+            
+            // Close confirmation modal
+            setConfirmPasswordModal({
+                open: false,
+                password: '',
+                actionType: '',
+                userId: null,
+                errorMessage: '',
+            });
+            
+        } catch (error) {
+            console.error('Error confirming password:', error);
+            setConfirmPasswordModal(prev => ({
+                ...prev,
+                errorMessage: 'An error occurred. Please try again.',
+            }));
+        } finally {
+            // Restore the search term in case it was changed during the auth process
+            if (searchTerm !== currentSearchTerm) {
+                setSearchTerm(currentSearchTerm);
+            }
+        }
+    };
+
     if (loading) {
         return <ApproveDenySkeleton />;
     }
@@ -800,12 +1144,20 @@ export default function ApproveDenyPage() {
                 <div className="bg-white rounded-xl shadow-md p-6 mt-8 mb-8">
                     <div className="flex justify-between items-center mb-4">
                         <h2 className="text-xl font-semibold text-gray-700">Secretary Assignments</h2>
-                        <button
-                            onClick={handleAssignSecretary}
-                            className="bg-purple-500 hover:bg-purple-600 text-white px-3 py-1.5 rounded text-sm font-medium"
-                        >
-                            Assign New Secretary
-                        </button>
+                        <div className="flex space-x-3">
+                            <button
+                                onClick={handleCreateDirectorClick}
+                                className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1.5 rounded text-sm font-medium"
+                            >
+                                Create Director
+                            </button>
+                            <button
+                                onClick={handleAssignSecretary}
+                                className="bg-purple-500 hover:bg-purple-600 text-white px-3 py-1.5 rounded text-sm font-medium"
+                            >
+                                Assign New Secretary
+                            </button>
+                        </div>
                     </div>
                     
                     {Object.keys(counselorAssignments).length === 0 ? (
@@ -1277,6 +1629,333 @@ export default function ApproveDenyPage() {
                         </Box>
                     </Box>
                 </Modal>
+
+            {/* Password Confirmation Modal */}
+            <Modal
+                open={confirmPasswordModal.open}
+                onClose={() => setConfirmPasswordModal(prev => ({...prev, open: false}))}
+                aria-labelledby="password-confirmation-modal"
+            >
+                <Box
+                    sx={{
+                        position: 'absolute',
+                        top: '50%',
+                        left: '50%',
+                        transform: 'translate(-50%, -50%)',
+                        bgcolor: 'white',
+                        borderRadius: '8px',
+                        boxShadow: 24,
+                        p: 4,
+                        width: 400,
+                        maxWidth: '90vw'
+                    }}
+                >
+                    <h2 className="text-xl font-bold text-gray-800 mb-4">Confirm Your Password</h2>
+                    <p className="text-gray-600 mb-4">
+                        For security purposes, please enter your password to confirm this action.
+                    </p>
+                    
+                    <div className="mb-4">
+                        <label className="text-black block text-sm font-medium text-gray-700 mb-1">Your Password</label>
+                        <input
+                            type="password"
+                            value={confirmPasswordModal.password}
+                            onChange={(e) => setConfirmPasswordModal(prev => ({...prev, password: e.target.value, errorMessage: ''}))}
+                            className="text-black w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            placeholder="Enter your password"
+                        />
+                        {confirmPasswordModal.errorMessage && (
+                            <p className="mt-1 text-xs text-red-600">{confirmPasswordModal.errorMessage}</p>
+                        )}
+                    </div>
+                    
+                    <div className="flex justify-end space-x-2 mt-6">
+                        <Button
+                            variant="outlined"
+                            onClick={() => setConfirmPasswordModal(prev => ({...prev, open: false}))}
+                            sx={{
+                                borderColor: '#d1d5db',
+                                color: '#4b5563'
+                            }}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            variant="contained"
+                            onClick={handleConfirmPassword}
+                            disabled={!confirmPasswordModal.password}
+                            sx={{
+                                bgcolor: '#3b82f6',
+                                '&:hover': {
+                                    bgcolor: '#2563eb'
+                                },
+                                '&.Mui-disabled': {
+                                    bgcolor: '#e5e7eb',
+                                    color: '#9ca3af'
+                                }
+                            }}
+                        >
+                            Confirm
+                        </Button>
+                    </div>
+                </Box>
+            </Modal>
+
+            {/* Director Creation Modal */}
+            <Modal
+                open={openDirectorModal}
+                onClose={() => setOpenDirectorModal(false)}
+                aria-labelledby="create-director-modal"
+            >
+                <Box
+                    sx={{
+                        position: 'absolute',
+                        top: '50%',
+                        left: '50%',
+                        transform: 'translate(-50%, -50%)',
+                        bgcolor: 'white',
+                        borderRadius: '8px',
+                        boxShadow: 24,
+                        p: 4,
+                        width: 500,
+                        maxWidth: '90vw',
+                        maxHeight: '90vh',
+                        overflow: 'auto'
+                    }}
+                >
+                    <h2 className="text-xl font-bold text-gray-800 mb-4">Create New Director</h2>
+                    <p className="text-gray-600 mb-4">
+                        Directors have full system access and can approve/deny registrations, assign secretaries, and manage system settings.
+                    </p>
+                    
+                    <div className="space-y-4">
+                        {/* Email */}
+                        <div>
+                            <label className="text-black block text-sm font-medium text-gray-700 mb-1">Email</label>
+                            <input
+                                type="email"
+                                name="email"
+                                value={directorForm.email}
+                                onChange={handleDirectorFormChange}
+                                className="text-black w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                placeholder="director@example.com"
+                            />
+                            {directorFormErrors.email && (
+                                <p className="mt-1 text-xs text-red-600">{directorFormErrors.email}</p>
+                            )}
+                        </div>
+                        
+                        {/* Password */}
+                        <div>
+                            <label className="text-black block text-sm font-medium text-gray-700 mb-1">Password</label>
+                            <input
+                                type="password"
+                                name="password"
+                                value={directorForm.password}
+                                onChange={handleDirectorFormChange}
+                                className="text-black w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                placeholder="********"
+                            />
+                            {directorFormErrors.password && (
+                                <p className="mt-1 text-xs text-red-600">{directorFormErrors.password}</p>
+                            )}
+                        </div>
+                        
+                        {/* Name */}
+                        <div>
+                            <label className="text-black block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+                            <input
+                                type="text"
+                                name="name"
+                                value={directorForm.name}
+                                onChange={handleDirectorFormChange}
+                                className="text-black w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                placeholder="John Doe"
+                            />
+                            {directorFormErrors.name && (
+                                <p className="mt-1 text-xs text-red-600">{directorFormErrors.name}</p>
+                            )}
+                        </div>
+                        
+                        {/* Username */}
+                        <div>
+                            <label className="text-black block text-sm font-medium text-gray-700 mb-1">Username</label>
+                            <input
+                                type="text"
+                                name="username"
+                                value={directorForm.username}
+                                onChange={handleDirectorFormChange}
+                                className="text-black w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                placeholder="director_username"
+                            />
+                            {directorFormErrors.username && (
+                                <p className="mt-1 text-xs text-red-600">{directorFormErrors.username}</p>
+                            )}
+                        </div>
+                        
+                        {/* Contact Number */}
+                        <div>
+                            <label className="text-black block text-sm font-medium text-gray-700 mb-1">Contact Number</label>
+                            <input
+                                type="text"
+                                name="contact_number"
+                                value={directorForm.contact_number}
+                                onChange={handleDirectorFormChange}
+                                className="text-black w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                placeholder="09123456789"
+                            />
+                            {directorFormErrors.contact_number && (
+                                <p className="mt-1 text-xs text-red-600">{directorFormErrors.contact_number}</p>
+                            )}
+                        </div>
+                        
+                        {/* Department */}
+                        <div>
+                            <label className="text-black block text-sm font-medium text-gray-700 mb-1">Department</label>
+                            <select
+                                name="department_assigned"
+                                value={directorForm.department_assigned}
+                                onChange={handleDirectorFormChange}
+                                className="text-black w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            >
+                                <option value="COECS">COECS</option>
+                                <option value="COED">COED</option>
+                                <option value="COL">COL</option>
+                                <option value="CAS">CAS</option>
+                                <option value="CBA">CBA</option>
+                                <option value="CCJE">CCJE</option>
+                                <option value="SHTM">SHTM</option>
+                            </select>
+                        </div>
+                        
+                        {/* Gender */}
+                        <div>
+                            <label className="text-black block text-sm font-medium text-gray-700 mb-1">Gender</label>
+                            <select
+                                name="gender"
+                                value={directorForm.gender}
+                                onChange={handleDirectorFormChange}
+                                className="text-black w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            >
+                                <option value="Male">Male</option>
+                                <option value="Female">Female</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                        
+                        {/* Birthday */}
+                        <div>
+                            <label className="text-black block text-sm font-medium text-gray-700 mb-1">Date of Birth</label>
+                            <input
+                                type="date"
+                                name="birthday"
+                                value={directorForm.birthday}
+                                onChange={handleDirectorFormChange}
+                                className="text-black w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                max={new Date().toISOString().split('T')[0]} // Prevent future dates
+                            />
+                            {directorFormErrors.birthday && (
+                                <p className="mt-1 text-xs text-red-600">{directorFormErrors.birthday}</p>
+                            )}
+                        </div>
+                    </div>
+                    
+                    <div className="flex justify-end space-x-2 mt-6">
+                        <Button
+                            variant="outlined"
+                            onClick={() => setOpenDirectorModal(false)}
+                            sx={{
+                                borderColor: '#d1d5db',
+                                color: '#4b5563'
+                            }}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            variant="contained"
+                            onClick={handleCreateDirector}
+                            sx={{
+                                bgcolor: '#3b82f6',
+                                '&:hover': {
+                                    bgcolor: '#2563eb'
+                                }
+                            }}
+                        >
+                            Create Director
+                        </Button>
+                    </div>
+                </Box>
+            </Modal>
+
+            {/* Director Password Verification Modal */}
+            <Modal
+                open={directorPasswordModal.open}
+                onClose={() => setDirectorPasswordModal(prev => ({...prev, open: false}))}
+                aria-labelledby="director-password-verification-modal"
+            >
+                <Box
+                    sx={{
+                        position: 'absolute',
+                        top: '50%',
+                        left: '50%',
+                        transform: 'translate(-50%, -50%)',
+                        bgcolor: 'white',
+                        borderRadius: '8px',
+                        boxShadow: 24,
+                        p: 4,
+                        width: 400,
+                        maxWidth: '90vw'
+                    }}
+                >
+                    <h2 className="text-xl font-bold text-gray-800 mb-4">Authentication Required</h2>
+                    <p className="text-gray-600 mb-4">
+                        Please enter your password to proceed with creating a new director account.
+                    </p>
+                    
+                    <div className="mb-4">
+                        <label className="text-black block text-sm font-medium text-gray-700 mb-1">Your Password</label>
+                        <input
+                            type="password"
+                            value={directorPasswordModal.password}
+                            onChange={(e) => setDirectorPasswordModal(prev => ({
+                                ...prev, 
+                                password: e.target.value,
+                                errorMessage: ''
+                            }))}
+                            className="text-black w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            placeholder="Enter your password"
+                        />
+                        {directorPasswordModal.errorMessage && (
+                            <p className="mt-1 text-xs text-red-600">{directorPasswordModal.errorMessage}</p>
+                        )}
+                    </div>
+                    
+                    <div className="flex justify-end space-x-2 mt-6">
+                        <Button
+                            variant="outlined"
+                            onClick={() => setDirectorPasswordModal(prev => ({...prev, open: false}))}
+                            sx={{
+                                borderColor: '#d1d5db',
+                                color: '#4b5563'
+                            }}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            variant="contained"
+                            onClick={handleDirectorPasswordVerify}
+                            sx={{
+                                bgcolor: '#3b82f6',
+                                '&:hover': {
+                                    bgcolor: '#2563eb'
+                                }
+                            }}
+                        >
+                            Verify
+                        </Button>
+                    </div>
+                </Box>
+            </Modal>
         </div>
     );
 }
