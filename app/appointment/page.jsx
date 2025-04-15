@@ -813,7 +813,7 @@ export default function AppointmentPage() {
             .eq('secretary_id', userId)
             .eq('status', 'completed')
             .eq('appointment_type', showGroupCompleted ? 'group' : 'individual')
-            .order('date', { ascending: true });
+            .order('date', { ascending: false });
           
           if (error) {
             console.error('Error fetching completed appointments for secretary:', error);
@@ -832,7 +832,7 @@ export default function AppointmentPage() {
               .eq('counselor_id', userId)
               .eq('status', 'completed')
               .eq('appointment_type', 'individual')
-              .order('availability_schedules(date)', { ascending: true });
+              .order('availability_schedules(date)', { ascending: false });
             
             if (error) {
               console.error('Error fetching completed appointments:', error);
@@ -854,7 +854,7 @@ export default function AppointmentPage() {
               .eq('counselor_id', userId)
               .eq('status', 'completed')
               .eq('appointment_type', 'group')
-              .order('availability_schedules(date)', { ascending: true });
+              .order('availability_schedules(date)', { ascending: false });
             
             if (groupError) {
               console.error('Error fetching completed group appointments:', groupError);
@@ -902,7 +902,7 @@ export default function AppointmentPage() {
             .eq('secretary_id', userId)
             .eq('status', 'cancelled')
             .eq('appointment_type', isGroup ? 'group' : 'individual')
-            .order('date', { ascending: true });
+            .order('date', { ascending: false });
           
           if (error) {
             console.error('Error fetching cancelled appointments for secretary:', error);
@@ -921,7 +921,7 @@ export default function AppointmentPage() {
               .eq('counselor_id', userId)
               .eq('status', 'cancelled')
               .eq('appointment_type', 'individual')
-              .order('availability_schedules(date)', { ascending: true });
+              .order('availability_schedules(date)', { ascending: false });
             
             if (error) {
               console.error('Error fetching cancelled appointments:', error);
@@ -943,7 +943,7 @@ export default function AppointmentPage() {
               .eq('counselor_id', userId)
               .eq('status', 'cancelled')
               .eq('appointment_type', 'group')
-              .order('availability_schedules(date)', { ascending: true });
+              .order('availability_schedules(date)', { ascending: false });
             
             if (groupError) {
               console.error('Error fetching cancelled group appointments:', groupError);

@@ -248,7 +248,8 @@ export default function GroupAppointmentsManager() {
       .eq("appointment_type", "group")
       .neq("status", "completed")
       .neq("status", "cancelled")
-      .eq("counselor_id", userId);
+      .eq("counselor_id", userId)
+      .order('availability_schedules(date)', { ascending: false });
 
     if (error) {
       console.error("Error fetching group appointments:", error);
@@ -329,7 +330,8 @@ export default function GroupAppointmentsManager() {
         .eq("secretary_id", session.user.id)
         .eq("appointment_type", "group")
         .neq("status", "completed")
-        .neq("status", "cancelled");
+        .neq("status", "cancelled")
+        .order('date', { ascending: false });
       
       if (error) {
         console.error("Error fetching group appointments for secretary:", error);
@@ -479,7 +481,8 @@ export default function GroupAppointmentsManager() {
         .from('availability_schedules')
         .select('*')
         .eq('date', groupDate.format('YYYY-MM-DD'))
-        .neq('availability_schedule_id', null)
+        .not('availability_schedule_id', 'is', null)
+        .order('date', { ascending: false })
         .eq('counselor_id', counselorId);
 
       if (fetchError) {
@@ -833,11 +836,11 @@ export default function GroupAppointmentsManager() {
         startTime = dayjs(
           selectedGroupAppointment.availability_schedules.start_time,
           "HH:mm"
-        ).format("hh:mm A");
+        ).format("h:mm A");
         endTime = dayjs(
           selectedGroupAppointment.availability_schedules.end_time,
           "HH:mm"
-        ).format("hh:mm A");
+        ).format("h:mm A");
       }
 
       // Create notification content
@@ -968,8 +971,9 @@ export default function GroupAppointmentsManager() {
           )
         `)
         .eq("appointment_type", "group")
-        .or('status.eq.pending,status.eq.rescheduled')
-        .not('availability_schedule_id', 'is', null);
+        .or("status.eq.pending,status.eq.rescheduled")
+        .not('availability_schedule_id', 'is', null)
+        .order('availability_schedules(date)', { ascending: false });
       
       // Apply additional filtering based on user role
       if (userRole === 'counselor') {
@@ -1214,10 +1218,10 @@ export default function GroupAppointmentsManager() {
                           ? `${dayjs(
                               appointment.availability_schedules.start_time,
                               "HH:mm"
-                            ).format("hh:mm A")} - ${dayjs(
+                            ).format("h:mm A")} - ${dayjs(
                               appointment.availability_schedules.end_time,
                               "HH:mm"
-                            ).format("hh:mm A")}`
+                            ).format("h:mm A")}`
                           : "Not scheduled"}
                       </TableCell>
                       <TableCell>
@@ -1385,7 +1389,7 @@ export default function GroupAppointmentsManager() {
               variant="subtitle1"
               sx={{ mb: 2, fontWeight: "medium", color: "black" }}
             >
-              Session Date and Time (Optional)
+              Session Date and Time
             </Typography>
             <LocalizationProvider dateAdapter={AdapterDayjs}>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1407,6 +1411,7 @@ export default function GroupAppointmentsManager() {
                     value={groupStartTime}
                     onChange={(newValue) => setGroupStartTime(newValue)}
                     sx={{ width: "100%" }}
+                    ampm={true}
                   />
                 </div>
                 <div>
@@ -1417,6 +1422,7 @@ export default function GroupAppointmentsManager() {
                     value={groupEndTime}
                     onChange={(newValue) => setGroupEndTime(newValue)}
                     sx={{ width: "100%" }}
+                    ampm={true}
                   />
                 </div>
               </div>
@@ -1622,7 +1628,10 @@ export default function GroupAppointmentsManager() {
               disabled={
                 selectedUsers.length < 2 ||
                 !selectedCategory ||
-                !groupReason.trim()
+                !groupReason.trim() ||
+                !groupDate ||
+                !groupStartTime ||
+                !groupEndTime
               }
               sx={{
                 backgroundColor: "#10b981",
@@ -1692,8 +1701,8 @@ export default function GroupAppointmentsManager() {
                   : "Not scheduled"}
                 {selectedGroupAppointment.availability_schedules?.start_time && 
                  selectedGroupAppointment.availability_schedules?.end_time &&
-                  ` | ${dayjs(selectedGroupAppointment.availability_schedules.start_time, "HH:mm").format("hh:mm A")} - 
-                     ${dayjs(selectedGroupAppointment.availability_schedules.end_time, "HH:mm").format("hh:mm A")}`
+                  ` | ${dayjs(selectedGroupAppointment.availability_schedules.start_time, "HH:mm").format("h:mm A")} - 
+                     ${dayjs(selectedGroupAppointment.availability_schedules.end_time, "HH:mm").format("h:mm A")}`
                 }
               </Typography>
             </Box>
@@ -1719,6 +1728,7 @@ export default function GroupAppointmentsManager() {
                   value={rescheduleStartTime}
                   onChange={(newValue) => setRescheduleStartTime(newValue)}
                   sx={{ width: "100%" }}
+                  ampm={true}
                 />
               </div>
               <div>
@@ -1729,6 +1739,7 @@ export default function GroupAppointmentsManager() {
                   value={rescheduleEndTime}
                   onChange={(newValue) => setRescheduleEndTime(newValue)}
                   sx={{ width: "100%" }}
+                  ampm={true}
                 />
               </div>
             </div>
