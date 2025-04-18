@@ -70,6 +70,14 @@ export default function ApproveDenyPage() {
         userId: null, // For approve/deny actions
         errorMessage: '',
     });
+    // New state for counselor department assignment
+    const [openDepartmentModal, setOpenDepartmentModal] = useState(false);
+    const [selectedCounselorForDept, setSelectedCounselorForDept] = useState(null);
+    const [selectedDepartmentForCounselor, setSelectedDepartmentForCounselor] = useState('');
+    const [counselorsList, setCounselorsList] = useState([]);
+    const [departmentOptions] = useState([
+        'COECS', 'COED', 'COL', 'CAS', 'CBA', 'CCJE', 'SHTM'
+    ]);
 
     // Log initial state and after first render
     useEffect(() => {
@@ -107,6 +115,7 @@ export default function ApproveDenyPage() {
                     setRegistrants(registrantsData || []);
                     setFilteredRegistrants(registrantsData || []);
                     setCounselors(counselorsData || []);
+                    setCounselorsList(counselorsData || []); // Set the counselors list
                     setLoading(false);
                     fetchCurrentUser();
                     fetchSecretaryAssignments();
@@ -964,6 +973,52 @@ export default function ApproveDenyPage() {
         }
     };
 
+    // Function to handle assigning departments to counselors
+    const handleAssignDepartment = (counselor) => {
+        if (!currentUser?.is_director) {
+            showSnackbar("Only directors can assign departments to counselors", "error");
+            return;
+        }
+        
+        setSelectedCounselorForDept(counselor);
+        setSelectedDepartmentForCounselor(counselor.department_assigned || '');
+        setOpenDepartmentModal(true);
+    };
+
+    // Function to submit department assignment
+    const handleDepartmentSubmit = async () => {
+        if (!selectedCounselorForDept || !selectedDepartmentForCounselor) {
+            showSnackbar("Please select a department", "error");
+            return;
+        }
+
+        try {
+            const { error } = await supabase
+                .from('users')
+                .update({ department_assigned: selectedDepartmentForCounselor })
+                .eq('user_id', selectedCounselorForDept.user_id);
+
+            if (error) {
+                console.error("Error assigning department:", error);
+                showSnackbar("Failed to assign department", "error");
+            } else {
+                showSnackbar("Department assigned successfully", "success");
+                
+                // Update local state
+                setCounselorsList(prev => prev.map(c => 
+                    c.user_id === selectedCounselorForDept.user_id 
+                        ? {...c, department_assigned: selectedDepartmentForCounselor} 
+                        : c
+                ));
+                
+                setOpenDepartmentModal(false);
+            }
+        } catch (err) {
+            console.error("Unexpected error in handleDepartmentSubmit:", err);
+            showSnackbar("An error occurred", "error");
+        }
+    };
+
     if (loading) {
         return <ApproveDenySkeleton />;
     }
@@ -1198,6 +1253,79 @@ export default function ApproveDenyPage() {
                         </div>
                     )}
                 </div>
+
+                {/* Counselor Department Assignments Section - Only visible to directors */}
+                {currentUser?.is_director && (
+                    <div className="bg-white rounded-xl shadow-md p-6 mt-8 mb-8">
+                        <div className="flex justify-between items-center mb-4">
+                            <h2 className="text-xl font-semibold text-gray-700">Counselor Department Assignments</h2>
+                            <div className="bg-white px-3 py-1.5 rounded-lg border border-gray-200">
+                                <span className="text-sm text-gray-600">Total: {counselorsList.filter(c => c.user_type === 'counselor' && !c.is_director).length}</span>
+                            </div>
+                        </div>
+                        
+                        {counselorsList.filter(c => c.user_type === 'counselor' && !c.is_director).length === 0 ? (
+                            <p className="text-gray-500 text-sm mt-4">No counselors found.</p>
+                        ) : (
+                            <div className="mt-4 overflow-x-auto">
+                                <table className="min-w-full divide-y divide-gray-200 table-auto">
+                                    <thead className="bg-gray-50">
+                                        <tr>
+                                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Counselor</th>
+                                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Current Department</th>
+                                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                            <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="bg-white divide-y divide-gray-200">
+                                        {counselorsList
+                                            .filter(c => c.user_type === 'counselor' && !c.is_director)
+                                            .map((counselor) => (
+                                                <tr key={counselor.user_id} className="hover:bg-gray-50 transition-colors">
+                                                    <td className="px-6 py-4 whitespace-nowrap">
+                                                        <div className="flex items-center space-x-3">
+                                                            <div className="w-10 h-10 bg-blue-100 text-blue-800 rounded-full flex items-center justify-center">
+                                                                <span className="text-lg font-semibold">{counselor.name?.charAt(0)}</span>
+                                                            </div>
+                                                            <div>
+                                                                <p className="font-medium">{counselor.name}</p>
+                                                                <p className="text-xs text-gray-500">{counselor.username || counselor.email}</p>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-6 py-4 whitespace-nowrap">
+                                                        {counselor.department_assigned ? (
+                                                            <span className="bg-blue-100 text-blue-800 py-1 px-2 rounded-lg text-xs font-medium">
+                                                                {counselor.department_assigned}
+                                                            </span>
+                                                        ) : (
+                                                            <span className="bg-gray-100 text-gray-800 py-1 px-2 rounded-lg text-xs font-medium">
+                                                                Not Assigned
+                                                            </span>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-6 py-4 whitespace-nowrap">
+                                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusBadgeClass(counselor.approval_status)}`}>
+                                                            {counselor.approval_status || 'pending'}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                                                        <button
+                                                            onClick={() => handleAssignDepartment(counselor)}
+                                                            className="bg-teal-500 hover:bg-teal-600 text-white px-3 py-1.5 rounded text-xs font-medium transition-colors"
+                                                            disabled={counselor.approval_status !== 'approved'}
+                                                        >
+                                                            Assign Department
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
 
             {/* Enhanced View Modal */}
@@ -1952,6 +2080,88 @@ export default function ApproveDenyPage() {
                             }}
                         >
                             Verify
+                        </Button>
+                    </div>
+                </Box>
+            </Modal>
+
+            {/* Department Assignment Modal */}
+            <Modal
+                open={openDepartmentModal}
+                onClose={() => setOpenDepartmentModal(false)}
+                aria-labelledby="department-assignment-modal"
+            >
+                <Box
+                    sx={{
+                        position: 'absolute',
+                        top: '50%',
+                        left: '50%',
+                        transform: 'translate(-50%, -50%)',
+                        bgcolor: 'white',
+                        borderRadius: '8px',
+                        boxShadow: 24,
+                        p: 4,
+                        width: 500,
+                        maxWidth: '90vw'
+                    }}
+                >
+                    <h2 className="text-xl font-bold text-gray-800 mb-4">Assign Department</h2>
+                    
+                    {selectedCounselorForDept && (
+                        <div className="mb-4">
+                            <p className="text-gray-600">
+                                Assign a department for <span className="font-semibold">{selectedCounselorForDept.name}</span>
+                            </p>
+                        </div>
+                    )}
+
+                    {/* Department Selection */}
+                    <FormControl fullWidth variant="outlined" className="mb-4">
+                        <InputLabel id="department-select-label">Department</InputLabel>
+                        <Select
+                            labelId="department-select-label"
+                            value={selectedDepartmentForCounselor}
+                            onChange={(e) => setSelectedDepartmentForCounselor(e.target.value)}
+                            label="Department"
+                        >
+                            <MenuItem value="">
+                                <em>Select a department</em>
+                            </MenuItem>
+                            {departmentOptions.map((dept) => (
+                                <MenuItem key={dept} value={dept}>
+                                    {dept}
+                                </MenuItem>
+                            ))}
+                        </Select>
+                    </FormControl>
+
+                    <div className="flex justify-end space-x-2 mt-4">
+                        <Button 
+                            variant="outlined" 
+                            onClick={() => setOpenDepartmentModal(false)}
+                            sx={{
+                                borderColor: '#d1d5db',
+                                color: '#4b5563'
+                            }}
+                        >
+                            Cancel
+                        </Button>
+                        <Button 
+                            variant="contained" 
+                            onClick={handleDepartmentSubmit}
+                            disabled={!selectedDepartmentForCounselor}
+                            sx={{
+                                bgcolor: '#14b8a6',
+                                '&:hover': {
+                                    bgcolor: '#0d9488'
+                                },
+                                '&.Mui-disabled': {
+                                    bgcolor: '#e5e7eb',
+                                    color: '#9ca3af'
+                                }
+                            }}
+                        >
+                            Assign
                         </Button>
                     </div>
                 </Box>
