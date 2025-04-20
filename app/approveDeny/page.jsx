@@ -5,7 +5,7 @@ import React, { useState, useEffect } from 'react';
 import Sidebar from "../components/dashboard components/sidebar";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { useRouter } from 'next/navigation';
-import { Modal, Box, Button, FormControl, InputLabel, Select, MenuItem, Typography, Snackbar, Alert, Skeleton, Paper, Divider, Grid } from '@mui/material';
+import { Modal, Box, Button, FormControl, InputLabel, Select, MenuItem, Typography, Snackbar, Alert, Skeleton, Paper, Divider, Grid, Switch, FormControlLabel } from '@mui/material';
 import { CheckCircle, Cancel } from "@mui/icons-material";
 
 export default function ApproveDenyPage() {
@@ -78,6 +78,8 @@ export default function ApproveDenyPage() {
     const [departmentOptions] = useState([
         'COECS', 'COED', 'COL', 'CAS', 'CBA', 'CCJE', 'SHTM'
     ]);
+    // New state for active/inactive filter
+    const [showActiveOnly, setShowActiveOnly] = useState('all'); // 'all', 'active', 'inactive'
 
     // Log initial state and after first render
     useEffect(() => {
@@ -987,27 +989,31 @@ export default function ApproveDenyPage() {
 
     // Function to submit department assignment
     const handleDepartmentSubmit = async () => {
-        if (!selectedCounselorForDept || !selectedDepartmentForCounselor) {
-            showSnackbar("Please select a department", "error");
+        if (!selectedCounselorForDept) {
+            showSnackbar("No counselor selected", "error");
             return;
         }
 
         try {
+            // If selectedDepartmentForCounselor is empty, it means we're setting the counselor as inactive
+            const departmentValue = selectedDepartmentForCounselor || null;
+            const actionType = departmentValue ? 'activated' : 'deactivated';
+
             const { error } = await supabase
                 .from('users')
-                .update({ department_assigned: selectedDepartmentForCounselor })
+                .update({ department_assigned: departmentValue })
                 .eq('user_id', selectedCounselorForDept.user_id);
 
             if (error) {
-                console.error("Error assigning department:", error);
-                showSnackbar("Failed to assign department", "error");
+                console.error("Error updating counselor status:", error);
+                showSnackbar(`Failed to set counselor as ${actionType}`, "error");
             } else {
-                showSnackbar("Department assigned successfully", "success");
+                showSnackbar(`Counselor ${actionType} successfully`, "success");
                 
                 // Update local state
                 setCounselorsList(prev => prev.map(c => 
                     c.user_id === selectedCounselorForDept.user_id 
-                        ? {...c, department_assigned: selectedDepartmentForCounselor} 
+                        ? {...c, department_assigned: departmentValue} 
                         : c
                 ));
                 
@@ -1015,6 +1021,50 @@ export default function ApproveDenyPage() {
             }
         } catch (err) {
             console.error("Unexpected error in handleDepartmentSubmit:", err);
+            showSnackbar("An error occurred", "error");
+        }
+    };
+
+    // Function to toggle active status
+    const handleToggleActiveStatus = async (counselor) => {
+        if (!currentUser?.is_director) {
+            showSnackbar("Only directors can change counselor active status", "error");
+            return;
+        }
+
+        try {
+            // If department is assigned, remove it to set inactive (deactivation happens directly)
+            // If no department, we'll open the department selection modal for activation
+            const isCurrentlyActive = Boolean(counselor.department_assigned);
+            
+            if (isCurrentlyActive) {
+                // Deactivate the counselor by removing department assignment
+                const { error } = await supabase
+                    .from('users')
+                    .update({ department_assigned: null })
+                    .eq('user_id', counselor.user_id);
+
+                if (error) {
+                    console.error("Error deactivating counselor:", error);
+                    showSnackbar("Failed to deactivate counselor", "error");
+                } else {
+                    showSnackbar("Counselor deactivated successfully", "success");
+                    
+                    // Update local state
+                    setCounselorsList(prev => prev.map(c => 
+                        c.user_id === counselor.user_id 
+                            ? {...c, department_assigned: null} 
+                            : c
+                    ));
+                }
+            } else {
+                // For activation, open the department assignment modal to select a department first
+                setSelectedCounselorForDept(counselor);
+                setSelectedDepartmentForCounselor(''); // Reset the selection
+                setOpenDepartmentModal(true);
+            }
+        } catch (err) {
+            console.error("Unexpected error in handleToggleActiveStatus:", err);
             showSnackbar("An error occurred", "error");
         }
     };
@@ -1259,8 +1309,21 @@ export default function ApproveDenyPage() {
                     <div className="bg-white rounded-xl shadow-md p-6 mt-8 mb-8">
                         <div className="flex justify-between items-center mb-4">
                             <h2 className="text-xl font-semibold text-gray-700">Counselor Department Assignments</h2>
-                            <div className="bg-white px-3 py-1.5 rounded-lg border border-gray-200">
-                                <span className="text-sm text-gray-600">Total: {counselorsList.filter(c => c.user_type === 'counselor' && !c.is_director).length}</span>
+                            <div className="flex items-center space-x-4">
+                                <div>
+                                    <select
+                                        className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
+                                        value={showActiveOnly}
+                                        onChange={(e) => setShowActiveOnly(e.target.value)}
+                                    >
+                                        <option value="all">All Counselors</option>
+                                        <option value="active">Active Only</option>
+                                        <option value="inactive">Inactive Only</option>
+                                    </select>
+                                </div>
+                                <div className="bg-white px-3 py-1.5 rounded-lg border border-gray-200">
+                                    <span className="text-sm text-gray-600">Total: {counselorsList.filter(c => c.user_type === 'counselor' && !c.is_director).length}</span>
+                                </div>
                             </div>
                         </div>
                         
@@ -1274,12 +1337,18 @@ export default function ApproveDenyPage() {
                                             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Counselor</th>
                                             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Current Department</th>
                                             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                            <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
+                                            <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Active</th>
+                                            <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody className="bg-white divide-y divide-gray-200">
                                         {counselorsList
                                             .filter(c => c.user_type === 'counselor' && !c.is_director)
+                                            .filter(c => {
+                                                if (showActiveOnly === 'active') return Boolean(c.department_assigned);
+                                                if (showActiveOnly === 'inactive') return !c.department_assigned;
+                                                return true; // 'all'
+                                            })
                                             .map((counselor) => (
                                                 <tr key={counselor.user_id} className="hover:bg-gray-50 transition-colors">
                                                     <td className="px-6 py-4 whitespace-nowrap">
@@ -1310,12 +1379,25 @@ export default function ApproveDenyPage() {
                                                         </span>
                                                     </td>
                                                     <td className="px-6 py-4 whitespace-nowrap text-center">
+                                                        <FormControlLabel
+                                                            control={
+                                                                <Switch
+                                                                    checked={Boolean(counselor.department_assigned)}
+                                                                    onChange={() => handleToggleActiveStatus(counselor)}
+                                                                    color="primary"
+                                                                    disabled={counselor.approval_status !== 'approved'}
+                                                                />
+                                                            }
+                                                            label=""
+                                                        />
+                                                    </td>
+                                                    <td className="px-6 py-4 whitespace-nowrap text-center">
                                                         <button
                                                             onClick={() => handleAssignDepartment(counselor)}
                                                             className="bg-teal-500 hover:bg-teal-600 text-white px-3 py-1.5 rounded text-xs font-medium transition-colors"
                                                             disabled={counselor.approval_status !== 'approved'}
                                                         >
-                                                            Assign Department
+                                                            {counselor.department_assigned ? 'Change Department' : 'Assign Department'}
                                                         </button>
                                                     </td>
                                                 </tr>
@@ -2105,13 +2187,32 @@ export default function ApproveDenyPage() {
                         maxWidth: '90vw'
                     }}
                 >
-                    <h2 className="text-xl font-bold text-gray-800 mb-4">Assign Department</h2>
+                    <h2 className="text-xl font-bold text-gray-800 mb-4">
+                        {selectedCounselorForDept?.department_assigned ? 'Change Department or Set Inactive' : 'Assign Department'}
+                    </h2>
                     
                     {selectedCounselorForDept && (
                         <div className="mb-4">
                             <p className="text-gray-600">
-                                Assign a department for <span className="font-semibold">{selectedCounselorForDept.name}</span>
+                                {selectedCounselorForDept.department_assigned 
+                                    ? `Change department for or deactivate ${selectedCounselorForDept.name}` 
+                                    : `Assign a department for ${selectedCounselorForDept.name}`}
                             </p>
+                            <div className="mt-2">
+                                <p className="text-sm text-gray-500">
+                                    <span className="font-semibold">Current Status:</span> {selectedCounselorForDept.department_assigned ? 'Active' : 'Inactive'}
+                                </p>
+                                {selectedCounselorForDept.department_assigned && (
+                                    <p className="text-sm text-gray-500">
+                                        <span className="font-semibold">Current Department:</span> {selectedCounselorForDept.department_assigned}
+                                    </p>
+                                )}
+                            </div>
+                            <div className="mt-3">
+                                <p className="text-sm text-gray-500">
+                                    * To set a counselor as inactive, clear the department selection
+                                </p>
+                            </div>
                         </div>
                     )}
 
@@ -2125,7 +2226,7 @@ export default function ApproveDenyPage() {
                             label="Department"
                         >
                             <MenuItem value="">
-                                <em>Select a department</em>
+                                <em>No Department (Set Inactive)</em>
                             </MenuItem>
                             {departmentOptions.map((dept) => (
                                 <MenuItem key={dept} value={dept}>
@@ -2149,7 +2250,6 @@ export default function ApproveDenyPage() {
                         <Button 
                             variant="contained" 
                             onClick={handleDepartmentSubmit}
-                            disabled={!selectedDepartmentForCounselor}
                             sx={{
                                 bgcolor: '#14b8a6',
                                 '&:hover': {
@@ -2161,7 +2261,7 @@ export default function ApproveDenyPage() {
                                 }
                             }}
                         >
-                            Assign
+                            Save
                         </Button>
                     </div>
                 </Box>
