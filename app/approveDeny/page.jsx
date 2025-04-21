@@ -80,6 +80,8 @@ export default function ApproveDenyPage() {
     ]);
     // New state for active/inactive filter
     const [showActiveOnly, setShowActiveOnly] = useState('all'); // 'all', 'active', 'inactive'
+    // New state for directors list
+    const [directors, setDirectors] = useState([]);
 
     // Log initial state and after first render
     useEffect(() => {
@@ -114,10 +116,19 @@ export default function ApproveDenyPage() {
                         
                     if (counselorsError) throw counselorsError;
                     
+                    // Fetch directors
+                    const { data: directorsData, error: directorsError } = await supabase
+                        .from("users")
+                        .select("*")
+                        .eq("is_director", true);
+                        
+                    if (directorsError) throw directorsError;
+                    
                     setRegistrants(registrantsData || []);
                     setFilteredRegistrants(registrantsData || []);
                     setCounselors(counselorsData || []);
                     setCounselorsList(counselorsData || []); // Set the counselors list
+                    setDirectors(directorsData || []); // Set the directors list
                     setLoading(false);
                     fetchCurrentUser();
                     fetchSecretaryAssignments();
@@ -558,8 +569,8 @@ export default function ApproveDenyPage() {
             errors.email = 'Email is required';
         } else if (!directorForm.email.includes('@')) {
             errors.email = 'Please enter a valid email';
-        // } else if (!directorForm.email.endsWith('@hnu.edu.ph')) {
-        //     errors.email = 'Email must be an HNU email address (@hnu.edu.ph)';
+        } else if (!directorForm.email.includes('@hnu.edu.ph')) {
+            errors.email = 'Email must be an HNU email address (@hnu.edu.ph)';
         }
         
         // Validate password
@@ -1251,12 +1262,6 @@ export default function ApproveDenyPage() {
                         <h2 className="text-xl font-semibold text-gray-700">Secretary Assignments</h2>
                         <div className="flex space-x-3">
                             <button
-                                onClick={handleCreateDirectorClick}
-                                className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1.5 rounded text-sm font-medium"
-                            >
-                                Create Director
-                            </button>
-                            <button
                                 onClick={handleAssignSecretary}
                                 className="bg-purple-500 hover:bg-purple-600 text-white px-3 py-1.5 rounded text-sm font-medium"
                             >
@@ -1300,6 +1305,74 @@ export default function ApproveDenyPage() {
                                     </div>
                                 );
                             })}
+                        </div>
+                    )}
+                </div>
+
+                {/* Directors Section */}
+                <div className="bg-white rounded-xl shadow-md p-6 mt-8 mb-8">
+                    <div className="flex justify-between items-center mb-4">
+                        <h2 className="text-xl font-semibold text-gray-700">System Directors</h2>
+                        {currentUser?.is_director && (
+                            <button
+                                onClick={handleCreateDirectorClick}
+                                className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1.5 rounded text-sm font-medium"
+                            >
+                                Create Director
+                            </button>
+                        )}
+                    </div>
+                    
+                    {directors.length === 0 ? (
+                        <p className="text-gray-500 text-sm mt-4">No directors found.</p>
+                    ) : (
+                        <div className="mt-4 overflow-x-auto">
+                            <table className="min-w-full divide-y divide-gray-200 table-auto">
+                                <thead className="bg-gray-50">
+                                    <tr>
+                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Department</th>
+                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact Number</th>
+                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="bg-white divide-y divide-gray-200">
+                                    {directors.map((director) => (
+                                        <tr key={director.user_id} className="hover:bg-gray-50 transition-colors">
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                <div className="flex items-center space-x-3">
+                                                    <div className="w-10 h-10 bg-blue-100 text-blue-800 rounded-full flex items-center justify-center">
+                                                        <span className="text-lg font-semibold">{director.name?.charAt(0)}</span>
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-medium">{director.name}</p>
+                                                        <p className="text-xs text-gray-500">{director.username}</p>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{director.email}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                {director.department_assigned ? (
+                                                    <span className="bg-blue-100 text-blue-800 py-1 px-2 rounded-lg text-xs font-medium">
+                                                        {director.department_assigned}
+                                                    </span>
+                                                ) : (
+                                                    <span className="bg-gray-100 text-gray-800 py-1 px-2 rounded-lg text-xs font-medium">
+                                                        Not Assigned
+                                                    </span>
+                                                )}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{director.contact_number}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusBadgeClass(director.approval_status)}`}>
+                                                    {director.approval_status || 'pending'}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
                         </div>
                     )}
                 </div>
