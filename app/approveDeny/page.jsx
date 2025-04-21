@@ -336,20 +336,20 @@ export default function ApproveDenyPage() {
         setSelectedCounselor('');
         setSelectedSecretary('');
         
-        // Fetch available counselors (approved counselors)
-        const { data: counselors, error: counselorError } = await supabase
+        // Fetch available directors (approved counselors with is_director = true)
+        const { data: directors, error: directorsError } = await supabase
             .from("users")
             .select("user_id, name")
-            .eq("user_type", "counselor")
+            .eq("is_director", true)
             .eq("approval_status", "approved");
             
-        if (counselorError) {
-            console.error("Error fetching counselors:", counselorError);
-            showSnackbar("Failed to load counselors", "error");
+        if (directorsError) {
+            console.error("Error fetching directors:", directorsError);
+            showSnackbar("Failed to load directors", "error");
             return;
         }
         
-        setAvailableCounselors(counselors || []);
+        setAvailableCounselors(directors || []);
         
         // Fetch available secretaries (approved secretaries)
         const { data: secretaries, error: secretariesError } = await supabase
@@ -1275,7 +1275,7 @@ export default function ApproveDenyPage() {
                     ) : (
                         <div className="mt-4">
                             {Object.entries(counselorAssignments).map(([counselorId, assignments]) => {
-                                const counselorName = assignments[0]?.counselor?.name || "Unknown Counselor";
+                                const counselorName = assignments[0]?.counselor?.name || "Unknown Director";
                                 return (
                                     <div key={counselorId} className="mb-6">
                                         <h3 className="text-lg font-medium text-gray-700 mb-2">
@@ -1696,24 +1696,24 @@ export default function ApproveDenyPage() {
                     <h2 className="text-xl font-bold text-gray-800 mb-4">Assign Secretary</h2>
                     
                     <p className="text-gray-600 mb-4">
-                        Select a counselor and a secretary to assign. The secretary will be responsible for managing the counselor's appointments and schedules.
+                        Select a director and a secretary to assign. The secretary will be responsible for managing the director's appointments and schedules.
                     </p>
 
-                    {/* Counselor Selection */}
+                    {/* Director Selection */}
                     <FormControl fullWidth variant="outlined" className="mb-4">
-                        <InputLabel id="counselor-select-label">Counselor</InputLabel>
+                        <InputLabel id="counselor-select-label">Director</InputLabel>
                         <Select
                             labelId="counselor-select-label"
                             value={selectedCounselor}
                             onChange={(e) => setSelectedCounselor(e.target.value)}
-                            label="Counselor"
+                            label="Director"
                         >
                             <MenuItem value="">
-                                <em>Select a counselor</em>
+                                <em>Select a director</em>
                             </MenuItem>
-                            {availableCounselors.map((counselor) => (
-                                <MenuItem key={counselor.user_id} value={counselor.user_id}>
-                                    {counselor.name}
+                            {availableCounselors.map((director) => (
+                                <MenuItem key={director.user_id} value={director.user_id}>
+                                    {director.name}
                                 </MenuItem>
                             ))}
                         </Select>
