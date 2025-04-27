@@ -147,13 +147,27 @@ export default function AppointmentCard() {
 
   // Helper function to convert time string to Date object
   const timeToDate = (timeStr, dateStr) => {
-    const [hours, minutes] = timeStr.split(':').map(Number);
-    const date = new Date(dateStr);
-    date.setHours(hours, minutes, 0, 0);
-    
-    // Log the conversion for debugging
-    console.log(`  - Converting ${dateStr} ${timeStr} to: ${date.toLocaleString()}`);
-    return date;
+    try {
+      // Use dayjs for consistent date handling
+      const dateObj = dayjs(dateStr);
+      if (!dateObj.isValid()) {
+        console.log(`  - Invalid date format: ${dateStr}`);
+        return null;
+      }
+      
+      const [hours, minutes] = timeStr.split(':').map(Number);
+      // Create a new dayjs object with the time values
+      const datetime = dateObj.hour(hours).minute(minutes).second(0);
+      
+      // Log the conversion for debugging
+      console.log(`  - Converting ${dateStr} ${timeStr} to: ${datetime.format('YYYY-MM-DD HH:mm:ss')}`);
+      
+      // Return as JavaScript Date for comparison
+      return datetime.toDate();
+    } catch (error) {
+      console.error(`Error converting time (${timeStr}) and date (${dateStr}):`, error);
+      return null;
+    }
   };
   
   // Function to check and complete expired individual appointments
@@ -223,17 +237,17 @@ export default function AppointmentCard() {
         console.log(`Checking appointment #${appointment.appointment_id}:`);
         console.log(`  - Status: ${appointment.status}`);
         console.log(`  - Schedule date: ${date}`);
-        console.log(`  - End time: ${end_time} (${appointmentEndTime.toLocaleString()})`);
+        console.log(`  - End time: ${end_time} (${appointmentEndTime ? appointmentEndTime.toLocaleString() : 'Invalid Date'})`);
         console.log(`  - Is schedule available: ${is_available}`);
         console.log(`  - Current time: ${now.toLocaleString()}`);
-        console.log(`  - Is expired: ${appointmentEndTime < now}`);
         
-        // Check if the appointment has ended
-        if (appointmentEndTime < now) {
+        // Check if appointmentEndTime is valid before comparing
+        if (appointmentEndTime && appointmentEndTime < now) {
           console.log(`  - EXPIRED: Appointment #${appointment.appointment_id} will be marked as completed`);
           expiredAppointmentIds.push(appointment.appointment_id);
         } else {
-          console.log(`  - NOT EXPIRED: Appointment #${appointment.appointment_id} has not ended yet`);
+          const reason = !appointmentEndTime ? 'invalid date' : 'not expired';
+          console.log(`  - NOT EXPIRED: Appointment #${appointment.appointment_id} has not ended yet (${reason})`);
         }
       }
       
