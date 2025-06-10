@@ -15,7 +15,8 @@ export default function Auth() {
   const [otp, setOtp] = useState("");
   const [isOtpModalVisible, setOtpModalVisible] = useState(false);
   const [isPendingModalVisible, setPendingModalVisible] = useState(false);
-  const [isForgotPasswordModalVisible, setForgotPasswordModalVisible] = useState(false);
+  const [isForgotPasswordModalVisible, setForgotPasswordModalVisible] =
+    useState(false);
   const [resetEmail, setResetEmail] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const router = useRouter();
@@ -36,42 +37,65 @@ export default function Auth() {
   const LoginSkeleton = () => (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-6 relative overflow-hidden">
       {/* Shimmer overlay */}
-      <Box 
-        sx={{ 
-          position: 'absolute',
+      <Box
+        sx={{
+          position: "absolute",
           top: 0,
           left: 0,
           right: 0,
           bottom: 0,
-          background: 'linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.8) 50%, rgba(255,255,255,0) 100%)',
-          animation: 'shimmer 2s infinite',
-          '@keyframes shimmer': {
-            '0%': { transform: 'translateX(-100%)' },
-            '100%': { transform: 'translateX(100%)' }
+          background:
+            "linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.8) 50%, rgba(255,255,255,0) 100%)",
+          animation: "shimmer 2s infinite",
+          "@keyframes shimmer": {
+            "0%": { transform: "translateX(-100%)" },
+            "100%": { transform: "translateX(100%)" },
           },
-          zIndex: 10
+          zIndex: 10,
         }}
       />
-      
+
       <div className="w-full max-w-md bg-white rounded-xl shadow-lg p-8">
         <div className="text-center mb-8">
-          <Skeleton variant="rectangular" width={180} height={50} sx={{ mx: 'auto', borderRadius: 1 }} />
-          <Skeleton variant="text" width={200} height={24} sx={{ mx: 'auto', mt: 2 }} />
+          <Skeleton
+            variant="rectangular"
+            width={180}
+            height={50}
+            sx={{ mx: "auto", borderRadius: 1 }}
+          />
+          <Skeleton
+            variant="text"
+            width={200}
+            height={24}
+            sx={{ mx: "auto", mt: 2 }}
+          />
         </div>
 
         <div className="space-y-5">
           <div>
             <Skeleton variant="text" width={80} height={20} />
-            <Skeleton variant="rectangular" height={48} sx={{ borderRadius: 1, mt: 1 }} />
+            <Skeleton
+              variant="rectangular"
+              height={48}
+              sx={{ borderRadius: 1, mt: 1 }}
+            />
           </div>
 
           <div>
             <Skeleton variant="text" width={100} height={20} />
-            <Skeleton variant="rectangular" height={48} sx={{ borderRadius: 1, mt: 1 }} />
+            <Skeleton
+              variant="rectangular"
+              height={48}
+              sx={{ borderRadius: 1, mt: 1 }}
+            />
           </div>
 
           <div className="pt-2">
-            <Skeleton variant="rectangular" height={48} sx={{ borderRadius: 8 }} />
+            <Skeleton
+              variant="rectangular"
+              height={48}
+              sx={{ borderRadius: 8 }}
+            />
           </div>
 
           <div className="flex items-center my-4">
@@ -84,10 +108,19 @@ export default function Auth() {
             </div>
           </div>
 
-          <Skeleton variant="rectangular" height={48} sx={{ borderRadius: 8 }} />
+          <Skeleton
+            variant="rectangular"
+            height={48}
+            sx={{ borderRadius: 8 }}
+          />
 
           <div className="mt-6 text-center">
-            <Skeleton variant="text" width={250} height={20} sx={{ mx: 'auto' }} />
+            <Skeleton
+              variant="text"
+              width={250}
+              height={20}
+              sx={{ mx: "auto" }}
+            />
             <div className="flex justify-center gap-2 mt-2">
               <Skeleton variant="text" width={120} height={20} />
               <Skeleton variant="text" width={120} height={20} />
@@ -188,7 +221,7 @@ export default function Auth() {
       alert("Please enter your email address");
       return;
     }
-    
+
     setLoading(true);
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
@@ -222,12 +255,12 @@ export default function Auth() {
 
     const userType = data?.user_type;
     const userStatus = data?.approval_status;
-    
+
     if (userStatus === "pending" || userStatus === "denied") {
       setPendingModalVisible(true);
       return;
     }
-    
+
     if (userType === "counselor") {
       router.push("/dashboard/counselor");
     } else if (userType === "secretary") {
@@ -261,6 +294,11 @@ export default function Auth() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="email@address.com"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !loading) {
+                  signInWithEmail();
+                }
+              }}
             />
           </div>
 
@@ -276,9 +314,14 @@ export default function Auth() {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Password"
                 style={{
-                  'WebkitTextSecurity': showPassword ? 'none' : 'disc',
-                  'appearance': 'none',
-                  'WebkitAppearance': 'none',
+                  WebkitTextSecurity: showPassword ? "none" : "disc",
+                  appearance: "none",
+                  WebkitAppearance: "none",
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !loading) {
+                    signInWithEmail();
+                  }
                 }}
               />
               <button
@@ -288,14 +331,32 @@ export default function Auth() {
                 aria-label={showPassword ? "Hide password" : "Show password"}
               >
                 {showPassword ? (
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M3.707 2.293a1 1 0 00-1.414 1.414l14 14a1 1 0 001.414-1.414l-1.473-1.473A10.014 10.014 0 0019.542 10C18.268 5.943 14.478 3 10 3a9.958 9.958 0 00-4.512 1.074l-1.78-1.781zm4.261 4.26l1.514 1.515a2.003 2.003 0 012.45 2.45l1.514 1.514a4 4 0 00-5.478-5.478z" clipRule="evenodd" />
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-5 w-5"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M3.707 2.293a1 1 0 00-1.414 1.414l14 14a1 1 0 001.414-1.414l-1.473-1.473A10.014 10.014 0 0019.542 10C18.268 5.943 14.478 3 10 3a9.958 9.958 0 00-4.512 1.074l-1.78-1.781zm4.261 4.26l1.514 1.515a2.003 2.003 0 012.45 2.45l1.514 1.514a4 4 0 00-5.478-5.478z"
+                      clipRule="evenodd"
+                    />
                     <path d="M12.454 16.697L9.75 13.992a4 4 0 01-3.742-3.741L2.335 6.578A9.98 9.98 0 00.458 10c1.274 4.057 5.065 7 9.542 7 .847 0 1.669-.105 2.454-.303z" />
                   </svg>
                 ) : (
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-5 w-5"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                  >
                     <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
-                    <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
+                    <path
+                      fillRule="evenodd"
+                      d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z"
+                      clipRule="evenodd"
+                    />
                   </svg>
                 )}
               </button>
@@ -311,7 +372,15 @@ export default function Auth() {
             </div>
           </div>
 
-          <div className="pt-2">
+          <div
+            className="pt-2"
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !loading) {
+                signInWithEmail();
+              }
+            }}
+            tabIndex={0} // Makes the div focusable so it can receive keyboard events
+          >
             <button
               onClick={signInWithEmail}
               disabled={loading}
@@ -346,9 +415,9 @@ export default function Auth() {
                 href="/register/counselor"
                 className="text-green-600 hover:text-green-800 font-medium"
               >
-                Sign up as a counselor{" "} 
+                Sign up as a counselor{" "}
               </LoadingButton>
-              <LoadingButton 
+              <LoadingButton
                 href="/register/secretary"
                 className="text-green-600 hover:text-green-800 font-medium"
               >
@@ -409,7 +478,9 @@ export default function Auth() {
               Account Pending Approval
             </h2>
             <p className="text-gray-600 mb-4">
-              Your account is currently pending or denied and needs director approval. You'll receive an email once your account has been approved.
+              Your account is currently pending or denied and needs director
+              approval. You'll receive an email once your account has been
+              approved.
             </p>
 
             <div className="flex justify-end mt-6">
@@ -431,7 +502,8 @@ export default function Auth() {
               Reset Your Password
             </h2>
             <p className="text-gray-600 mb-4">
-              Enter your email address, and we'll send you instructions to reset your password.
+              Enter your email address, and we'll send you instructions to reset
+              your password.
             </p>
 
             <input

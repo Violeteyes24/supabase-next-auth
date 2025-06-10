@@ -1,53 +1,28 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# Mental Help
 
-## Getting Started
+Welcome to the **Mental Help** project, a web application designed to provide resources and support for mental health.
 
-First, run the development server:
+## Live Site
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+You can access the deployed application at [mentalhelp.fun](https://mentalhelp.fun).
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## User Roles
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+The application supports the following user roles:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- **Director**
+- **Counselor**
+- **Secretary**
 
-## Learn More
+## Features
 
-To learn more about Next.js, take a look at the following resources:
+- **Dashboard Analytics**: Provides reliable metrics such as the number of students, appointments, and mood tracker usage.
+- **Profile Management**: Allows users to manage their profiles effectively.
+- **Reports**: Offers detailed insights beyond analytics, including user engagement with the chatbot, mood sentiment analysis, and user demographics.
+- **Appointment Management**: Facilitates scheduling for individual and group sessions in the physical guidance office.
+- **Messaging**: Enables communication between students and counselors, as well as between secretaries and students.
+- **Notifications**: Allows the Director to send notifications to all user roles.
+- **Approve/Deny**: A special privilege for the Director to approve or deny registrants.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
-
-## GitHub Work Flow
-
-- git add .                         # Stage all changes
-- git commit -m "First attempt, Register, Sign In and Middleware"  # Commit with a message
-- git remote add origin https://github.com/Violeteyes24/supabase-next-auth.git  # Add the remote repository
-- git push -u origin main           # Push changes to the main branch
-
-``` 
-git push -u origin main --force
-```
-
-⚠️ Warning: Force pushing will overwrite the remote repository's current state, potentially deleting others' work. Use it with caution.
-
-## Tutorial Hell Links :>
-
-- Supabase-next-auth: https://www.youtube.com/watch?v=dhXjHGklaZc&t=2s
