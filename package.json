@@ -28,7 +28,7 @@
     "html2canvas": "^1.4.1",
     "jspdf": "^3.0.0",
     "langchain": "^0.3.13",
-    "next": "^15.1.6",
+    "next": "15.1.11",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-icons": "^5.4.0",
